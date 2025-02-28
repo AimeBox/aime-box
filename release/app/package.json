@@ -1,0 +1,33 @@
+{
+  "name": "electron-react-boilerplate",
+  "version": "0.1.0",
+  "description": "A foundation for scalable desktop apps",
+  "license": "MIT",
+  "author": {
+    "name": "Electron React Boilerplate Maintainers",
+    "email": "electronreactboilerplate@gmail.com",
+    "url": "https://github.com/electron-react-boilerplate"
+  },
+  "main": "./dist/main/main.js",
+  "scripts": {
+    "rebuild": "node -r ts-node/register ../../.erb/scripts/electron-rebuild.js",
+    "postinstall": "npm run rebuild && npm run link-modules",
+    "link-modules": "node -r ts-node/register ../../.erb/scripts/link-modules.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.3.3",
+    "@lancedb/lancedb": "^0.12.0",
+    "@langchain/community": "^0.3.29",
+    "@langchain/core": "^0.3.39",
+    "apache-arrow": "^17.0.0",
+    "better-sqlite3": "^9.6.0",
+    "langchain": "^0.3.15",
+    "playwright": "^1.50.1",
+    "sharp": "^0.33.5",
+    "sherpa-onnx-node": "^1.10.42",
+    "speaker": "^0.5.5",
+    "sqlite3": "^5.1.7",
+    "typeorm": "^0.3.20",
+    "vm2": "^3.9.19"
+  }
+}

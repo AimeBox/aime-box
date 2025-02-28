@@ -1,0 +1,117 @@
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+
+import { ChatOptions } from '@/entity/Chat';
+import { BaseAgent } from '../BaseAgent';
+import { z } from 'zod';
+import { FormSchema } from '@/types/form';
+import { t } from 'i18next';
+import { Embeddings } from '@langchain/core/embeddings';
+import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
+import { ToolRunnableConfig } from '@langchain/core/tools';
+import { IterableReadableStream } from '@langchain/core/utils/stream';
+import { getProviderModel } from '@/main/utils/providerUtil';
+import settingsManager from '@/main/settings';
+import { RunnableConfig } from '@langchain/core/runnables';
+import { getChatModel } from '@/main/llm';
+import { ChatMessage } from '@langchain/core/messages';
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+
+export class TranslateAgent extends BaseAgent {
+  name: string = 'Translate';
+
+  description: string = '翻译专家,将文本翻译成目标语言';
+
+  tags: string[] = ['work'];
+
+  hidden: boolean = false;
+
+  schema = z.object({
+    text: z.string().describe('translate text'),
+    target_language: z
+      .enum([t('language.english'), t('language.chinese')])
+      .describe('target language'),
+    context: z
+      .optional(z.string())
+      .describe('translate text context,to better understand the text'),
+  });
+
+  configSchema: FormSchema[] = [
+    {
+      label: t('model'),
+      field: 'model',
+      component: 'ProviderSelect',
+      componentProps: {
+        type: 'llm',
+      },
+    },
+    {
+      label: t('prompt'),
+      field: 'prompt',
+      component: 'InputTextArea',
+    },
+  ];
+
+  config: any = {
+    model: '',
+    prompt: '',
+  };
+
+  llm: BaseChatModel;
+
+  constructor(options: {
+    provider: string;
+    model: string;
+    options: ChatOptions;
+  }) {
+    super(options);
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager?: CallbackManagerForToolRun,
+    config?: RunnableConfig,
+  ): Promise<any> {
+    const stream = await this.stream(input, config);
+    let output = '';
+    for await (const chunk of stream) {
+      output += chunk;
+    }
+    return output;
+  }
+
+  async stream(
+    input: z.infer<typeof this.schema> | string,
+    options?: RunnableConfig,
+  ): Promise<IterableReadableStream<any>> {
+    const { provider, modelName } =
+      getProviderModel(this.config.model) ??
+      getProviderModel(settingsManager.getSettings().defaultLLM);
+    this.llm = await getChatModel(provider, modelName);
+    const that = this;
+    const prompt_template = ChatPromptTemplate.fromMessages([
+      ['user', this.config.prompt],
+    ]);
+    let text;
+    let target_language;
+    let context = '';
+    if (typeof input === 'string') {
+      text = input;
+    } else {
+      text = input.text;
+      target_language = input.target_language;
+      context = input.context;
+    }
+
+    async function* generateStream() {
+      const stream = await prompt_template
+        .pipe(that.llm)
+        .stream({ text, target_language, context });
+      for await (const chunk of stream) {
+        yield chunk.content;
+      }
+    }
+
+    const stream = IterableReadableStream.fromAsyncGenerator(generateStream());
+    return stream;
+  }
+}

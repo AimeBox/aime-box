@@ -1,0 +1,137 @@
+{
+  "embeddings": [
+    {
+      "id": "bge-m3",
+      "type": "huggingface",
+      "repo": "Xenova/bge-m3",
+      "download": "https://huggingface.co/Xenova/bge-m3"
+    },
+    {
+      "id": "bge-large-zh-v1.5",
+      "type": "huggingface",
+      "repo": "Xenova/bge-large-zh-v1.5",
+      "download": "https://huggingface.co/Xenova/bge-large-zh-v1.5"
+    },
+    {
+      "id": "nomic-embed-text-v1.5",
+      "type": "huggingface",
+      "repo": "nomic-ai/nomic-embed-text-v1.5",
+      "download": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5"
+    }
+  ],
+  "reranker": [
+    {
+      "id": "bge-reranker-large",
+      "type": "huggingface",
+      "repo": "Xenova/bge-reranker-large",
+      "download": "https://huggingface.co/Xenova/bge-reranker-large"
+    },
+    {
+      "id": "bge-reranker-base",
+      "type": "huggingface",
+      "repo": "Xenova/bge-reranker-base",
+      "download": "https://huggingface.co/Xenova/bge-reranker-base"
+    },
+    {
+      "id": "jina-reranker-v2-base-multilingual",
+      "type": "huggingface",
+      "repo": "jinaai/jina-reranker-v2-base-multilingual",
+      "download": "https://huggingface.co/jinaai/jina-reranker-v2-base-multilingual"
+    }
+  ],
+  "ocr": [
+    {
+      "id": "RapidOCR-json_v0.2.0",
+      "type": "github",
+      "download": "https://github.com/hiroi-sora/RapidOCR-json/releases/download/v0.2.0/RapidOCR-json_v0.2.0.7z"
+    }
+  ],
+  "tts": [
+    {
+      "id": "kokoro-multi-lang-v1_0",
+      "type": "github",
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2"
+    },
+    {
+      "id": "matcha-icefall-zh-baker",
+      "type": "github",
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/matcha-icefall-zh-baker.tar.bz2"
+    },
+    {
+      "id": "vits-icefall-zh-aishell3",
+      "type": "github",
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-icefall-zh-aishell3.tar.bz2"
+    },
+    {
+      "id": "vits-melo-tts-zh_en",
+      "type": "github",
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-melo-tts-zh_en.tar.bz2"
+    }
+  ],
+  "stt": [
+    {
+      "id": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
+      "type": "github",
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2"
+    },
+    {
+      "id": "sherpa-onnx-whisper-large-v3",
+      "type": "huggingface",
+      "repo": "csukuangfj/sherpa-onnx-whisper-large-v3",
+      "download": "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-large-v3"
+    },
+    {
+      "id": "sherpa-onnx-whisper-small",
+      "type": "huggingface",
+      "repo": "csukuangfj/sherpa-onnx-whisper-small",
+      "download": "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small"
+    }
+  ],
+  "vad": [
+    {
+      "id": "silero_vad",
+      "type": "github",
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+    }
+  ],
+  "speaker_diarization": [
+    {
+      "id": "sherpa-onnx-pyannote-segmentation-3-0",
+      "type": "github",
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2"
+    },
+    {
+      "id": "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k",
+      "type": "github",
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx"
+    }
+  ],
+  "clip": [
+    {
+      "id": "chinese-clip-vit-large-patch14-336px",
+      "repo": "Xenova/chinese-clip-vit-large-patch14-336px",
+      "type": "huggingface",
+      "download": "https://huggingface.co/Xenova/chinese-clip-vit-large-patch14-336px"
+    },
+    {
+      "id": "clip-vit-base-patch32",
+      "repo": "Xenova/clip-vit-base-patch32",
+      "type": "huggingface",
+      "download": "https://huggingface.co/Xenova/clip-vit-base-patch32"
+    },
+    {
+      "id": "jina-clip-v2",
+      "repo": "jinaai/jina-clip-v2",
+      "type": "huggingface",
+      "download": "https://huggingface.co/jinaai/jina-clip-v2"
+    }
+  ],
+  "other": [
+    {
+      "id": "rmbg-1.4",
+      "repo": "briaai/RMBG-1.4",
+      "type": "huggingface",
+      "download": "https://huggingface.co/briaai/RMBG-1.4"
+    }
+  ]
+}

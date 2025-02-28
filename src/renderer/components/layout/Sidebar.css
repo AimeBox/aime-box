@@ -1,0 +1,17 @@
+/* .ant-menu-item{
+  @apply !bg-blue-300
+} */
+
+.profile-item {
+  @apply flex justify-center
+
+
+}
+.profile-item > .ant-menu-submenu-title{
+  height: 64px
+}
+
+.ant-menu-submenu-title{
+  height: 64px
+}
+
