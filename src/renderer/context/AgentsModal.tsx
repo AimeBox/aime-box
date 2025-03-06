@@ -49,7 +49,7 @@ export const AgentsModal = React.forwardRef(
     };
 
     return (
-      <Modal title={t('tool.add_tool')} {...props}>
+      <Modal title={t('agent.add_agent')} {...props}>
         <Space direction="vertical" className="w-full">
           <Input.Search
             placeholder="input search"
@@ -65,7 +65,7 @@ export const AgentsModal = React.forwardRef(
                 items={[
                   {
                     key: 'all',
-                    label: <span>{t('tools.show_all')}</span>,
+                    label: <span>{t('agent.show_all')}</span>,
                     className: '!h-8 !flex !items-center',
                   },
                 ]}

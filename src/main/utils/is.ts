@@ -83,6 +83,7 @@ export function isUrl(path: string): boolean {
   const reg = /^http(s)?:\/\/([\w-]+\.)+[\w-]+(\/[\w- ./?%&=]*)?/;
   return reg.test(path);
 }
+
 export function isEmpty<T = unknown>(val: T): val is T {
   if (isArray(val) || isString(val)) {
     return val.length === 0;

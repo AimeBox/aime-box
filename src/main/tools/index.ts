@@ -32,7 +32,7 @@ import {
   GooglePlacesAPIParams,
 } from '@langchain/community/tools/google_places';
 import { FormSchema } from '../../types/form';
-import { isArray, isObject, isString } from '../utils/is';
+import { isArray, isObject, isString, isUrl } from '../utils/is';
 import * as path from 'path';
 import { RegisterToolSchema } from './RegisterTool';
 import { SocialMediaSearch } from './SocialMediaSearch';
@@ -59,6 +59,8 @@ import { WebSearchTool } from './WebSearchTool';
 import { ChartjsTool } from './Chartjs';
 import { ZodObject } from 'zod';
 import { BaseTool } from './BaseTool';
+import { KnowledgeBaseQuery } from './KnowledgeBaseQuery';
+import fs from 'fs';
 
 export interface ToolInfo {
   name: string;
@@ -67,6 +69,7 @@ export interface ToolInfo {
   parameters: object | undefined;
   tags?: string[] | undefined;
   officialLink?: string | undefined;
+  configSchema?: FormSchema[] | undefined;
 }
 
 export class ToolsManager {
@@ -157,6 +160,7 @@ export class ToolsManager {
         schema: schema,
         parameters: x.parameters,
         officialLink: x.tool['officialLink'],
+        configSchema: x.tool.configSchema,
       } as ToolInfo;
     });
     return res;
@@ -280,7 +284,10 @@ export class ToolsManager {
       openAIApiKey: 'NULL', // Default
     });
     await this.registerTool(RapidOcrTool);
-    await this.registerTool(PythonInterpreterTool, { pythonPath: '' });
+    await this.registerTool(PythonInterpreterTool, {
+      pythonPath: '',
+      keepVenv: false,
+    });
 
     await this.registerTool(GoogleRoutesAPI, {
       apiKey: 'NULL',
@@ -334,6 +341,7 @@ export class ToolsManager {
       model: 'matcha-icefall-zh-baker@local',
     });
     await this.registerTool(WebSearchTool);
+    await this.registerTool(KnowledgeBaseQuery);
   };
 
   public update = async (toolName: string, arg: any) => {
@@ -376,6 +384,10 @@ export class ToolsManager {
     } else {
       if (res.startsWith('data:image/')) {
         return `![image](${res})`;
+      } else if (isUrl(res)) {
+        return `![](${res})`;
+      } else if (fs.existsSync(res)) {
+        return `![](file://${res.replace(/\\/g, '/')})`;
       }
       return res;
     }
@@ -388,13 +400,19 @@ export class ToolsManager {
   ) => {
     const tool = this.tools.find((x) => x.name == toolName);
     if (tool) {
-      const res = await tool.tool.stream(arg);
       let output = '';
-      for await (const chunk of res) {
-        output += chunk;
+      const toolOutputFormat = tool.tool.outputFormat ?? 'markdown';
+      if (toolOutputFormat == 'markdown') {
+        const res = await tool.tool.stream(arg);
+        for await (const chunk of res) {
+          output += chunk;
+        }
+      } else if (toolOutputFormat == 'json') {
+        output = await tool.tool.invoke(arg);
       }
 
       console.log(`tool:${toolName}`, output);
+
       if (outputFormat == 'default') return output;
       else if (outputFormat == 'markdown') {
         return this.toMarkdown(output);

@@ -55,6 +55,7 @@ export enum KnowledgeBaseSourceType {
   Web = 'web',
   File = 'file',
   Folder = 'folder',
+  Text = 'text',
 }
 @Entity('knowledgebase_item')
 export class KnowledgeBaseItem {

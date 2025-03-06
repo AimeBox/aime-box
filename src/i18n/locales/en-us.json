@@ -73,7 +73,14 @@
     "add_source": "Add",
     "import": "Import",
     "chunkSize": "Chunk Size",
-    "enable": "Enable"
+    "enable": "Enable",
+    "action": "Action",
+    "state": "State",
+    "name": "Name",
+    "delete": "Delete",
+    "description": "Description",
+    "tags": "Tags",
+    "restart": "Restart"
   },
   "prompts": {
     "create_prompt": "Create Prompt"
@@ -82,7 +89,10 @@
     "chat_options": {
       "tools": "tools"
     },
-    "export": "Export"
+    "export": "Export",
+    "knowledgebase": "KnowledgeBase",
+    "tool": "Tools",
+    "fileChat": "File Chat"
   },
   "language": {
     "english": "English",
@@ -92,5 +102,14 @@
   "paste": "Paste",
   "cut": "Cut",
   "selectAll": "Select All",
-  "all": "All"
+  "all": "All",
+  "agent": {
+    "config": "Agent Config",
+    "base_config": "Base Config"
+  },
+  "knowledgebase": {
+    "create_knowledgebase": "Create KnowledgeBase",
+    "edit_knowledgebase": "Edit KnowledgeBase",
+    "select_knowledgebase": "Select KnowledgeBase"
+  }
 }

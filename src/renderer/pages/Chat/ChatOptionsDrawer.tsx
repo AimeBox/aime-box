@@ -21,6 +21,7 @@ import { FaBook, FaTools, FaTrash, FaTrashAlt } from 'react-icons/fa';
 import { GlobalContext } from '@/renderer/context/GlobalContext';
 import { FaRegMessage } from 'react-icons/fa6';
 import { Prompt } from '@/entity/Prompt';
+import { KnowledgeBase } from '@/entity/KnowledgeBase';
 
 export interface ChatOptionsDrawerProps extends DrawerProps {
   value?: ChatOptions;
@@ -28,9 +29,9 @@ export interface ChatOptionsDrawerProps extends DrawerProps {
 }
 
 export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
-  const { agents, tools, prompts } = useContext(GlobalContext);
+  const { agents, tools, prompts, knowledgeBase } = useContext(GlobalContext);
   const [currentTab, setCurrentTab] = useState<string>('base');
-
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [insideValue, setInsideValue] = useState<ChatOptions>(props?.value);
 
   const items: TabsProps['items'] = useMemo(
@@ -53,6 +54,12 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
   const openAgentModal = () => {
     agents.open(props?.value?.agentNames || []);
   };
+  const openKnowledgeBaseModal = () => {
+    knowledgeBase.open(props?.value?.kbList || []);
+    knowledgeBase.onSelect = (kbs) => {
+      onChange({ kbList: kbs.map((kb) => kb.id) });
+    };
+  };
 
   const onChange = (value: Record<string, any>) => {
     props?.onChange?.(value);
@@ -72,7 +79,14 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
 
   useEffect(() => {
     setInsideValue(props?.value);
+    console.log(props?.value);
   }, [props?.value]);
+
+  useEffect(() => {
+    const res = window.electron.db.getMany<KnowledgeBase>('knowledgebase', {});
+    setKnowledgeBases(res);
+  }, []);
+
   return (
     <ConfigProvider
       drawer={{
@@ -178,6 +192,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                       <Tag
                         key={toolName}
                         closable
+                        color="processing"
                         rootClassName="p-2 text-base rounded-xl gap-2 cursor-pointer items-center"
                         onClose={() => {
                           const _selectToolNames =
@@ -188,7 +203,6 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                             toolNames: _selectToolNames,
                           });
                         }}
-                        closeIcon={<FaTrashAlt size={14} />}
                         onClick={() => {}}
                         className="flex flex-row justify-between items-center"
                       >
@@ -228,6 +242,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                       <Tag
                         key={agentName}
                         closable
+                        color="processing"
                         rootClassName="p-2 text-base rounded-xl gap-2 cursor-pointer items-center"
                         onClose={() => {
                           const _selectAgentlNames =
@@ -246,19 +261,55 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                   </div>
                 </div>
 
-                <div className="bg-gray-100 rounded-2xl">
-                  <div className="flex flex-row justify-between p-4">
+                <div className="flex flex-col gap-2 p-4 bg-gray-100 rounded-2xl">
+                  <div className="flex flex-row justify-between">
                     <div className="flex flex-row gap-2 items-center">
                       <FaBook></FaBook>
                       <strong>{t('chat.chat_options.knowledge_base')}</strong>
                     </div>
                     <div>
-                      <Button size="small" type="text">
+                      <Button
+                        size="small"
+                        type="text"
+                        onClick={openKnowledgeBaseModal}
+                      >
                         + {t('add')}
                       </Button>
                     </div>
                   </div>
-                  <div className="flex flex-col"></div>
+                  <div className="flex flex-row flex-wrap gap-2">
+                    {knowledgeBases
+                      .filter((x) => props?.value?.kbList?.includes(x.id))
+                      .map((kb) => {
+                        return (
+                          <Tag
+                            key={kb.id}
+                            closable
+                            color="processing"
+                            rootClassName="p-2 text-base rounded-xl gap-2 cursor-pointer items-center"
+                            onClose={() => {
+                              const _selectKbIds = props?.value?.kbList.filter(
+                                (t) => t !== kb.id,
+                              );
+                              onChange({
+                                kbList: _selectKbIds,
+                              });
+                            }}
+                            className="flex flex-row justify-between items-center"
+                          >
+                            <div className="flex flex-col min-w-40 max-w-60">
+                              <div className="flex flex-row gap-2 items-center">
+                                <FaBook></FaBook>
+                                {kb.name}
+                              </div>
+                              <div className="overflow-hidden text-xs text-gray-500 whitespace-nowrap text-ellipsis">
+                                {kb.description}
+                              </div>
+                            </div>
+                          </Tag>
+                        );
+                      })}
+                  </div>
                 </div>
                 <div className="bg-gray-100 rounded-2xl">
                   <div className="flex flex-row justify-between p-4">

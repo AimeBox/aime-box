@@ -15,7 +15,6 @@ import fs from 'fs';
 // import sherpa_onnx from 'sherpa-onnx-node';
 import Speaker from 'speaker';
 import { getModelsPath, getTmpPath } from '../utils/path';
-import { Worker } from 'worker_threads';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface TextToSpeechParameters extends ToolParams {
@@ -32,46 +31,16 @@ export class TextToSpeech extends StructuredTool {
     return 'TextToSpeech';
   }
 
-  name: string;
+  name: string = 'text_to_speech';
 
-  description: string;
+  description: string = 'text to speech';
 
-  model: string;
-
-  worker: Worker;
-
-  // sherpa_onnx: any;
+  model: string = 'matcha-icefall-zh-baker@local';
 
   constructor(params?: TextToSpeechParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'text_to_speech',
-    });
 
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'text to speech',
-    });
-    Object.defineProperty(this, 'model', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'matcha-icefall-zh-baker@local',
-    });
     this.model = params?.model;
-    // Function('return import("sherpa-onnx-node")')()
-    //   .then((mod: any) => {
-    //     this.sherpa_onnx = mod.default;
-    //     return null;
-    //   })
-    //   .catch((err) => {
-    //     throw err;
-    //   });
   }
 
   public async sherpa_onnx(): Promise<any> {
@@ -104,7 +73,7 @@ export class TextToSpeech extends StructuredTool {
       enableExternalBuffer: false,
     });
     if (audio.sampleRate) {
-      await tts.play(audio);
+      await this.play(audio);
       return 'success';
     } else {
       return 'tts failed';
@@ -242,36 +211,4 @@ export class TextToSpeech extends StructuredTool {
       console.error(error);
     }
   };
-
-  async createOfflineTts() {
-    const sherpa_onnx = Function('return import("sherpa-onnx-node")')();
-
-    const sherpa_onnxapi = await sherpa_onnx;
-    const sxxx = sherpa_onnxapi.default;
-    const model = 'vits-icefall-zh-aishell3';
-    const phoneFst = path.join(getModelsPath(), 'tts', `${model}/phone.fst`);
-    const dateFst = path.join(getModelsPath(), 'tts', `${model}/date.fst`);
-    const numberFst = path.join(getModelsPath(), 'tts', `${model}/number.fst`);
-    const new_heteronymFst = path.join(
-      getModelsPath(),
-      'tts',
-      `${model}/new_heteronym.fst`,
-    );
-    const config = {
-      model: {
-        vits: {
-          model: path.join(getModelsPath(), 'tts', `${model}/model.onnx`),
-          tokens: path.join(getModelsPath(), 'tts', `${model}/tokens.txt`),
-          lexicon: path.join(getModelsPath(), 'tts', `${model}/lexicon.txt`),
-        },
-        debug: true,
-        numThreads: 1,
-        provider: 'cpu',
-      },
-      maxNumStences: 1,
-      ruleFsts: `${phoneFst},${dateFst},${numberFst},${new_heteronymFst}`,
-      ruleFars: path.join(getModelsPath(), 'tts', `${model}/rule.far`),
-    };
-    return new sxxx.OfflineTts(config);
-  }
 }

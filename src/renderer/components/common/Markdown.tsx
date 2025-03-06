@@ -31,7 +31,7 @@ const production = {
   Fragment: prod.Fragment,
   jsx: prod.jsx,
   jsxs: prod.jsxs,
-  createElement: React.createElement,
+  //createElement: React.createElement,
 };
 export function Markdown(props: MarkdownProps) {
   const [renderedContent, setRenderedContent] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export function Markdown(props: MarkdownProps) {
 
       .use(rehypeMath)
       .use(rehypeKatex)
-      .use(rehypeSanitize)
+      //.use(rehypeSanitize)
       .use(rehypeHighlight)
 
       .use(rehypeMermaid, { strategy: 'img-svg' })

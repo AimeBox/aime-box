@@ -5,6 +5,7 @@ import {
   ipcRenderer,
   BrowserWindow,
   app,
+  IpcMainInvokeEvent,
 } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
 import { concat } from '@langchain/core/utils/stream';
@@ -47,6 +48,8 @@ import { agentManager } from '../agents';
 import { getProviderModel } from '../utils/providerUtil';
 import { Serialized } from '@langchain/core/dist/load/serializable';
 import { notificationManager } from '../app/NotificationManager';
+import { BaseTool } from '../tools/BaseTool';
+import { KnowledgeBaseQuery } from '../tools/KnowledgeBaseQuery';
 // const repository = dbManager.dataSource.getRepository(Chat);
 
 export class ChatManager {
@@ -88,8 +91,13 @@ export class ChatManager {
     );
     ipcMain.handle(
       'chat:update',
-      (event, chatId: string, title: string, model: string) =>
-        this.updateChat(chatId, title, model),
+      (
+        event,
+        chatId: string,
+        title: string,
+        model: string,
+        options?: ChatOptions,
+      ) => this.updateChat(event, chatId, title, model, options),
     );
     ipcMain.on(
       'chat:chat-resquest',
@@ -194,14 +202,31 @@ export class ChatManager {
     return res;
   }
 
-  public async updateChat(chatId: string, title: string, model: string) {
+  public async updateChat(
+    event: IpcMainInvokeEvent,
+    chatId: string,
+    title: string,
+    model: string,
+    options?: ChatOptions,
+  ) {
     const _chat = await this.chatRepository.findOne({
       where: { id: chatId },
     });
     if (_chat) {
-      _chat.title = title;
-      _chat.model = model;
+      if (title) {
+        if (_chat.title != title) {
+          _chat.title = title;
+          event.sender.send(`chat:title-changed`, _chat);
+        }
+      }
+      if (model) {
+        _chat.model = model;
+      }
+      if (options) {
+        _chat.options = { ...(_chat.options || {}), ...options };
+      }
       const res = await this.chatRepository.save(_chat);
+      event.sender.send(`chat:changed:${chatId}`, _chat);
       return res;
     }
     return undefined;
@@ -365,6 +390,8 @@ export class ChatManager {
             text: output,
           },
         ];
+        insertResponeData.time_cost =
+          new Date().getTime() - insertData.timestamp;
         insertResponeData.status = ChatStatus.SUCCESS;
         await this.chatMessageRepository.manager.save(insertResponeData);
         event(`chat:message-changed:${chatId}`, insertResponeData);
@@ -492,7 +519,9 @@ export class ChatManager {
             msg.error_msg = message.additional_kwargs['error'] as
               | string
               | undefined;
+            msg.time_cost = new Date().getTime() - insertData.timestamp;
             msg.timestamp = new Date().getTime();
+
             msg.setUsage(message.usage_metadata);
             await this.chatMessageRepository.manager.save(msg);
             event(`chat:message-finish:${chatId}`, msg);
@@ -524,6 +553,28 @@ export class ChatManager {
     }
   }
 
+  public async buildTools(options?: ChatOptions) {
+    const tools = [] as BaseTool[];
+    if (options?.agentNames && options?.agentNames.length > 0) {
+      const agents = agentManager.agents.filter((x) =>
+        options?.agentNames.includes(x.info.name),
+      );
+      tools.push(...agents.map((x) => x.agent));
+    }
+
+    if (options?.toolNames && options?.toolNames.length > 0) {
+      tools.push(
+        ...(toolsManager.tools
+          .filter((x) => options?.toolNames.includes(x.name))
+          .map((x) => x.tool) as BaseTool[]),
+      );
+    }
+    if (options?.kbList && options?.kbList.length > 0) {
+      tools.push(new KnowledgeBaseQuery({ knowledgebaseIds: options.kbList }));
+    }
+    return tools;
+  }
+
   public async chat(
     providerModel: string,
     messages: BaseMessage[],
@@ -543,10 +594,11 @@ export class ChatManager {
     if (handlerMessageCreated) await handlerMessageCreated(aiMessage);
 
     let gathered;
+    const tools = await this.buildTools(options);
     try {
       const { provider, modelName } = getProviderModel(providerModel);
 
-      const llm = await getChatModel(provider, modelName, options);
+      const llm = await getChatModel(provider, modelName, options, tools);
       if (options?.streaming === undefined || options?.streaming) {
         const stream = await llm.stream(messages, { signal });
 
@@ -579,9 +631,7 @@ export class ChatManager {
       for (let index = 0; index < tool_calls.length; index++) {
         const tool_call = tool_calls[index];
         const { name, type, id, args } = tool_call;
-        const tool =
-          toolsManager.tools.find((x) => x.tool.name == name)?.tool ||
-          agentManager.agents.find((x) => x.info.name == name)?.agent;
+        const tool = tools.find((x) => x.name == name);
 
         if (tool) {
           const toolMessage = new ToolMessage({
@@ -617,6 +667,16 @@ export class ChatManager {
               await handlerMessageFinished(toolMessage);
             //messages.push(toolMessage);
           }
+        } else {
+          const toolMessage = new ToolMessage({
+            id: uuidv4(),
+            tool_call_id: id,
+            name: name,
+            content: 'Tool not found',
+            status: ChatStatus.ERROR,
+          });
+          toolMessage.additional_kwargs['error'] = 'Tool not found';
+          await handlerMessageFinished(toolMessage);
         }
       }
       await this.chat(providerModel, messages, options, callbacks, signal);

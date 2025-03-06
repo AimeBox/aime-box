@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FaEdit,
   FaEllipsisH,
+  FaFile,
+  FaFileAudio,
   FaPlus,
   FaSearch,
   FaTrashAlt,
@@ -21,7 +23,7 @@ export interface ChatListRef {
 }
 
 export interface ChatListProps {
-  onNewChat?: (mode: 'default' | 'task') => void;
+  onNewChat?: (mode: 'default' | 'task' | 'file') => void;
 }
 // const ChatListComponent = function ({
 //   onNewChat,
@@ -143,6 +145,17 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
               >
                 {t('chat.newchat')}
               </Button>
+              <Button
+                type="text"
+                block
+                icon={<FaRegMessage />}
+                onClick={() => {
+                  setAddButtonOpen(false);
+                  onNewChat('file');
+                }}
+              >
+                {t('chat.fileChat')}
+              </Button>
             </div>
           }
         >
@@ -155,6 +168,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
           return (
             <ListItem
               key={chat.id}
+              icon={chat.mode === 'file' ? <FaFile /> : undefined}
               active={currentChatId === chat.id}
               title={chat.title}
               subTitle={chat.mode === 'agent' && <small>@{chat.agent}</small>}
@@ -164,6 +178,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
                   <Button
                     icon={<FaTrashAlt />}
                     type="text"
+                    style={{ justifyContent: 'flex-start' }}
                     block
                     danger
                     onClick={() => {

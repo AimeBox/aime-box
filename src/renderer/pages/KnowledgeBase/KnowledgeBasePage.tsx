@@ -49,19 +49,19 @@ export default function KnowledgeBasePage() {
 
   const schemas = [
     {
-      label: 'Name',
+      label: t('knowledge.name'),
       field: 'name',
       required: true,
       component: 'Input',
     },
     {
-      label: 'Description',
+      label: t('knowledge.description'),
       field: 'description',
       required: true,
       component: 'InputTextArea',
     },
     {
-      label: 'Tags',
+      label: t('knowledge.tags'),
       field: 'tags',
       component: 'Select',
       required: false,
@@ -90,8 +90,9 @@ export default function KnowledgeBasePage() {
       label: 'Embedding',
       field: 'embedding',
       required: true,
-      defaultValue: 'bge-m3@local',
+
       subLabel: '设置后将无法更改',
+
       component: <ProviderSelect type="embedding" />,
       ifShow({ values }) {
         return !values.id;
@@ -101,18 +102,19 @@ export default function KnowledgeBasePage() {
       label: 'Reranker',
       field: 'reranker',
       required: false,
-      defaultValue: 'bge-reranker-large@local',
       component: <ProviderSelect type="reranker" allowClear />,
     },
   ] as FormSchema[];
   const getData = async () => {
     const res = window.electron.db.getMany<KnowledgeBase>('knowledgebase', {});
+    console.log(res);
     setList(res);
   };
 
   const onKBSubmit = async (values) => {
     values.tags = values.tags;
     values.vectorStoreConfig = {};
+    values.reranker = values.reranker || null;
     if (currentKB) {
       await window.electron.kb.update(currentKB.id, values);
     } else {
@@ -157,6 +159,8 @@ export default function KnowledgeBasePage() {
           width={250}
           onSearch={onSearch}
           onAdd={() => {
+            setCurrentKB(undefined);
+            navigate(`/knowledge-base`);
             kbModalRef.current.openModal(true);
           }}
         >
@@ -167,9 +171,11 @@ export default function KnowledgeBasePage() {
                   title={item.name}
                   subTitle={
                     <div className="flex flex-col gap-1">
-                      {item.description}
-                      <div className="">
-                        <Tag>{item.vectorStoreType}</Tag>
+                      <span className="line-clamp-2">{item.description}</span>
+                      <div>
+                        <Tag className="max-w-[120px] text-ellipsis whitespace-nowrap overflow-hidden">
+                          {item.embedding}
+                        </Tag>
                       </div>
                     </div>
                   }
@@ -215,7 +221,11 @@ export default function KnowledgeBasePage() {
       </div>
 
       <FormModal
-        title={t('knowledgebase')}
+        title={
+          currentKB?.id
+            ? t('knowledgebase.edit_knowledgebase')
+            : t('knowledgebase.create_knowledgebase')
+        }
         ref={kbModalRef}
         schemas={schemas}
         formProps={{ layout: 'vertical' }}

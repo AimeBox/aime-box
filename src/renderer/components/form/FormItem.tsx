@@ -75,6 +75,7 @@ const FormModal = forwardRef((props: FormItemProps, ref) => {
       <Form.Item
         label={props.schema.label}
         extra={props.schema.subLabel}
+        help={props.schema.helpMessage}
         name={props.schema.field}
         rules={[
           {

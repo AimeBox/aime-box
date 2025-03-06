@@ -48,66 +48,68 @@ const FileSelect = React.forwardRef(
       );
     };
     return (
-      <Upload
-        name="avatar"
-        listType="picture-card"
-        className="avatar-uploader"
-        showUploadList
-        openFileDialogOnClick={false}
-        fileList={fileList}
-        accept={accept}
-        onRemove={(file) => {
-          const _fileList = fileList.filter((x) => x.uid !== file.uid);
-          setFileList(_fileList);
-          onChange?.(_fileList.map((x) => x.uid));
-        }}
-        iconRender={iconRender}
-      >
-        <button
-          style={{ border: 0, background: 'none' }}
-          type="button"
-          className="flex flex-col justify-center items-center w-full h-full"
-          onClick={async () => {
-            const filters = [];
-            if (mode == 'file' && accept) {
-              filters.push({
-                name: '文件',
-                extensions: accept?.split(',').map((x) => x.substring(1)),
-              });
-            }
-            const res = await window.electron.app.showOpenDialog({
-              properties:
-                mode == 'file'
-                  ? ['openFile', 'multiSelections']
-                  : ['openDirectory', 'multiSelections'],
-              filters: mode == 'file' ? filters : undefined,
-            });
-            if (res && res.length > 0) {
-              const _fileList: UploadFile[] = [...fileList];
-              for (let index = 0; index < res.length; index++) {
-                const item = res[index];
-                if (!_fileList.find((x) => x.uid == item.path)) {
-                  _fileList.push({
-                    uid: item.path,
-                    name: item.name,
-                    fileName: item.name,
-                    status: 'done',
-                  });
-                }
-              }
-
-              setFileList(_fileList);
-
-              onChange?.(_fileList.map((x) => x.uid));
-            }
+      <>
+        <Upload
+          name="avatar"
+          listType="picture-card"
+          className="avatar-uploader"
+          showUploadList
+          openFileDialogOnClick={false}
+          fileList={fileList}
+          accept={accept}
+          onRemove={(file) => {
+            const _fileList = fileList.filter((x) => x.uid !== file.uid);
+            setFileList(_fileList);
+            onChange?.(_fileList.map((x) => x.uid));
           }}
+          iconRender={iconRender}
         >
-          <FaPlus />
-          <div style={{ marginTop: 8 }}>
-            {mode == 'file' ? t('selectFile') : t('selectFolder')}
-          </div>
-        </button>
-      </Upload>
+          <button
+            style={{ border: 0, background: 'none' }}
+            type="button"
+            className="flex flex-col justify-center items-center w-full h-full"
+            onClick={async () => {
+              const filters = [];
+              if (mode == 'file' && accept) {
+                filters.push({
+                  name: '文件',
+                  extensions: accept?.split(',').map((x) => x.substring(1)),
+                });
+              }
+              const res = await window.electron.app.showOpenDialog({
+                properties:
+                  mode == 'file'
+                    ? ['openFile', 'multiSelections']
+                    : ['openDirectory', 'multiSelections'],
+                filters: mode == 'file' ? filters : undefined,
+              });
+              if (res && res.length > 0) {
+                const _fileList: UploadFile[] = [...fileList];
+                for (let index = 0; index < res.length; index++) {
+                  const item = res[index];
+                  if (!_fileList.find((x) => x.uid == item.path)) {
+                    _fileList.push({
+                      uid: item.path,
+                      name: item.name,
+                      fileName: item.name,
+                      status: 'done',
+                    });
+                  }
+                }
+
+                setFileList(_fileList);
+
+                onChange?.(_fileList.map((x) => x.uid));
+              }
+            }}
+          >
+            <FaPlus />
+            <div style={{ marginTop: 8 }}>
+              {mode == 'file' ? t('selectFile') : t('selectFolder')}
+            </div>
+          </button>
+        </Upload>
+      </>
     );
   },
 );

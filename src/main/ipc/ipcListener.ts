@@ -30,7 +30,7 @@ export default function ipcListener(mainWindow: BrowserWindow) {
     ): Promise<void> => {
       const res = await dialog.showOpenDialog(mainWindow as BrowserWindow, arg);
 
-      if (res.canceled || res.filePaths.length == 0) {
+      if (!res || res.canceled || res.filePaths.length == 0) {
         return undefined;
       } else {
         const list = [] as ChatInputAsset[];
@@ -72,7 +72,7 @@ export default function ipcListener(mainWindow: BrowserWindow) {
     'app:showSaveDialog',
     async (event, arg: SaveDialogOptions = {}): Promise<void> => {
       const res = await dialog.showSaveDialog(mainWindow as BrowserWindow, arg);
-      if (res.canceled || !res.filePath) {
+      if (!res || res.canceled || !res.filePath) {
         event.returnValue = undefined;
       } else {
         event.returnValue = res.filePath;
@@ -112,20 +112,13 @@ export default function ipcListener(mainWindow: BrowserWindow) {
       event.returnValue = null;
     },
   );
-  ipcMain.on('app:openPath', async (event, path: string): Promise<void> => {
-    event.returnValue = await shell.openPath(path);
-  });
-  ipcMain.on(
-    'app:showItemInFolder',
-    async (event, fullPath: string): Promise<void> => {
-      shell.showItemInFolder(fullPath);
-      event.returnValue = null;
-    },
+  ipcMain.handle('app:openPath', (event, path: string) => shell.openPath(path));
+  ipcMain.handle('app:showItemInFolder', (event, fullPath: string) =>
+    shell.showItemInFolder(fullPath),
   );
-  ipcMain.on('app:trashItem', async (event, path: string): Promise<void> => {
-    await shell.trashItem(path);
-    event.returnValue = null;
-  });
+  ipcMain.handle('app:trashItem', (event, path: string) =>
+    shell.trashItem(path),
+  );
   ipcMain.on('app:clipboard', (event, text: string) => {
     clipboard.writeText(text);
     event.returnValue = null;

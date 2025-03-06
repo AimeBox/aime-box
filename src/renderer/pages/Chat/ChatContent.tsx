@@ -2,7 +2,11 @@ import { Chat, ChatMessage, ChatOptions } from '@/entity/Chat';
 import ChatMessageBox from '@/renderer/components/chat/ChatMessageBox';
 import ChatQuickInput from '@/renderer/components/chat/ChatQuickInput';
 import ProviderSelect from '@/renderer/components/providers/ProviderSelect';
-import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import {
+  ScrollArea,
+  ScrollAreaProps,
+  ScrollAreaRef,
+} from '@/renderer/components/ui/scroll-area';
 import {
   Button,
   Input,
@@ -56,8 +60,8 @@ export default function ChatContent() {
     undefined,
   );
   const [attachments, setAttachments] = useState<ChatInputAttachment[]>([]);
-  const { agents, tools } = useContext(GlobalContext);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const { agents, tools, knowledgeBase } = useContext(GlobalContext);
+  const scrollRef = useRef<ScrollAreaRef | null>(null);
   const editorRef = useRef<EditorRef>(null);
   const registerEvent = (id: string) => {
     const list = {
@@ -100,12 +104,14 @@ export default function ChatContent() {
     if (!chatInputMessage?.trim()) {
       return;
     }
+
     window.electron.chat.chatResquest({
       chatId: currentChat.id,
-      content: chatInputMessage,
+      content: chatInputMessage.trim(),
       extend: { attachments: attachments },
     });
     editorRef.current?.clear();
+    scrollToBottom(false);
   };
 
   const onCancel = async (chatId: string) => {
@@ -121,15 +127,8 @@ export default function ChatContent() {
     });
   }
 
-  const scrollToBottom = useCallback(() => {
-    setTimeout(
-      () =>
-        scrollRef.current?.scrollTo({
-          top: scrollRef.current.scrollHeight,
-          behavior: 'smooth',
-        }),
-      500,
-    );
+  const scrollToBottom = useCallback((onlyIsBottom = false) => {
+    setTimeout(() => scrollRef.current?.scrollBottom(onlyIsBottom), 500);
   }, []);
 
   const handleChatStream = async (stream) => {
@@ -144,7 +143,7 @@ export default function ChatContent() {
           ];
 
           const r = { ...preChat, chatMessages: [...preChat.chatMessages] };
-          scrollToBottom();
+          scrollToBottom(true);
           return r;
         }
 
@@ -172,13 +171,20 @@ export default function ChatContent() {
   };
 
   const handleChangedTitle = async () => {
-    await window.electron.db.update(
-      'chat',
-      { title: currentChat.title } as any,
-      {
-        id: currentChat.id,
-      },
+    await window.electron.chat.update(
+      currentChat.id,
+      currentChat.title,
+      currentModel,
+      { options: currentChat.options },
     );
+
+    // await window.electron.db.update(
+    //   'chat',
+    //   { title: currentChat.title } as any,
+    //   {
+    //     id: currentChat.id,
+    //   },
+    // );
   };
 
   useEffect(() => {
@@ -329,7 +335,11 @@ export default function ChatContent() {
                   </div>
                 </div>
               </div>
-              <ScrollArea className="flex-1 h-full" viewPortRef={scrollRef}>
+              <ScrollArea
+                className="flex-1 h-full"
+                ref={scrollRef}
+                showScrollBottom
+              >
                 <div className="">
                   {currentChat && (
                     <div className="flex flex-col py-8 w-full h-full">
@@ -472,22 +482,71 @@ export default function ChatContent() {
                     placement="top"
                     title={
                       <div className="flex flex-col">
-                        <strong>{t('tool')}</strong>
+                        <strong>{t('chat.tool')}</strong>
                         {currentChat?.options?.toolNames?.join(',')}
                       </div>
                     }
                   >
                     <Button
                       className="flex flex-row items-center rounded-full"
+                      color={
+                        currentChat?.options?.toolNames?.length > 0
+                          ? 'primary'
+                          : 'default'
+                      }
+                      variant={
+                        currentChat?.options?.toolNames?.length > 0
+                          ? 'filled'
+                          : 'outlined'
+                      }
                       onClick={() =>
                         tools.open(currentChat?.options?.toolNames || [])
                       }
                     >
-                      tools{' '}
+                      {t('chat.tool')}
                       <Tag className="mr-0 rounded-full">
                         +{' '}
                         {currentChat?.options?.toolNames?.length > 0
                           ? currentChat?.options?.toolNames?.length
+                          : 'add'}
+                      </Tag>
+                    </Button>
+                  </Tooltip>
+                  <Tooltip
+                    placement="top"
+                    title={
+                      <div className="flex flex-col">
+                        <strong>{t('chat.knowledgebase')}</strong>
+                        {currentChat?.options?.toolNames?.join(',')}
+                      </div>
+                    }
+                  >
+                    <Button
+                      className="flex flex-row items-center rounded-full"
+                      color={
+                        currentChat?.options?.kbList?.length > 0
+                          ? 'primary'
+                          : 'default'
+                      }
+                      variant={
+                        currentChat?.options?.kbList?.length > 0
+                          ? 'filled'
+                          : 'outlined'
+                      }
+                      onClick={() => {
+                        knowledgeBase.open(currentChat?.options?.kbList || []);
+                        knowledgeBase.onSelect = (kbs) => {
+                          onChatOptionsChanged({
+                            kbList: kbs.map((kb) => kb.id),
+                          });
+                        };
+                      }}
+                    >
+                      {t('chat.knowledgebase')}
+                      <Tag className="mr-0 rounded-full">
+                        +{' '}
+                        {currentChat?.options?.kbList?.length > 0
+                          ? currentChat?.options?.kbList?.length
                           : 'add'}
                       </Tag>
                     </Button>

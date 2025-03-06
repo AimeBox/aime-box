@@ -16,7 +16,7 @@ import {
   KnowledgeBaseUpdateInput,
 } from './knowledgebase';
 import { GlobalSettings } from './settings';
-import { ChatInputAsset, ChatInputExtend, ChatMode } from '@/types/chat';
+import { ChatInputExtend, ChatMode } from '@/types/chat';
 import { Prompt, PromptGroup } from '@/entity/Prompt';
 
 const electronHandler = {
@@ -52,14 +52,21 @@ const electronHandler = {
     },
   },
   app: {
-    showOpenDialog: (arg: OpenDialogOptions) =>
-      ipcRenderer.invoke('app:showOpenDialog', arg),
+    showOpenDialog: (
+      arg: OpenDialogOptions,
+    ): Promise<
+      { ext: string; name: string; path: string; type: 'file' | 'folder' }[]
+    > => ipcRenderer.invoke('app:showOpenDialog', arg),
     info: () => ipcRenderer.sendSync('app:info'),
     setTheme: (theme: 'system' | 'light' | 'dark') =>
       ipcRenderer.sendSync('app:setTheme', theme),
     clipboard: (text: string) => ipcRenderer.sendSync('app:clipboard', text),
     tts: (text: string) => ipcRenderer.send('app:tts', text),
     resetTTS: () => ipcRenderer.invoke('app:resetTTS'),
+    openPath: (path: string) => ipcRenderer.invoke('app:openPath', path),
+    showItemInFolder: (path: string) =>
+      ipcRenderer.invoke('app:showItemInFolder', path),
+    trashItem: (path: string) => ipcRenderer.invoke('app:trashItem', path),
   },
   db: {
     insert(tableName: string, data: any) {
@@ -122,8 +129,13 @@ const electronHandler = {
       agentName?: string,
     ): Promise<Chat | undefined> =>
       ipcRenderer.invoke('chat:create', mode, providerModel, agentName),
-    update: (chat: Chat): Promise<Chat> =>
-      ipcRenderer.invoke('chat:update', chat),
+    update: (
+      chatId: string,
+      title: string,
+      model: string,
+      options,
+    ): Promise<Chat> =>
+      ipcRenderer.invoke('chat:update', chatId, title, model, options),
     export(input: { chatId: string; savePath: string }) {
       const res = ipcRenderer.sendSync('chat:export', input);
       return res;

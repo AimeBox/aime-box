@@ -32,7 +32,6 @@
   "settings.defaultLLM": "默认AI助手模型",
   "settings.websearch_settings": "搜索引擎设置",
   "settings.general_settings": "常规设置",
-  "settings.settings": "设置",
   "settings.defaultSTT": "默认语音识别模型",
   "settings.about": "关于我们",
   "settings.theme": "主题模式",
@@ -57,7 +56,6 @@
   "theme": "主题",
   "kb.score": "相似度",
   "kb.rerank_score": "重排得分",
-  "settings.localModelPath": "本地模型存放目录",
   "sidebar.chat": "聊天",
   "sidebar.providers": "模型供应商",
   "chat.newchat": "新聊天",
@@ -78,12 +76,9 @@
   "tool.add_tool": "添加工具",
   "tools.show_all": "全部",
   "chat.chat_options.clear": "清空",
-  "settings.serverEnable": "远程服务端口",
-  "settings.serverPort.description": "开启后可在外部通过API方式调用内部Tools方法",
   "cancel": "取消",
   "all": "全部",
   "delete": "删除",
-  "knowledgebase": "知识库",
   "edit": "编辑",
   "chat.chat_options.agents": "AI助手",
   "selectFile": "选择文件",
@@ -94,7 +89,13 @@
     "import": "导入",
     "chunkSize": "分块大小",
     "enable": "是否启用",
-    "delete": "删除"
+    "delete": "删除",
+    "action": "操作",
+    "state": "状态",
+    "name": "名称",
+    "description": "描述",
+    "tags": "标签",
+    "restart": "失败重试"
   },
   "enable": "是否启用",
   "prompts": {
@@ -102,7 +103,11 @@
   },
   "chat": {
     "prompts": "提示词",
-    "export": "导出"
+    "export": "导出",
+    "tool": "工具",
+    "knowledgebase": "知识库",
+    "fileChat": "文档对话",
+    "newchat": "新建聊天"
   },
   "language": {
     "english": "英语",
@@ -113,5 +118,23 @@
   "selectAll": "全选",
   "providers": {
     "manager_model": "管理模型"
+  },
+  "agent": {
+    "config": "AI助手配置",
+    "base_config": "基础配置"
+  },
+  "settings": {
+    "serverEnable": "远程服务端口",
+    "serverPort": {
+      "description": "开启后可在外部通过API方式调用内部Tools方法"
+    },
+    "settings": "设置",
+    "localModelPath": "本地模型存放目录",
+    "huggingfaceUrl": "HuggingfaceUrl"
+  },
+  "knowledgebase": {
+    "create_knowledgebase": "创建知识库",
+    "edit_knowledgebase": "修改知识库",
+    "select_knowledgebase": "选择知识库"
   }
 }

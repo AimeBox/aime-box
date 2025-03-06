@@ -11,6 +11,7 @@ export interface ListItemProps {
   active?: boolean;
   menu?: ReactNode;
   onClick?: () => void;
+  icon?: ReactNode;
   // openMenu?: boolean;
   // setOpenMenu?: (open: boolean) => void;
 }
@@ -24,6 +25,7 @@ export const ListItem = forwardRef((props: ListItemProps) => {
     active = false,
     menu,
     onClick,
+    icon,
     // openMenu,
     // setOpenMenu,
   } = props;
@@ -39,8 +41,16 @@ export const ListItem = forwardRef((props: ListItemProps) => {
         <div className="flex overflow-hidden self-center w-full whitespace-nowrap text-ellipsis">
           <div className="self-center text-left">
             <div className="flex flex-col">
-              <div className="font-bold whitespace-normal line-clamp-1">
-                {title}
+              <div className="flex flex-row items-center">
+                {icon && <div className="mr-1">{icon}</div>}
+                <div
+                  className="font-bold whitespace-normal line-clamp-1"
+                  style={{
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {title}
+                </div>
               </div>
               <small className="text-gray-500 whitespace-normal line-clamp-1">
                 {subTitle}

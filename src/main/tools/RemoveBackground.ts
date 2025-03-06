@@ -8,11 +8,14 @@ import { Transformers } from '../utils/transformers';
 import { z } from 'zod';
 import { isUrl } from '../utils/is';
 import fs from 'fs';
+import path from 'path';
+import { getTmpPath } from '../utils/path';
+import { v4 as uuidv4 } from 'uuid';
 
 export class RemoveBackground extends StructuredTool {
   schema = z.object({
     pathOrUrl: z.string().describe('local file or folder path, or Url '),
-    outputFormat: z.optional(z.enum(['base64', 'file'])).default('base64'),
+    outputFormat: z.optional(z.enum(['base64', 'file'])).default('file'),
     outputPath: z.optional(
       z
         .string()
@@ -35,7 +38,8 @@ export class RemoveBackground extends StructuredTool {
       const base64String = buffer.toString('base64');
       return `data:image/png;base64,${base64String}`;
     } else {
-      if (!input.outputPath) throw new Error('未选择保存的文件路径');
+      if (!input.outputPath)
+        input.outputPath = path.join(getTmpPath(), `${uuidv4()}.png`);
       fs.writeFileSync(input.outputPath, buffer);
       return input.outputPath;
     }

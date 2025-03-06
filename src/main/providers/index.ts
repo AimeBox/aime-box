@@ -358,7 +358,10 @@ export class ProvidersManager {
     const httpProxy = settingsManager.getHttpAgent();
     emb_list.push({
       name: 'local',
-      models: settingsManager.getLocalModels()['embeddings'].map((x) => x.id),
+      models: settingsManager
+        .getLocalModels()
+        ['embeddings'].filter((x) => x.exists)
+        .map((x) => x.id),
     });
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
@@ -498,7 +501,7 @@ export class ProvidersManager {
     const localModels = settingsManager.getLocalModels();
     emb_list.push({
       name: 'local',
-      models: localModels['tts'].map((x) => x.id),
+      models: localModels['tts'].filter((x) => x.exists).map((x) => x.id),
     });
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
@@ -530,15 +533,21 @@ export class ProvidersManager {
     const emb_list = [];
     const settings = settingsManager.getSettings();
     const httpProxy = settingsManager.getHttpAgent();
+    // emb_list.push({
+    //   name: 'local',
+    //   models: [
+    //     'whisper-large-v3',
+    //     'whisper-small',
+    //     'sense-voice-zh-en-ja-ko-yue',
+    //     'zipformer-zh',
+    //   ],
+    // });
+    const localModels = settingsManager.getLocalModels();
     emb_list.push({
       name: 'local',
-      models: [
-        'whisper-large-v3',
-        'whisper-small',
-        'sense-voice-zh-en-ja-ko-yue',
-        'zipformer-zh',
-      ],
+      models: localModels['stt'].filter((x) => x.exists).map((x) => x.id),
     });
+
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
       if (connection.type == ProviderType.OPENAI) {

@@ -43,24 +43,12 @@ export class FileRead extends Tool {
     return 'file-read';
   }
 
-  name: string;
+  name: string = 'file-read';
 
-  description: string;
+  description: string = 'read file';
 
   constructor(params?: FileReadParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'file-read',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'read file',
-    });
   }
 
   async _call(input: string, runManager, config): Promise<string> {

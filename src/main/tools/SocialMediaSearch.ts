@@ -19,6 +19,7 @@ import * as cheerio from 'cheerio';
 
 import * as vm from 'vm';
 import { getDataPath } from '../utils/path';
+import { BaseTool } from './BaseTool';
 
 // const getUserDataPath = (...paths: string[]): string => {
 //   return path.join(
@@ -63,71 +64,62 @@ interface XHSNoteItem {
   xsec_token: string;
 }
 
-export class SocialMediaSearch extends Tool {
+export class SocialMediaSearch extends BaseTool {
+  schema = z.object({
+    platform: z
+      .enum(['xhs', 'bilibili', 'douyin', 'kuaishou', 'tiktok', 'twitter'])
+      .describe(
+        'xhs: 小红书 ,bilibili: 哔哩哔哩,douyin: 抖音, kuaishou: 快搜, tiktok: Tiktok, twitter: 推特',
+      ),
+    keyword: z.optional(z.string()).describe('搜索关键字'),
+    url: z.optional(z.string()).describe('网址连接'),
+    //count: z.number().default(10),
+  });
+
   static lc_name() {
     return 'social-media-search';
   }
 
-  name: string;
+  name: string = 'social-media-search';
 
-  description: string;
+  description: string = 'search social media post';
 
   userDataDir: string;
 
   httpProxy: string | undefined;
 
+  outputFormat: 'json' | 'markdown' = 'json';
+
   constructor() {
     super();
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'social-media-search',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'search social media post',
-    });
-    Object.defineProperty(this, 'schema', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: z.object({
-        platform: z
-          .enum(['xhs', 'bilibili', 'douyin', 'kuaishou', 'tiktok', 'twitter'])
-          .describe(
-            'xhs: 小红书 ,bilibili: 哔哩哔哩,douyin: 抖音, kuaishou: 快搜, tiktok: Tiktok, twitter: 推特',
-          ),
-        keyword: z.optional(z.string()).describe('搜索关键字'),
-        url: z.optional(z.string()).describe('网址连接'),
-        //count: z.number().default(10),
-      }),
-    });
     this.userDataDir = path.join(getDataPath(), 'User Data');
-    //this.httpProxy = settingsManager.getPorxy();
   }
 
   async getBrowserContext(): Promise<BrowserContext> {
-    const browser_context = await chromium.launchPersistentContext(
-      this.userDataDir,
-      {
-        channel: 'msedge',
-        headless: false,
-
-        proxy: this.httpProxy
-          ? {
-              server: `${this.httpProxy}`,
-            }
-          : undefined,
-        args: ['--disable-blink-features=AutomationControlled'],
-      },
-    ); // Or 'firefox' or 'webkit'.
-    return browser_context;
+    // const browser_context = await chromium.launchPersistentContext(
+    //   this.userDataDir,
+    //   {
+    //     channel: 'msedge',
+    //     headless: false,
+    //     devtools: true,
+    //     proxy: this.httpProxy
+    //       ? {
+    //           server: `${this.httpProxy}`,
+    //         }
+    //       : undefined,
+    //     args: ['--disable-blink-features=AutomationControlled'],
+    //   },
+    // ); // Or 'firefox' or 'webkit'.
+    const msbrowser = await chromium.connectOverCDP('http://localhost:9222');
+    const defaultContext = msbrowser.contexts()[0];
+    return defaultContext;
   }
 
-  async _call(input: any, runManager, config): Promise<any> {
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<any> {
     this.httpProxy = settingsManager.getPorxy();
 
     let res = null;
@@ -137,6 +129,7 @@ export class SocialMediaSearch extends Tool {
       if (input.url) {
         const browser_context = await this.getBrowserContext();
         res = await this.xhs_post_detail(browser_context, input.url);
+        res = await this.xhs_note_to_markdown(res);
         await browser_context.close();
       } else {
         const need_login = await this.xhs_check_login();
@@ -194,6 +187,25 @@ export class SocialMediaSearch extends Tool {
     // } catch (e) {
     //   throw e;
     // }
+  }
+
+  async xhs_note_to_markdown(data: { note: any; comments: any }) {
+    let text = '<note>\n';
+
+    text += `### 标题:${data.note.title}\n`;
+    text += `### 内容\n${data.note.desc}\n`;
+    text += `### 图片\n${data.note.imageList.map((x) => `![](${x.urlDefault})`).join('\n')}\n`;
+    if (data.note.video) {
+      const stream = Object.values(data.note.video.media.stream);
+      const item = stream.find((x: any[]) => x.length > 0);
+      const video_url = item[0].backupUrls[0];
+      text += `### 视频\n[${video_url}](${video_url})\n`;
+    }
+
+    // text += `### 标签\n${data.note.tagList.map((x) => `#${x.name}`).join(' ')}`;
+
+    text += `\n</note>`;
+    return text;
   }
 
   async xhs_check_login() {
@@ -315,7 +327,7 @@ export class SocialMediaSearch extends Tool {
             vm.runInContext('var info = ' + text, sandbox);
             note = sandbox.info.note;
             note = note.noteDetailMap[note.currentNoteId].note;
-            console.log('note:', note.noteDetailMap[note.currentNoteId].note);
+            console.log('note:', note);
           }
         });
         //console.log(data);

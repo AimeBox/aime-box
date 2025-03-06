@@ -23,7 +23,13 @@ import {
   KnowledgeBaseItemChunk,
 } from '../../../main/knowledgebase';
 import { Markdown } from '@/renderer/components/common/Markdown';
-import { FaPlus, FaTrashAlt } from 'react-icons/fa';
+import {
+  FaCheckCircle,
+  FaPlus,
+  FaSpinner,
+  FaTimes,
+  FaTrashAlt,
+} from 'react-icons/fa';
 import FormModal, {
   FormModalRef,
 } from '@/renderer/components/modals/FormModal';
@@ -90,6 +96,10 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
             label: 'Local Folder',
             value: 'folder',
           },
+          {
+            label: 'Text',
+            value: 'text',
+          },
         ],
       },
     },
@@ -100,6 +110,15 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
       componentProps: {},
       ifShow({ values }) {
         return values['sourceType'] == 'web';
+      },
+    },
+    {
+      label: 'Text',
+      field: 'text',
+      component: 'InputTextArea',
+      componentProps: {},
+      ifShow({ values }) {
+        return values['sourceType'] == 'text';
       },
     },
     {
@@ -182,7 +201,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
 
   const dataset_columns = [
     {
-      title: 'Name',
+      title: t('knowledge.name'),
       dataIndex: 'name',
       key: 'name',
       ellipsis: { showTitle: true },
@@ -195,7 +214,15 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
             >
               {text}
             </div>
-            <Link className="w-fit" href={record.source} target="_blank">
+            <Link
+              className="w-fit"
+              href={record.source}
+              target="_blank"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.electron.app.openPath(record.source);
+              }}
+            >
               <div className="text-xs">{record.source}</div>
             </Link>
             <div className="flex flex-row gap-2 mb-1 text-gray-500">
@@ -211,7 +238,8 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
       title: t('knowledge.enable'),
       dataIndex: 'isEnable',
       key: 'isEnable',
-      width: '100px',
+      width: '80px',
+      align: 'center',
       render: (text, record, index) => {
         return (
           <Switch
@@ -224,14 +252,27 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
       },
     },
     {
-      title: 'State',
+      title: t('knowledge.state'),
       dataIndex: 'state',
       key: 'state',
-      width: '100px',
+      width: '80px',
+      align: 'center',
+      render: (text, record, index) => {
+        if (record.state == 'pending') {
+          return <FaSpinner className="w-full animate-spin"></FaSpinner>;
+        } else if (record.state == 'fail') {
+          return <FaTimes color="red"></FaTimes>;
+        } else {
+          return (
+            <FaCheckCircle color="green" className="w-full"></FaCheckCircle>
+          );
+        }
+      },
     },
     {
-      title: 'Action',
+      title: t('knowledge.action'),
       width: 100,
+      align: 'center',
       render: (_, record) => (
         <Space size="middle">
           <Popconfirm
@@ -386,12 +427,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
           >
             {t('knowledge.add_source')}
           </Button>
-          <Button
-            shape="round"
-            onClick={() => window.electron.kb.restart(knowledgeBaseId)}
-          >
-            {t('knowledge.restart')}
-          </Button>
+
           <Button
             shape="round"
             onClick={() => {
@@ -399,6 +435,12 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
             }}
           >
             {t('knowledge.search')}
+          </Button>
+          <Button
+            shape="round"
+            onClick={() => window.electron.kb.restart(knowledgeBaseId)}
+          >
+            {t('knowledge.restart')}
           </Button>
           {selectedRowKeys.length > 0 && (
             <Button

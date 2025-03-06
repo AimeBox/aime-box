@@ -39,7 +39,7 @@ import {
 import { PlaywrightWebBaseLoader } from '@langchain/community/document_loaders/web/playwright';
 import { Document } from '@langchain/core/documents';
 import { v4 as uuidv4 } from 'uuid';
-import { In, Like } from 'typeorm';
+import { In, Like, Or } from 'typeorm';
 import { LanceDBStore } from '../db/vectorstores/LanceDBStore';
 import {
   KnowledgeBase,
@@ -58,6 +58,7 @@ import { getReranker } from '../reranker';
 import { getLoaderFromExt } from '../loaders';
 import { notificationManager } from '../app/NotificationManager';
 import { NotificationMessage } from '@/types/notification';
+import { ChatStatus } from '@/entity/Chat';
 
 export interface KnowledgeBaseDocument {
   document: DocumentInterface<Record<string, any>>;
@@ -87,7 +88,16 @@ export interface KnowledgeBaseUpdateInput {
 export class KnowledgeBaseManager {
   // limiter: Bottleneck;
 
-  public init() {
+  public async init() {
+    const repository = dbManager.dataSource.getRepository(KnowledgeBaseItem);
+    await repository.update(
+      {
+        state: KnowledgeBaseItemState.Pending,
+      },
+      {
+        state: KnowledgeBaseItemState.Fail,
+      },
+    );
     if (!ipcMain) return;
     // this.limiter = new Bottleneck({
     //   maxConcurrent: 1, // 最大并发任务数
@@ -162,83 +172,95 @@ export class KnowledgeBaseManager {
     const kb = await kb_repository.findOne({ where: { id: kbId } });
     const repository = dbManager.dataSource.getRepository(KnowledgeBaseItem);
     const kbItems = await repository.find({
-      where: { knowledgeBaseId: kbId, state: KnowledgeBaseItemState.Pending },
+      where: {
+        knowledgeBaseId: kbId,
+        state: KnowledgeBaseItemState.Fail,
+      },
     });
     const vectraStore = await this.getVectorStore(kb);
+    const notificationId = uuidv4();
+    notificationManager.create({
+      id: notificationId,
+      title: notificationId,
+      type: 'progress',
+      description: '导入中...',
+      percent: 0,
+      duration: undefined,
+      closeEnable: false,
+    } as NotificationMessage);
+
     for (let index = 0; index < kbItems.length; index++) {
       const kbItem = kbItems[index];
       const textSplitter = new RecursiveCharacterTextSplitter({
         chunkSize: kbItem.config?.chunkSize ?? 500,
         chunkOverlap: kbItem.config?.chunkOverlap ?? 50,
       });
+      notificationManager.update({
+        id: notificationId,
+        title: '导入知识库',
+        type: 'progress',
+        description: `正在导入[${kbItem.name}]`,
+        percent: (index / kbItems.length) * 100,
+        duration: undefined,
+        closeEnable: false,
+      } as NotificationMessage);
       console.log(`${index}/${kbItems.length} ${kbItem.source}`);
+
       let loader;
-      if (isUrl(kbItem.source)) {
-        const loader = new PlaywrightWebBaseLoader(kbItem.source, {
-          launchOptions: {
-            headless: true,
-            channel: 'msedge',
-          },
-        });
-        const docs = await loader.load();
+      let documents = [];
+      try {
+        if (kbItem.sourceType == KnowledgeBaseSourceType.Web) {
+          const doc = await urlToMarkdown(kbItem.source);
+          documents = await textSplitter.splitDocuments([
+            new Document({
+              metadata: { source: kbItem.source, title: doc.metadata.title },
+              pageContent: doc.pageContent,
+            }),
+          ]);
+        } else if (kbItem.sourceType == KnowledgeBaseSourceType.File) {
+          const ext = path.extname(kbItem.source).toLowerCase();
+          const loader = getLoaderFromExt(ext, kbItem.source);
+          const name = path.basename(kbItem.source);
 
-        const doc = await htmlToMarkdown(docs[0]);
-        // const dom = new JSDOM(docs[0].pageContent, {
-        //   url: kbItem.source,
-        // });
-        // const reader = new Readability(dom.window.document);
-        // const article = reader.parse();
-        // const markdown = turndownService.turndown(article.content);
-        const documents = [
-          new Document({
-            metadata: { source: kbItem.source, title: doc.metadata.title },
-            pageContent: doc.pageContent,
-          }),
-        ];
-        const allSplits = await textSplitter.splitDocuments(documents);
-        if (allSplits.length > 0) {
-          await vectraStore.addDocuments(allSplits, {
-            kbid: Array(allSplits.length).fill(kb.id),
-            kbitemid: Array(allSplits.length).fill(kbItem.id),
-            is_enable: kbItem.isEnable,
+          const doc = await loader.load();
+          documents = await textSplitter.splitDocuments([...doc]);
+          if (documents.length > 0) {
+            documents.forEach((d) => {
+              d.metadata.title = name;
+            });
+          }
+        }
+        if (documents.length > 0) {
+          await vectraStore.addDocuments(documents, {
+            kbid: Array(documents.length).fill(kb.id),
+            kbitemid: Array(documents.length).fill(kbItem.id),
+            isEnable: Array(documents.length).fill(true),
           });
           kbItem.state = KnowledgeBaseItemState.Completed;
-          kbItem.chunkCount = allSplits.length;
+          kbItem.chunkCount = documents.length;
           await repository.save(kbItem);
         } else {
-          kbItem.state = KnowledgeBaseItemState.Fail;
-          kbItem.chunkCount = allSplits.length;
-          await repository.save(kbItem);
+          await repository.delete(kbItem);
         }
-      } else {
-        if (path.extname(kbItem.source).toLowerCase() == '.txt') {
-          loader = new TextLoader(kbItem.source);
-        } else if (path.extname(kbItem.source).toLowerCase() == '.docx') {
-          loader = new DocxLoader(kbItem.source);
-        }
-        const name = path.basename(kbItem.source);
-        const document = await loader.load();
-
-        const allSplits = await textSplitter.splitDocuments(document);
-        if (allSplits.length > 0) {
-          console.log(
-            `${index}/${kbItems.length} ${allSplits.length} ${kbItem.source}`,
-          );
-          await vectraStore.addDocuments(allSplits, {
-            kbid: Array(allSplits.length).fill(kb.id),
-            kbitemid: Array(allSplits.length).fill(kbItem.id),
-            is_enable: kbItem.isEnable,
-          });
-          kbItem.state = KnowledgeBaseItemState.Completed;
-          kbItem.chunkCount = allSplits.length;
-          await repository.save(kbItem);
-        } else {
-          kbItem.state = KnowledgeBaseItemState.Fail;
-          kbItem.chunkCount = allSplits.length;
-          await repository.save(kbItem);
-        }
+      } catch (err) {
+        console.error(err);
+        kbItem.state = KnowledgeBaseItemState.Fail;
+        await repository.save(kbItem);
+        notificationManager.sendNotification(
+          `${kbItem.source} 导入失败`,
+          'error',
+        );
       }
     }
+    notificationManager.update({
+      id: notificationId,
+      title: '导入知识库',
+      type: 'progress',
+      description: `导入完成`,
+      percent: 100,
+      duration: 3,
+      closeEnable: true,
+    } as NotificationMessage);
   };
 
   private async insertRecord(
@@ -261,10 +283,14 @@ export class KnowledgeBaseManager {
     //   document = htmlToMarkdown(document);
     //   // document.metadata.title = document.metadata.source;
     // }
+    let name = document.pageContent.slice(0, 20);
+    if (document.metadata.source || document.metadata.title) {
+      name = document.metadata.title ?? path.basename(document.metadata.source);
+    }
     await repository.insert({
       id: kbItemId,
       knowledgeBase: kb,
-      name: document.metadata.title ?? path.basename(document.metadata.source),
+      name,
       source: document.metadata.source,
       sourceType,
       isEnable: true,
@@ -282,7 +308,7 @@ export class KnowledgeBaseManager {
     if (sourceType == KnowledgeBaseSourceType.Web) {
       splitter = RecursiveCharacterTextSplitter.fromLanguage('html', {
         chunkSize: config?.chunkSize ?? 500,
-        chunkOverlap: config?.chunkOverlap ?? 0,
+        chunkOverlap: config?.chunkOverlap ?? 50,
       });
     }
     documents = await splitter.splitDocuments([document]);
@@ -312,6 +338,13 @@ export class KnowledgeBaseManager {
     const repository = dbManager.dataSource.getRepository(KnowledgeBaseItem);
     const kb = await kb_repository.findOne({ where: { id: input.kbId } });
     const vectraStore = await this.getVectorStore(kb);
+    try {
+      const embeddings = await this.getEmbeddings(kb);
+      await embeddings.embedQuery('embedding test');
+    } catch {
+      notificationManager.sendNotification('embedding fail', 'error');
+      return;
+    }
 
     const textSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: input.config.chunkSize ?? 500,
@@ -329,9 +362,7 @@ export class KnowledgeBaseManager {
         KnowledgeBaseSourceType.Web,
         input.config,
       );
-      return;
-    }
-    if (input.config.files && input.config.files.length > 0) {
+    } else if (input.config.files && input.config.files.length > 0) {
       sourceType = KnowledgeBaseSourceType.File;
       const kbItems = [] as KnowledgeBaseItem[];
       const notificationId = uuidv4();
@@ -387,7 +418,16 @@ export class KnowledgeBaseManager {
       } as NotificationMessage);
     } else if (input.config.folders && input.config.folders.length > 0) {
       sourceType = KnowledgeBaseSourceType.Folder;
-
+      const notificationId = uuidv4();
+      notificationManager.create({
+        id: notificationId,
+        title: notificationId,
+        type: 'progress',
+        description: '导入中...',
+        percent: 0,
+        duration: undefined,
+        closeEnable: false,
+      } as NotificationMessage);
       for (let index = 0; index < input.config.folders.length; index++) {
         const loader = new DirectoryLoader(
           input.config.folders[index],
@@ -398,7 +438,8 @@ export class KnowledgeBaseManager {
             '.jpg': (path) => new ImageLoader(path),
             '.png': (path) => new ImageLoader(path),
             '.txt': (path) => new TextLoader(path),
-            '.docx': (path) => new DocxLoader(path),
+            '.docx': (path) => new DocxLoader(path, { type: 'docx' }),
+            '.doc': (path) => new DocxLoader(path, { type: 'doc' }),
             '.pdf': (path) => new PDFLoader(path),
             // '.csv': (path) => new CSVLoader(path, 'text'),
           },
@@ -418,6 +459,19 @@ export class KnowledgeBaseManager {
           );
         }
       }
+    } else if (input.config.text) {
+      await this.insertRecord(
+        kb.id,
+        new Document({
+          pageContent: input.config.text,
+          metadata: {
+            source: null,
+            title: null,
+          },
+        }),
+        KnowledgeBaseSourceType.Text,
+        input.config,
+      );
     }
   };
 
@@ -507,16 +561,20 @@ export class KnowledgeBaseManager {
     const ranker_scores = {};
     const result = [];
     if (kb.reranker) {
-      const reranker = await getReranker(kb.reranker);
-      const res = await reranker.rerank(
-        query,
-        documents.map((x) => x[0].pageContent),
-        undefined,
-        true,
-      );
-      for (let index = 0; index < res.length; index++) {
-        ranker_scores[documents[res[index].index][0].metadata.id] =
-          res[index].score;
+      try {
+        const reranker = await getReranker(kb.reranker);
+        const res = await reranker.rerank(
+          query,
+          documents.map((x) => x[0].pageContent),
+          undefined,
+          true,
+        );
+        for (let index = 0; index < res.length; index++) {
+          ranker_scores[documents[res[index].index][0].metadata.id] =
+            res[index].score;
+        }
+      } catch {
+        notificationManager.sendNotification(`${kb.reranker} error`, 'error');
       }
     }
 
@@ -673,7 +731,13 @@ export class KnowledgeBaseManager {
   public update = async (id: string, input: KnowledgeBaseUpdateInput) => {
     delete input['embedding'];
     delete input['vectorStoreType'];
-    await dbManager.update('knowledgebase', input, { id });
+    const kb_repository = dbManager.dataSource.getRepository(KnowledgeBase);
+    const kb = await kb_repository.findOne({
+      where: { id },
+    });
+    const _kb = { ...kb, ...input };
+    const res = await kb_repository.save(_kb);
+    console.log(res);
   };
 }
 

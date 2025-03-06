@@ -194,6 +194,10 @@ export class ChatMessage {
   @Column({ nullable: true })
   divider?: boolean = false;
 
+  //耗时
+  @Column({ nullable: true })
+  time_cost?: number;
+
   public setUsage(usage_metadata: {
     total_tokens?: number;
     input_tokens?: number;

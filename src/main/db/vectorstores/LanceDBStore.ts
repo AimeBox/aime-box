@@ -57,7 +57,7 @@ export class LanceDBStore extends BaseVectorStore {
     if ((await store.connect.tableNames()).includes(store.tableName)) {
       store.client = await store.connect.openTable(store.tableName);
       const schema = await store.client.schema();
-      console.log(schema);
+      //console.log(schema);
     } else {
       const schemaList = [
         new arrow.Field('id', new arrow.Utf8()),

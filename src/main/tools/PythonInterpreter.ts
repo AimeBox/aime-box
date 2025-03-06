@@ -15,15 +15,32 @@ import fs from 'fs';
 import { runCommand, runCommandSync } from '../utils/exec';
 import { getTmpPath } from '../utils/path';
 import { platform } from 'process';
+import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
 
 export interface PythonInterpreterParameters extends ToolParams {
   pythonPath?: string;
+  keepVenv?: boolean;
 }
 
-export class PythonInterpreterTool extends StructuredTool {
+export class PythonInterpreterTool extends BaseTool {
   static lc_name() {
     return 'python_interpreter';
   }
+
+  configSchema: FormSchema[] = [
+    {
+      label: 'Python Path',
+      field: 'pythonPath',
+      component: 'Input',
+    },
+    {
+      label: 'Keep Venv',
+      field: 'keepVenv',
+      component: 'Switch',
+      defaultValue: false,
+    },
+  ];
 
   schema = z.object({
     script: z.string().describe('python script'),
@@ -33,34 +50,19 @@ export class PythonInterpreterTool extends StructuredTool {
     ),
   });
 
-  name: string;
+  name: string = 'python_interpreter';
 
-  description: string;
+  description: string = `Evaluates python code in a sandbox environment. The environment resets on every execution. You must send the whole script every time and print your outputs.`;
 
   pythonPath: string;
 
+  keepVenv: boolean = false;
+
   constructor(params?: PythonInterpreterParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'python_interpreter',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: `Evaluates python code in a sandbox environment. The environment resets on every execution. You must send the whole script every time and print your outputs.`,
-    });
-    Object.defineProperty(this, 'pythonPath', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: undefined,
-    });
 
     this.pythonPath = params?.pythonPath;
+    this.keepVenv = params?.keepVenv ?? false;
   }
 
   async _call(
@@ -175,6 +177,10 @@ export class PythonInterpreterTool extends StructuredTool {
       );
 
       return out.trim();
+    } finally {
+      if (!this.keepVenv) {
+        fs.rmSync(path.join(getTmpPath(), 'sandbox'), { recursive: true });
+      }
     }
     return null;
   }

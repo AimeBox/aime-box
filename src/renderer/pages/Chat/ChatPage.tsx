@@ -22,12 +22,32 @@ import { FaSeedling, FaTowerObservation } from 'react-icons/fa6';
 import ChatList, { ChatListRef } from '@/renderer/components/chat/ChatList';
 import ChatContent from './ChatContent';
 import Content from '@/renderer/components/layout/Content';
+import { ChatMode } from '@/types/chat';
+import { Chat } from '@/entity/Chat';
+import ChatFileContent from './ChatFileContent';
 
 export default function ChatPage() {
   const chatListRef = useRef<ChatListRef | null>(null);
+  const [mode, setMode] = useState<ChatMode | null>(null);
   const navigate = useNavigate();
-  useEffect(() => {}, []);
-  const onNewChat = async (mode: string) => {
+  const location = useLocation();
+  useEffect(() => {
+    // ?mode=default
+    if (location.search) {
+      const s = {};
+      location.search
+        .substring(1)
+        .split('&')
+        .forEach((item) => {
+          const [key, value] = item.split('=');
+          s[key] = value;
+        });
+      const _mode = s['mode'];
+      setMode(_mode);
+    }
+  }, [location.search]);
+
+  const onNewChat = async (mode: ChatMode) => {
     const chat = await window.electron.chat.create(mode);
     if (chatListRef.current) {
       chatListRef.current.getData(true);
@@ -43,7 +63,10 @@ export default function ChatPage() {
 
         <div className="flex flex-col flex-1 w-full min-w-0 h-full min-h-full">
           <Routes>
-            <Route path="*" element={<ChatContent />} />
+            {(mode == 'default' || mode == 'agent') && (
+              <Route path="*" element={<ChatContent />} />
+            )}
+            {mode == 'file' && <Route path="*" element={<ChatFileContent />} />}
           </Routes>
         </div>
       </div>

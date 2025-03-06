@@ -70,7 +70,7 @@ export default function AgentConfigDrawer(props: AgentConfigDrawerProps) {
       }}
     >
       <Drawer
-        title={t('agent.config')}
+        title={value?.name}
         className="rounded-2xl shadow-lg"
         {...props}
         width={600}
@@ -88,6 +88,7 @@ export default function AgentConfigDrawer(props: AgentConfigDrawerProps) {
             {currentTab == 'base' && (
               <div>
                 <BasicForm
+                  layout="vertical"
                   value={value?.config}
                   schemas={value?.configSchema ?? []}
                   onFinish={onFinish}

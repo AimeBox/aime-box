@@ -9,6 +9,7 @@ import {
   SaveDialogOptions,
 } from 'electron';
 import { t } from 'i18next';
+import { appManager } from './app/AppManager';
 
 const fs = require('fs');
 
@@ -60,6 +61,15 @@ export default class MenuBuilder {
             label: t('selectAll'),
             role: 'selectAll',
             accelerator: 'Ctrl+A',
+          }),
+        );
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(
+          new MenuItem({
+            label: t('play'),
+            click: () => {
+              appManager.tts(selectionText.trim());
+            },
           }),
         );
       } else if (mediaType == 'image') {

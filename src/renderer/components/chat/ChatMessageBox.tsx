@@ -1,6 +1,7 @@
 import {
   FaAngleDown,
   FaClipboard,
+  FaClock,
   FaEdit,
   FaLightbulb,
   FaMedapps,
@@ -358,8 +359,23 @@ const ChatMessageBox = React.forwardRef(
                       </div>
 
                       {value.role == 'assistant' && (
-                        <div className="text-xs font-medium text-gray-400">
-                          tokens: {value.total_tokens}
+                        <div className="flex flex-row gap-2 items-center text-xs font-medium text-gray-400">
+                          <span>tokens: {value.total_tokens} </span>
+                          {value.time_cost && (
+                            <div className="flex flex-row gap-1 items-center">
+                              <FaClock />
+                              {(value.time_cost / 1000).toFixed(2)}s
+                            </div>
+                          )}
+                          {value.time_cost && (
+                            <div className="flex flex-row gap-1 items-center">
+                              {(
+                                value.total_tokens /
+                                (value.time_cost / 1000)
+                              ).toFixed(0)}{' '}
+                              token/s
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

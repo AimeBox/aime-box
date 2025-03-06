@@ -89,7 +89,7 @@ export default function LocalModelManager() {
               <div className="flex flex-col gap-2" key={group}>
                 <div className="font-semibold">{group}</div>
                 <div className="flex flex-col justify-between items-center">
-                  <div>{localModels[group].id}</div>
+                  <div>{t(localModels[group].id)}</div>
                   <div className="flex flex-col gap-2 w-full">
                     {localModels[group].map((model) => {
                       return (

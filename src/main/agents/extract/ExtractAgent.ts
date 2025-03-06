@@ -356,7 +356,7 @@ export class ExtractAgent extends BaseAgent {
         }
         if (extractResult.length > 0) {
           extractResult = [...new Set(extractResult)];
-          extractFieldsResult[field.field] = extractResult;
+          extractFieldsResult[field.field] = extractResult.join(',');
         }
       }
     }
@@ -444,9 +444,11 @@ export class ExtractAgent extends BaseAgent {
       yield `\n\n需要提取字段为:\n${fields.map((x) => ` - \`${x.type}\` **${x.field}** : ${x.name} (${x.description})`).join('\n')}\n\n`;
       const outputs = [];
       yield `| 文件名 `;
+      const defaultFields = {};
       for (let index = 0; index < fields.length; index++) {
         const field = fields[index];
         yield `| ${field.field} `;
+        defaultFields[field.field] = null;
       }
       yield ` |\n`;
       yield `|${'-'.repeat(7)}`;
@@ -467,21 +469,34 @@ export class ExtractAgent extends BaseAgent {
         } catch {}
 
         if (doc) {
-          const result = await that.extractFile(doc, fields);
-          if (result) {
-            let p = '';
-            const values = Object.values(result);
-            for (let vindex = 0; vindex < values.length; vindex++) {
-              const value = values[vindex];
-              if (isArray(value)) {
-                p += `| ${value?.join(',')?.replaceAll('\n', ' ') || ''} `;
-              } else {
-                p += `| ${value?.toString()?.replaceAll('\n', ' ') || ''} `;
+          try {
+            const result = await that.extractFile(doc, fields);
+            if (result) {
+              let p = '';
+              const values = { ...defaultFields };
+              for (const key in values) {
+                values[key] = result[key];
+                const value = values[key];
+                if (isArray(value)) {
+                  p += `| ${value?.join(',')?.replaceAll('\n', ' ') || ''} `;
+                } else {
+                  p += `| ${value?.toString()?.replaceAll('\n', ' ') || ''} `;
+                }
               }
-            }
 
-            yield `${p}`;
-          } else {
+              // for (let vindex = 0; vindex < values.length; vindex++) {
+              //   const value = values[vindex];
+              //   if (isArray(value)) {
+              //     p += `| ${value?.join(',')?.replaceAll('\n', ' ') || ''} `;
+              //   } else {
+              //     p += `| ${value?.toString()?.replaceAll('\n', ' ') || ''} `;
+              //   }
+              // }
+
+              yield `${p}`;
+            }
+          } catch (err) {
+            yield `| ${err}`;
           }
         }
         yield `|\n`;

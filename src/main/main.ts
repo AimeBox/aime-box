@@ -62,7 +62,8 @@ process.on('uncaughtException', (error) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('未处理的 Promise 拒绝:', reason);
-  dialog.showErrorBox('应用错误', `发生了一个错误: ${reason}`);
+  // dialog.showErrorBox('应用错误', `发生了一个错误: ${reason}`);
+
   // 处理未捕获的 Promise 拒绝
 });
 

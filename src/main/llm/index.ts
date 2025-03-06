@@ -22,11 +22,14 @@ import { ChatOptions } from '../../entity/Chat';
 import { ChatDeepSeek } from '@langchain/deepseek';
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { agentManager } from '../agents/index';
+import { KnowledgeBaseQuery } from '../tools/KnowledgeBaseQuery';
+import { BaseTool } from '../tools/BaseTool';
 
 export async function getChatModel(
   providerName: string,
   modelName: string,
   options?: ChatOptions,
+  tools: BaseTool[] = [],
 ): Promise<BaseChatModel> {
   const provider = await (
     await providersManager.getProviders()
@@ -39,20 +42,6 @@ export async function getChatModel(
   }
   if (!model.enable) {
     throw new Error('Model not enable');
-  }
-
-  let tools = [] as Tool[];
-  if (options?.agentNames && options?.agentNames.length > 0) {
-    const agents = agentManager.agents.filter((x) =>
-      options?.agentNames.includes(x.info.name),
-    );
-    tools.push(...agents.map((x) => x.agent));
-  }
-
-  if (options?.toolNames && options?.toolNames.length > 0) {
-    tools = toolsManager.tools
-      .filter((x) => options?.toolNames.includes(x.name))
-      .map((x) => x.tool) as Tool[];
   }
 
   let llm;

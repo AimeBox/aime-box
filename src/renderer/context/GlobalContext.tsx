@@ -31,6 +31,8 @@ import { NotificationMessage } from '@/types/notification';
 import { HomeOutlined } from '@ant-design/icons';
 import { PromptsModal } from './PromptsModal';
 import { Prompt } from '@/entity/Prompt';
+import { KnowledgeBase } from '@/entity/KnowledgeBase';
+import { KnowledgeBaseModal } from './KnowledgeBaseModal';
 
 type GlobalContextProviderState = {
   tools: {
@@ -52,6 +54,11 @@ type GlobalContextProviderState = {
     close: () => void;
     onSelect: (prompt: Prompt) => void;
   };
+  knowledgeBase: {
+    open: (kbIds: string[]) => void;
+    close: () => void;
+    onSelect: (kbs: KnowledgeBase[]) => void;
+  };
 };
 const initialState = {
   tools: {
@@ -71,6 +78,11 @@ const initialState = {
     close: () => {},
     onSelect: (prompt: Prompt) => {},
   },
+  knowledgeBase: {
+    open: (kbIds: string[]) => {},
+    close: () => {},
+    onSelect: (kbs: KnowledgeBase[]) => {},
+  },
   // isOpen: false,
   // openToolsModal: (selectToolNames: string[]) => Promise<void>,
   // closeToolsModal: () => {},
@@ -87,10 +99,15 @@ export function GlobalContextProvider({
   const [isToolModalOpen, setIsToolModalOpen] = useState(false);
   const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
   const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false);
+  const [isKnowledgeBaseModalOpen, setIsKnowledgeBaseModalOpen] =
+    useState(false);
   const [promptsRole, setPromptsRole] = useState<string | undefined>(undefined);
 
   const [selectedTools, setSelectedTools] = useState<ToolInfo[]>([]);
   const [selectedAgents, setSelectedAgents] = useState<AgentInfo[]>([]);
+  const [selectedKnowledgeBases, setSelectedKnowledgeBases] = useState<
+    KnowledgeBase[]
+  >([]);
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [api, contextHolder] = notification.useNotification();
@@ -144,6 +161,19 @@ export function GlobalContextProvider({
         },
         onSelect: (prompt: Prompt) => {
           console.log(prompt);
+        },
+      },
+      knowledgeBase: {
+        open: (kbIds: string[]) => {
+          setIsKnowledgeBaseModalOpen(true);
+          const res = window.electron.db.getMany<KnowledgeBase>(
+            'knowledgebase',
+            {},
+          );
+          setSelectedKnowledgeBases(res.filter((kb) => kbIds.includes(kb.id)));
+        },
+        close: () => {
+          setIsKnowledgeBaseModalOpen(false);
         },
       },
     }),
@@ -274,6 +304,19 @@ export function GlobalContextProvider({
         }}
         onCancel={() => setIsPromptsModalOpen(false)}
       ></PromptsModal>
+      <KnowledgeBaseModal
+        zIndex={2000}
+        open={isKnowledgeBaseModalOpen}
+        destroyOnClose
+        selectedKnowledgeBases={selectedKnowledgeBases}
+        setSelectedKnowledgeBases={setSelectedKnowledgeBases}
+        footer={null}
+        onSelect={(kbs) => {
+          setIsPromptsModalOpen(false);
+          value.knowledgeBase.onSelect(kbs);
+        }}
+        onCancel={() => setIsKnowledgeBaseModalOpen(false)}
+      ></KnowledgeBaseModal>
     </GlobalContext.Provider>
   );
 }

@@ -22,7 +22,6 @@ import { Tool, ToolParams } from '@langchain/core/tools';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { RunnableLambda } from '@langchain/core/runnables';
 import { ChatGroqInput, ChatGroq as LangchainChatGroq } from '@langchain/groq';
-import { toolsManager } from '../tools';
 import settingsManager from '../settings';
 
 import providersManager from '../providers';

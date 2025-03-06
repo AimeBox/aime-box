@@ -51,7 +51,7 @@ export default function Sidebar() {
       key: 'home',
       icon: <FaHome />,
       label: t('sidebar.home'),
-      href: '/',
+      href: '/home',
     },
     {
       key: 'chat',
@@ -115,6 +115,7 @@ export default function Sidebar() {
       key: 'github',
       icon: <FaGithub />,
       label: 'Github',
+      href: 'https://github.com/AimeBox/aime-box',
     },
   ] as any[];
   const [meunBottomList, setMeunBottomList] = useState([
@@ -128,7 +129,7 @@ export default function Sidebar() {
       key: 'theme',
       label: t('sidebar.theme'),
       icon: (
-        <div className="flex items-center justify-center w-full text-sm">
+        <div className="flex justify-center items-center w-full text-sm">
           <ThemeToggle />
         </div>
       ),
@@ -161,12 +162,13 @@ export default function Sidebar() {
       {/* <AboutModel open={showAboutModel} onOk={() => setShowAboutModel(false)} />
       <LoginModal open={showLoginModal} onOk={() => setShowLoginModal(false)} /> */}
       <div className="">
-        <div className="flex flex-col h-full overflow-hidden ">
+        <div className="flex overflow-hidden flex-col h-full">
           <Menu
             className="flex-1 !px-2 bg-transparent pt-2"
             mode="inline"
             theme={theme}
             inlineCollapsed
+            selectedKeys={defaultSelectedKeys}
             defaultSelectedKeys={defaultSelectedKeys}
             style={{ width: 80, border: 'none' }}
             items={meunList}
@@ -189,25 +191,13 @@ export default function Sidebar() {
               items={meunBottomList}
               onClick={({ item, key, keyPath, domEvent }) => {
                 //setOpenKeys([]);
-                if (key == 'settings') {
-                  navigate(item.props.href);
-                  //setShowSettingModel(true);
-                } else if (key == 'about') {
-                  setShowAboutModel(true);
-                } else if (key == 'profile') {
-                  // if (!globalState.currentUser) setShowLoginModal(true);
-                } else if (key == 'logout') {
-                  // if (globalState.currentUser) {
-                  //   // logout();
-                  //   // setGlobalState({
-                  //   //   currentUser: null,
-                  //   // });
-                  // }
+                if (item.props.href) {
+                  window.open(item.props.href, '_blank');
                 }
               }}
               onSelect={({ item, key, keyPath, selectedKeys, domEvent }) => {}}
             />
-            <div className="flex items-center justify-center w-full py-2 text-sm">
+            <div className="flex justify-center items-center py-2 w-full text-sm">
               {appInfo.version}
             </div>
           </div>

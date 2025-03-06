@@ -43,30 +43,36 @@ export default function Tools() {
     setTools(res);
   };
   const onShowToolSetting = (tool: ToolInfo) => {
+    console.log(tool);
     const toolSettinSchemas = [] as FormSchema[];
-    Object.keys(tool.parameters).forEach((p) => {
-      if (isString(tool.parameters[p])) {
-        toolSettinSchemas.push({
-          label: p,
-          field: p,
-          component: 'Input',
-        });
-      }
-      if (isNumber(tool.parameters[p])) {
-        toolSettinSchemas.push({
-          label: p,
-          field: p,
-          component: 'InputNumber',
-        });
-      }
-      if (isBoolean(tool.parameters[p])) {
-        toolSettinSchemas.push({
-          label: p,
-          field: p,
-          component: 'Switch',
-        });
-      }
-    });
+    if (tool.configSchema) {
+      toolSettinSchemas.push(...tool.configSchema);
+    } else {
+      Object.keys(tool.parameters).forEach((p) => {
+        if (isString(tool.parameters[p])) {
+          toolSettinSchemas.push({
+            label: p,
+            field: p,
+            component: 'Input',
+          });
+        }
+        if (isNumber(tool.parameters[p])) {
+          toolSettinSchemas.push({
+            label: p,
+            field: p,
+            component: 'InputNumber',
+          });
+        }
+        if (isBoolean(tool.parameters[p])) {
+          toolSettinSchemas.push({
+            label: p,
+            field: p,
+            component: 'Switch',
+          });
+        }
+      });
+    }
+
     setToolSettinSchemas(toolSettinSchemas);
     setTimeout(() => {
       setCurrentTool(tool);
@@ -340,8 +346,8 @@ export default function Tools() {
                 )}
                 {isString(invokeOutput) && (
                   <>
-                    <pre>{invokeOutput}</pre>
-                    {/* <ResponseCard value={invokeOutput} /> */}
+                    {/* <pre>{invokeOutput}</pre> */}
+                    <ResponseCard value={invokeOutput} />
                   </>
                 )}
               </div>

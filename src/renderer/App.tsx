@@ -7,7 +7,7 @@ import {
 import 'tailwindcss/tailwind.css';
 import icon from '../../assets/icon.svg';
 import './App.css';
-import { Provider, useDispatch } from 'react-redux';
+import { Provider, useDispatch, useSelector } from 'react-redux';
 import store from './store';
 import Home from './pages/Home';
 import Sidebar from './components/layout/Sidebar';
@@ -19,7 +19,7 @@ import Settings from './pages/Settings';
 import Tools from './pages/Tools';
 import ChatPage from './pages/Chat/ChatPage';
 import React, { ReactNode, useEffect, useMemo } from 'react';
-import { getProviders } from './store/providerSlice';
+import { fetchProviders } from './store/providerSlice';
 import AgentPage from './pages/Agent/AgentPage';
 import { setSettings } from './store/settingsSlice';
 import { ipcRenderer } from 'electron';
@@ -33,7 +33,9 @@ function TemplatePage(props: { children: ReactNode }) {
   const Context = React.createContext({ name: 'Default' });
   const { children } = props;
   const dispatch = useDispatch();
-  dispatch(getProviders());
+  useEffect(() => {
+    dispatch(fetchProviders());
+  }, [dispatch]);
   const settings = window.electron.setting.getSettings();
   dispatch(setSettings(settings));
   //const [api, contextHolder] = notification.useNotification();
@@ -76,7 +78,7 @@ export default function App() {
           <Router>
             <TemplatePage>
               <Routes>
-                <Route path="/" element={<Home />} />
+                <Route path="/home" element={<Home />} />
                 <Route path="/agent/*" element={<AgentPage />} />
                 <Route path="/prompts/*" element={<PromptsPage />} />
                 <Route path="/chat/*" element={<ChatPage />} />
