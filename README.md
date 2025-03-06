@@ -8,10 +8,10 @@
 目标尽量实现全离线本地可执行的之智能agent
 
 ### 🖼 **截图**
-![image](docs\assets\20250307003357.png)
-![image](docs\assets\20250307003718.png)
-![image](docs\assets\20250307003731.png)
-![image](docs\assets\20250307003750.png)
+![image](docs/assets/20250307003357.png)
+![image](docs/assets/20250307003718.png)
+![image](docs/assets/20250307003731.png)
+![image](docs/assets/20250307003750.png)
 
 ### 开始
 1. 添加模型提供商(如Ollama)
