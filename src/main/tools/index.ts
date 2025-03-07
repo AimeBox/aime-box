@@ -387,7 +387,7 @@ export class ToolsManager {
       } else if (isUrl(res)) {
         return `![](${res})`;
       } else if (fs.existsSync(res)) {
-        return `![](file://${res.replace(/\\/g, '/')})`;
+        return `![](file:///${res.replace(/\\/g, '/')})`;
       }
       return res;
     }
