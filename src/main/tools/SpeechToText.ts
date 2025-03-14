@@ -15,6 +15,8 @@ import { ToolField } from './ToolField';
 import { getModelsPath } from '../utils/path';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
 
 export interface SpeechToTextParameters extends ToolParams {
   ffmpegPath: string;
@@ -22,7 +24,7 @@ export interface SpeechToTextParameters extends ToolParams {
   apiKey: string;
 }
 
-export class SpeechToText extends StructuredTool {
+export class SpeechToText extends BaseTool {
   schema = z.object({
     fileOrUrl: z.string().describe('The file of the audio file'),
     language: z
@@ -37,66 +39,34 @@ export class SpeechToText extends StructuredTool {
       .describe('Speaker Diarization'),
   });
 
-  static lc_name() {
-    return 'speech_to_text';
-  }
-
-  name: string;
+  name: string = 'speech-to-text';
 
   description: string;
 
   ffmpegPath: string;
 
-  @ToolField({
-    field: 'model',
-    component: 'Select',
-    componentProps: {
-      options: [
-        { value: 'sense-voice@local', label: 'sense-voice@local' },
-        { value: 'whisper-medium@local', label: 'whisper-medium@local' },
-        { value: 'whisper-large-v3@local', label: 'whisper-large-v3@local' },
-        { value: 'openai-whisper', label: 'OpenAI-Whisper' },
-      ],
-    },
-  })
   model: string;
-
-  apiKey: string;
 
   sherpa_onnx: any;
 
+  configSchema: FormSchema[] = [
+    {
+      field: 'model',
+      component: 'ProviderSelect',
+      componentProps: {
+        type: 'stt',
+      },
+    },
+    {
+      label: 'FFmpeg Path',
+      field: 'ffmpegPath',
+      component: 'Input',
+    },
+  ];
+
   constructor(params?: SpeechToTextParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'speech_to_text',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'speech to text',
-    });
-    Object.defineProperty(this, 'ffmpegPath', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: '',
-    });
-    Object.defineProperty(this, 'model', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'sense-voice@local',
-    });
-    Object.defineProperty(this, 'apiKey', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: '',
-    });
+
     this.ffmpegPath = params?.ffmpegPath;
     if (!this.ffmpegPath || !fs.existsSync(this.ffmpegPath)) {
       if (process.env.FFMPEG_PATH) {

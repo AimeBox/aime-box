@@ -19,6 +19,8 @@ import ProviderSelect from '../providers/ProviderSelect';
 import { FaPlus } from 'react-icons/fa';
 import { t } from 'i18next';
 import FileSelect from './FileSelect';
+import AgentSelect from '../agents/AgentSelect';
+import ToolSelect from '../tools/ToolSelect';
 
 export interface FormItemProps {
   schema: FormSchema;
@@ -122,6 +124,12 @@ const FormModal = forwardRef((props: FormItemProps, ref) => {
 
         {props.schema.component === 'ProviderSelect' && (
           <ProviderSelect {...props.schema.componentProps}></ProviderSelect>
+        )}
+        {props.schema.component === 'AgentSelect' && (
+          <AgentSelect {...props.schema.componentProps}></AgentSelect>
+        )}
+        {props.schema.component === 'ToolSelect' && (
+          <ToolSelect {...props.schema.componentProps}></ToolSelect>
         )}
       </Form.Item>
     )

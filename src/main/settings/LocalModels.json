@@ -48,9 +48,14 @@
   ],
   "tts": [
     {
-      "id": "kokoro-multi-lang-v1_0",
+      "id": "kokoro-int8-multi-lang-v1_1",
       "type": "github",
-      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2"
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2"
+    },
+    {
+      "id": "kokoro-multi-lang-v1_1",
+      "type": "github",
+      "download": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_1.tar.bz2"
     },
     {
       "id": "matcha-icefall-zh-baker",
@@ -132,6 +137,18 @@
       "repo": "briaai/RMBG-1.4",
       "type": "huggingface",
       "download": "https://huggingface.co/briaai/RMBG-1.4"
+    },
+    {
+      "id": "rmbg-2.0",
+      "repo": "briaai/RMBG-2.0",
+      "type": "huggingface",
+      "download": "https://huggingface.co/briaai/RMBG-2.0"
+    },
+    {
+      "id": "doclayout_yolo",
+      "repo": "darknoah99/DocLayout-YOLO-DocStructBench-onnx",
+      "type": "huggingface",
+      "download": "https://huggingface.co/darknoah99/DocLayout-YOLO-DocStructBench-onnx"
     }
   ]
 }

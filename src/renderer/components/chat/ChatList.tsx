@@ -42,13 +42,11 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
 
   const navigate = useNavigate();
   const getData = async (clear = false) => {
-    const res = await window.electron.db.page<Chat>(
-      'chat',
-      {},
-      clear ? 0 : chats.length,
-      30,
-      'timestamp desc',
-    );
+    const res = await window.electron.chat.getChatPage({
+      skip: clear ? 0 : chats.length,
+      pageSize: 30,
+      sort: 'timestamp desc',
+    });
 
     setTotalCount(res.totalCount);
     setChats((preChats) => {
@@ -171,7 +169,9 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
               icon={chat.mode === 'file' ? <FaFile /> : undefined}
               active={currentChatId === chat.id}
               title={chat.title}
-              subTitle={chat.mode === 'agent' && <small>@{chat.agent}</small>}
+              subTitle={
+                chat.mode === 'agent' && <small>@{chat.agentName}</small>
+              }
               href={`/chat/${chat.id}?mode=${chat.mode}`}
               menu={
                 <div className="flex flex-col">

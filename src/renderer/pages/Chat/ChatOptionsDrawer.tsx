@@ -72,7 +72,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
 
   useEffect(() => {
     onChange({
-      toolNames: tools.selectedTools.map((t) => t.name),
+      toolNames: tools.selectedTools.map((t) => t.id),
       agentNames: agents.selectedAgents.map((a) => a.name),
     });
   }, [tools, agents]);
@@ -351,10 +351,10 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                       <div className="w-20">
                         {t('chat.chat_options.temperature')}
                       </div>
-                      {insideValue?.temperature && (
+                      {insideValue?.temperature !== undefined && (
                         <Slider
                           value={insideValue?.temperature}
-                          disabled={insideValue?.temperature == undefined}
+                          disabled={insideValue?.temperature === undefined}
                           className="w-60"
                           min={0}
                           max={1}
@@ -376,10 +376,10 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                         }
                       ></Switch>
                       <div className="w-20">Top K</div>
-                      {insideValue?.top_k && (
+                      {insideValue?.top_k !== undefined && (
                         <Slider
                           value={insideValue?.top_k}
-                          disabled={insideValue?.top_k == undefined}
+                          disabled={insideValue?.top_k === undefined}
                           className="w-60"
                           min={0}
                           max={1}
@@ -399,10 +399,10 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                         }
                       ></Switch>
                       <div className="w-20">Top P</div>
-                      {insideValue?.top_p && (
+                      {insideValue?.top_p !== undefined && (
                         <Slider
                           value={insideValue?.top_p}
-                          disabled={insideValue?.top_p == undefined}
+                          disabled={insideValue?.top_p === undefined}
                           className="w-60"
                           min={0}
                           max={1}

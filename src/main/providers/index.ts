@@ -208,13 +208,15 @@ export class ProvidersManager {
         const url = 'https://openrouter.ai/api/v1/models';
         const res = await fetch(url, options);
         const models = await res.json();
-        return models.data.map((x) => {
-          return {
-            name: x.id,
-            enable:
-              connection.models?.find((z) => z.name == x.id)?.enable || false,
-          };
-        });
+        return models.data
+          .map((x) => {
+            return {
+              name: x.id,
+              enable:
+                connection.models?.find((z) => z.name == x.id)?.enable || false,
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection.type === ProviderType.SILICONFLOW) {
         const options = {
           method: 'GET',

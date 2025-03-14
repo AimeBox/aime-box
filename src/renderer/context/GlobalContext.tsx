@@ -121,13 +121,11 @@ export function GlobalContextProvider({
     () => ({
       tools: {
         //isOpen: isToolModalOpen,
-        open: (selectToolNames: string[]) => {
+        open: async (selectToolNames: string[]) => {
           setIsToolModalOpen(true);
-          const tools = window.electron.tools.getInfo();
+          const tools = await window.electron.tools.getList();
           setTools(tools);
-          setSelectedTools(
-            tools.filter((t) => selectToolNames.includes(t.name)),
-          );
+          setSelectedTools(tools.filter((t) => selectToolNames.includes(t.id)));
         },
         close: () => {
           setIsToolModalOpen(false);

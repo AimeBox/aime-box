@@ -21,56 +21,42 @@ import { DuckDuckGoSearchTool } from './DuckDuckGoSearch';
 import { SearxngSearchTool } from './SearxngSearchTool';
 import { TavilySearchTool } from './TavilySearch';
 import { SerpAPI } from '@langchain/community/tools/serpapi';
+import { BaseTool } from './BaseTool';
 
 export interface WebSearchToolParameters extends ToolParams {
   provider?: string;
   limit: number;
 }
 
-export class WebSearchTool extends Tool {
+export class WebSearchTool extends BaseTool {
   static lc_name() {
-    return 'WebSearch';
+    return 'web-search';
   }
 
-  name: string;
+  schema = z.object({
+    query: z.string().describe('The query to search the web for.'),
+  });
 
-  description: string;
+  name: string = 'web-search';
+
+  description: string = 'Search the web for information.';
 
   provider?: string;
 
-  limit: number;
+  limit: number = 10;
 
   constructor(params?: WebSearchToolParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'WebSearch',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'Web Search ',
-    });
-    Object.defineProperty(this, 'provider', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: undefined,
-    });
-    Object.defineProperty(this, 'limit', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 10,
-    });
+
     this.provider = params?.provider;
     this.limit = params?.limit ?? 10;
   }
 
-  async _call(input: string, runManager, config): Promise<any> {
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<any> {
     try {
       const settings = settingsManager.getSettings();
       const httpAgent = settingsManager.getHttpAgent();
@@ -84,7 +70,7 @@ export class WebSearchTool extends Tool {
         const msg = [
           {
             role: 'user',
-            content: input,
+            content: input.query,
           },
         ];
         const tool = 'web-search-pro';
@@ -119,7 +105,7 @@ export class WebSearchTool extends Tool {
         }
       } else if (this.provider == WebSearchEngine.DuckDuckGo) {
         const d = new DuckDuckGoSearchTool({ maxResults: this.limit });
-        const res = await d.invoke(input);
+        const res = await d.invoke(input.query);
         return res;
       } else if (
         this.provider == WebSearchEngine.Searxng &&
@@ -129,7 +115,7 @@ export class WebSearchTool extends Tool {
           apiBase: settings.webSearchEngine.searxng.apiBase,
           params: { numResults: this.limit },
         });
-        const res = await d.invoke(input);
+        const res = await d.invoke(input.query);
         return res;
       } else if (
         this.provider == WebSearchEngine.Tavily &&
@@ -139,14 +125,14 @@ export class WebSearchTool extends Tool {
           apiKey: settings.webSearchEngine.tavily.apiKey,
           maxResults: this.limit,
         });
-        const res = await d.invoke(input);
+        const res = await d.invoke(input.query);
         return res;
       } else if (
         this.provider == WebSearchEngine.Serpapi &&
         settings.webSearchEngine.serpapi.apiKey
       ) {
         const d = new SerpAPI(settings.webSearchEngine.serpapi.apiKey);
-        const res = await d.invoke(input);
+        const res = await d.invoke(input.query);
         return res;
       }
       return 'config has error';

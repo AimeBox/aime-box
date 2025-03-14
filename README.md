@@ -34,6 +34,7 @@
 - 本地知识库引擎，使用lancedb 进行本地知识库检索，支持image、docx、doc、text、url做为输入源
 - 多agent，目前有数据提取agent、代码助手、翻译助手
 - 提示词保存功能
+- MCP支持,可接入供模型调用
   
 
 ### 📝 **Todo**
@@ -75,7 +76,8 @@ npm run package
 ### 🌐 **About**
 author: 781172480@qq.com
 
-
+### ChangeLog
+[CHANGELOG](./CHANGELOG.md)
 
 ## License
 

@@ -16,22 +16,35 @@ import fs from 'fs';
 import Speaker from 'speaker';
 import { getModelsPath, getTmpPath } from '../utils/path';
 import { v4 as uuidv4 } from 'uuid';
+import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
 
 export interface TextToSpeechParameters extends ToolParams {
   model: string;
 }
 
-export class TextToSpeech extends StructuredTool {
+export class TextToSpeech extends BaseTool {
   schema = z.object({
     text: z.string().describe('input Text'),
     sid: z.number().default(0).optional().describe('speaker id'),
+    speed: z.number().default(1.0).optional().describe('speed'),
   });
+
+  configSchema: FormSchema[] = [
+    {
+      field: 'model',
+      component: 'ProviderSelect',
+      componentProps: {
+        type: 'tts',
+      },
+    },
+  ];
 
   static lc_name() {
     return 'TextToSpeech';
   }
 
-  name: string = 'text_to_speech';
+  name: string = 'text-to-speech';
 
   description: string = 'text to speech';
 
@@ -64,17 +77,21 @@ export class TextToSpeech extends StructuredTool {
     if (!isString(input.text)) {
       resolve('input value is not string');
     }
-    const tts_config = this.getConfig(this.model);
-    const tts = await this.createTts(tts_config);
-    const audio = tts.generate({
-      text: input.text,
-      sid: 0,
-      speed: 1.0,
-      enableExternalBuffer: false,
-    });
-    if (audio.sampleRate) {
-      await this.play(audio);
-      return 'success';
+    if (this.model.split('@')[1] == 'local') {
+      const tts_config = this.getConfig(this.model.split('@')[0]);
+      const tts = await this.createTts(tts_config);
+      const audio = tts.generate({
+        text: input.text,
+        sid: input.sid ?? 0,
+        speed: input.speed ?? 1.0,
+        enableExternalBuffer: false,
+      });
+      if (audio.sampleRate) {
+        await this.play(audio);
+        return 'success';
+      } else {
+        return 'tts failed';
+      }
     } else {
       return 'tts failed';
     }
@@ -149,11 +166,18 @@ export class TextToSpeech extends StructuredTool {
         maxNumSentences: 1,
         ruleFsts: `${path.join(getModelsPath(), 'tts', modelName, 'phone.fst')},${path.join(getModelsPath(), 'tts', modelName, 'date.fst')},${path.join(getModelsPath(), 'tts', modelName, 'number.fst')}`,
       };
-    } else if (modelName == 'kokoro-multi-lang-v1_0') {
+    } else if (
+      modelName == 'kokoro-multi-lang-v1_0' ||
+      modelName == 'kokoro-multi-lang-v1_1' ||
+      modelName == 'kokoro-int8-multi-lang-v1_1'
+    ) {
+      const onnx = modelName.includes('int8')
+        ? `model.int8.onnx`
+        : `model.onnx`;
       config = {
         model: {
           kokoro: {
-            model: path.join(getModelsPath(), 'tts', modelName, `model.onnx`),
+            model: path.join(getModelsPath(), 'tts', modelName, onnx),
             voices: path.join(getModelsPath(), 'tts', modelName, `voices.bin`),
 
             tokens: path.join(getModelsPath(), 'tts', modelName, `tokens.txt`),
@@ -164,7 +188,7 @@ export class TextToSpeech extends StructuredTool {
               `espeak-ng-data`,
             ),
             dictDir: path.join(getModelsPath(), 'tts', modelName, `dict`),
-            lexicon: `${path.join(getModelsPath(), 'tts', modelName, 'lexicon-us-en.txt')},${path.join(getModelsPath(), 'tts', modelName, 'lexicon-zh.txt')}`,
+            lexicon: `${path.join(getModelsPath(), 'tts', modelName, 'lexicon-gb-en.txt')},${path.join(getModelsPath(), 'tts', modelName, 'lexicon-us-en.txt')},${path.join(getModelsPath(), 'tts', modelName, 'lexicon-zh.txt')}`,
           },
           debug: true,
           numThreads: 4,

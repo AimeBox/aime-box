@@ -19,7 +19,7 @@ import React, {
 import { ScrollArea } from '../components/ui/scroll-area';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { ToolInfo } from '@/main/tools';
-import { FaCheck, FaInfoCircle, FaSearch } from 'react-icons/fa';
+import { FaCheck, FaInfoCircle, FaPlus, FaSearch } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import { t } from 'i18next';
 import { Prompt, PromptGroup } from '@/entity/Prompt';
@@ -71,11 +71,10 @@ export const PromptsModal = React.forwardRef(
         }}
       >
         <Space direction="vertical" className="w-full">
-          <Input.Search
-            placeholder="input search"
-            enterButton
-            onSearch={onSearch}
-          />
+          <div className="flex flex-row gap-2">
+            <Input.Search placeholder="input search" onSearch={onSearch} />
+            <Button type="primary" icon={<FaPlus />} />
+          </div>
           <div className="flex flex-row">
             <div className="pr-2 border-r border-gray-300 border-solid">
               <Menu

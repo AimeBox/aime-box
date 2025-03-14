@@ -21,14 +21,12 @@ import { ProviderType, Providers } from '../../entity/Providers';
 import { ChatOptions } from '../../entity/Chat';
 import { ChatDeepSeek } from '@langchain/deepseek';
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
-import { agentManager } from '../agents/index';
-import { KnowledgeBaseQuery } from '../tools/KnowledgeBaseQuery';
 import { BaseTool } from '../tools/BaseTool';
 
 export async function getChatModel(
   providerName: string,
   modelName: string,
-  options?: ChatOptions,
+  options: ChatOptions = { streaming: true },
   tools: BaseTool[] = [],
 ): Promise<BaseChatModel> {
   const provider = await (

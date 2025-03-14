@@ -85,26 +85,30 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
       componentProps: {
         options: [
           {
-            label: 'Web',
+            label: t('knowledgebase.web'),
             value: 'web',
           },
           {
-            label: 'Local File',
+            label: t('knowledgebase.files'),
             value: 'file',
           },
           {
-            label: 'Local Folder',
+            label: t('knowledgebase.folders'),
             value: 'folder',
           },
           {
-            label: 'Text',
+            label: t('knowledgebase.text'),
             value: 'text',
+          },
+          {
+            label: t('knowledgebase.sitemap'),
+            value: 'sitemap',
           },
         ],
       },
     },
     {
-      label: 'Url',
+      //label: 'Url',
       field: 'url',
       component: 'Input',
       componentProps: {},
@@ -113,7 +117,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
       },
     },
     {
-      label: 'Text',
+      label: t('knowledgebase.text'),
       field: 'text',
       component: 'InputTextArea',
       componentProps: {},
@@ -124,7 +128,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
     {
       field: 'files',
       component: 'File',
-      helpMessage: '支持.txt, .pdf, .docx, .doc, .png, .jpg, .jpeg',
+      helpMessage: '.txt, .pdf, .docx, .doc, .png, .jpg, .jpeg',
       componentProps: {
         accept: '.txt,.pdf,.docx,.doc,.png,.jpg,.jpeg',
       },
@@ -135,14 +139,25 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
     {
       field: 'folders',
       component: 'Folder',
-      helpMessage: '支持.txt, .pdf, .docx, .doc, .png, .jpg, .jpeg',
+      helpMessage: '.txt, .pdf, .docx, .doc, .png, .jpg, .jpeg',
 
       ifShow({ values }) {
         return values['sourceType'] == 'folder';
       },
     },
     {
-      label: t('knowledge.chunkSize'),
+      //label: t('knowledgebase.sitemap'),
+      field: 'sitemap',
+      component: 'Input',
+      componentProps: {
+        placeholder: 'https://example.com/',
+      },
+      ifShow({ values }) {
+        return values['sourceType'] == 'sitemap';
+      },
+    },
+    {
+      label: t('knowledgebase.chunkSize'),
       field: 'chunkSize',
       component: 'Slider',
       defaultValue: 500,
@@ -152,7 +167,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
       },
     },
     {
-      label: 'Chunk Overlap Token',
+      label: t('knowledgebase.chunkOverlap'),
       field: 'chunkOverlap',
       component: 'Slider',
       defaultValue: 50,
@@ -162,7 +177,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
       },
     },
     {
-      label: 'Recursive',
+      label: t('knowledgebase.recursive'),
       field: 'recursive',
       component: 'Switch',
       componentProps: {},

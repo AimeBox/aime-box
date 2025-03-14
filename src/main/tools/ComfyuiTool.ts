@@ -12,49 +12,39 @@ import path from 'path';
 import { app } from 'electron';
 import { PythonShell, Options } from 'python-shell';
 import fs from 'fs';
+import { BaseTool } from './BaseTool';
 
 export interface ComfyuiToolParameters extends ToolParams {
   defaultApiBase?: string;
 }
 
-export class ComfyuiTool extends Tool {
+export class ComfyuiTool extends BaseTool {
+  schema = z.object({
+    fileOrCode: z.string().describe('The file or code to run'),
+  });
+
   static lc_name() {
-    return 'comfyui_tool';
+    return this.name;
   }
 
-  name: string;
+  name: string = 'comfyui_tool';
 
-  description: string;
+  description: string = `comfyui workflow.`;
 
-  defaultApiBase: string;
+  defaultApiBase: string = 'http://127.0.0.1:8188';
 
   constructor(params?: ComfyuiToolParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'comfyui_tool',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: `comfyui workflow.`,
-    });
-    Object.defineProperty(this, 'defaultApiBase', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'http://127.0.0.1:8188',
-    });
-
     this.defaultApiBase = params?.defaultApiBase;
   }
 
-  async _call(fileOrCode: string, runManager, config): Promise<string> {
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<string> {
     if (!this.defaultApiBase) {
-      return 'not found python';
+      return 'not found';
     }
 
     return null;

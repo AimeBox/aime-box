@@ -23,17 +23,15 @@ import {
   ClientOptions,
 } from '@langchain/openai';
 import settingsManager from '../settings';
+import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
 
 export interface DallEParameters extends ToolParams {
   apiKey: string;
   model: 'dall-e-3' | 'dall-e-2';
 }
 
-export class DallE extends StructuredTool {
-  static lc_name() {
-    return 'dalle_api';
-  }
-
+export class DallE extends BaseTool {
   schema = z.object({
     prompt: z.string().describe('image prompt'),
     quality: z
@@ -46,9 +44,29 @@ export class DallE extends StructuredTool {
       .describe('Image Response Format'),
   });
 
-  name: string;
+  configSchema?: FormSchema[] = [
+    {
+      field: 'apiKey',
+      component: 'Input',
+      label: 'API Key',
+    },
+    {
+      field: 'model',
+      component: 'Select',
+      label: 'Model',
+      componentProps: {
+        options: [
+          { label: 'Dall-E 3', value: 'dall-e-3' },
+          { label: 'Dall-E 2', value: 'dall-e-2' },
+        ],
+      },
+    },
+  ];
 
-  description: string;
+  name: string = 'dalle';
+
+  description: string =
+    'A wrapper around OpenAI DALL-E API. Useful for when you need to generate images from a text description. Input should be an image description.';
 
   model?: 'dall-e-3' | 'dall-e-2';
 
@@ -64,19 +82,6 @@ export class DallE extends StructuredTool {
 
   constructor(params?: DallEParameters) {
     super();
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'dalle_api_wrapper',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value:
-        'A wrapper around OpenAI DALL-E API. Useful for when you need to generate images from a text description. Input should be an image description.',
-    });
     this.model = params?.model || 'dall-e-3';
     this.apiKey = params?.apiKey;
     const clientConfig = {

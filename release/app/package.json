@@ -1,12 +1,12 @@
 {
-  "name": "electron-react-boilerplate",
-  "version": "0.1.0",
-  "description": "A foundation for scalable desktop apps",
-  "license": "MIT",
+  "name": "aime-box",
+  "version": "0.1.1",
+  "description": "Aime Box is a tool agent box for producer.",
+  "license": "Apache-2.0",
   "author": {
-    "name": "Electron React Boilerplate Maintainers",
-    "email": "electronreactboilerplate@gmail.com",
-    "url": "https://github.com/electron-react-boilerplate"
+    "name": "AimeBox",
+    "email": "781172480@qq.com",
+    "url": "https://github.com/AimeBox/aime-box"
   },
   "main": "./dist/main/main.js",
   "scripts": {
@@ -19,12 +19,13 @@
     "@lancedb/lancedb": "^0.12.0",
     "@langchain/community": "^0.3.29",
     "@langchain/core": "^0.3.39",
+    "@modelcontextprotocol/sdk": "^1.7.0",
     "apache-arrow": "^17.0.0",
     "better-sqlite3": "^9.6.0",
     "langchain": "^0.3.15",
     "playwright": "^1.50.1",
     "sharp": "^0.33.5",
-    "sherpa-onnx-node": "^1.10.42",
+    "sherpa-onnx-node": "^1.10.46",
     "speaker": "^0.5.5",
     "sqlite3": "^5.1.7",
     "typeorm": "^0.3.20",

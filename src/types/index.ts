@@ -121,4 +121,6 @@ export type ComponentType =
   | 'ColorPicker'
   | 'Tinymce'
   | 'MarkDown'
-  | 'ProviderSelect';
+  | 'ProviderSelect'
+  | 'AgentSelect'
+  | 'ToolSelect';

@@ -92,7 +92,8 @@
     "export": "Export",
     "knowledgebase": "KnowledgeBase",
     "tool": "Tools",
-    "fileChat": "File Chat"
+    "fileChat": "File Chat",
+    "export_image": "Export Image"
   },
   "language": {
     "english": "English",
@@ -110,6 +111,18 @@
   "knowledgebase": {
     "create_knowledgebase": "Create KnowledgeBase",
     "edit_knowledgebase": "Edit KnowledgeBase",
-    "select_knowledgebase": "Select KnowledgeBase"
+    "select_knowledgebase": "Select KnowledgeBase",
+    "chunkSize": "Chunk Size",
+    "sitemap": "Sitemap",
+    "folders": "Folders",
+    "files": "Files",
+    "text": "Text",
+    "web": "Web",
+    "chunkOverlap": "Chunk Overlap",
+    "recursive": "Recursive"
+  },
+  "tools": {
+    "addMcp": "Add Mcp",
+    "tool_config": "Tool Config"
   }
 }

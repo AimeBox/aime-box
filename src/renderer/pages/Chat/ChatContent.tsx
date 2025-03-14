@@ -44,6 +44,7 @@ import { GlobalContext } from '@/renderer/context/GlobalContext';
 import { Editor, EditorRef } from '@/renderer/components/common/Editor';
 import { ChatInputAttachment } from '@/types/chat';
 import ChatAttachment from '@/renderer/components/chat/ChatAttachment';
+import html2canvas from 'html2canvas';
 
 export default function ChatContent() {
   const location = useLocation();
@@ -83,13 +84,25 @@ export default function ChatContent() {
     let res = await window.electron.chat.getChat(id);
     console.log(res);
     if (!res.model) {
-      const defaultLLM = await window.electron.providers.getDefaultLLM();
-      if (defaultLLM) {
-        await window.electron.db.update('chat', { model: defaultLLM } as any, {
+      if (res.mode == 'agent' || res.mode == 'supervisor') {
+        const agent = await window.electron.db.get('agent', res.agent);
+        await window.electron.db.update('chat', { model: agent.model } as any, {
           id: res.id,
         });
-
         res = await window.electron.chat.getChat(id);
+      } else if (res.mode == 'default') {
+        const defaultLLM = await window.electron.providers.getDefaultLLM();
+        if (defaultLLM) {
+          await window.electron.db.update(
+            'chat',
+            { model: defaultLLM } as any,
+            {
+              id: res.id,
+            },
+          );
+
+          res = await window.electron.chat.getChat(id);
+        }
       }
     }
     setCurrentModel(res.model);
@@ -259,7 +272,16 @@ export default function ChatContent() {
   };
 
   const onExport = async () => {};
-
+  const onExportImage = async () => {
+    const canvas = await html2canvas(document.querySelector('#chat-content'), {
+      scrollY: -window.scrollY, // 处理滚动区域
+      useCORS: true, // 如果需要加载跨域图片
+    });
+    const image = canvas.toDataURL('image/png');
+    await window.electron.chat.export('image', currentChat.id, {
+      image: image,
+    });
+  };
   const onSetDivider = async (chatMessage: ChatMessage, value: boolean) => {
     await window.electron.db.update(
       'chat_message',
@@ -327,6 +349,16 @@ export default function ChatContent() {
                           >
                             {t('chat.export')}
                           </Button>
+                          <Button
+                            icon={<FaFileExport />}
+                            type="text"
+                            block
+                            onClick={() => {
+                              onExportImage();
+                            }}
+                          >
+                            {t('chat.export_image')}
+                          </Button>
                         </div>
                       }
                     >
@@ -340,7 +372,7 @@ export default function ChatContent() {
                 ref={scrollRef}
                 showScrollBottom
               >
-                <div className="">
+                <div className="" id="chat-content">
                   {currentChat && (
                     <div className="flex flex-col py-8 w-full h-full">
                       <div className="pb-10">

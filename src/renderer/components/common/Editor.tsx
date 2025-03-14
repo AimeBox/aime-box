@@ -143,6 +143,44 @@ export const Editor = forwardRef<EditorRef, EditorProps>((props, ref) => {
         modules={{
           toolbar: false,
           clipboard: true,
+          // keyboard: {
+          //   bindings: {
+          //     enter: {
+          //       key: 13, // Enter 键
+          //       handler: () => {
+          //         console.log('Enter pressed! Submitting content...');
+          //         return false; // 阻止默认换行行为
+          //       },
+          //     },
+          //     shiftEnter: {
+          //       key: 13,
+          //       shiftKey: true, // 需要 Shift 组合键
+          //       handler: (range, context) => {
+          //         const quill = quillRef.current.getEditor();
+          //         if (quill) {
+          //           quill.insertText(range.index, '\n'); // 插入换行
+          //           quill.setSelection(range.index + 1); // 移动光标
+          //         }
+          //       },
+          //     },
+          //   },
+          // },
+          // keyboard: {
+          //   bindings: {
+          //     enter: {
+          //       key: 13, // Enter key code
+          //       handler: (range, context) => {
+          //         if (!context.event.shiftKey) {
+          //           // 没有按下Shift键，阻止默认行为
+          //           context.event.preventDefault();
+          //           return false;
+          //         }
+          //         // 按下了Shift键，由Quill处理默认的换行行为
+          //         return true;
+          //       },
+          //     },
+          //   },
+          // },
         }}
         ref={quillRef}
       />

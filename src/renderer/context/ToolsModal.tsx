@@ -33,7 +33,8 @@ export const ToolsModal = React.forwardRef(
       setSelectedTools = (tools: ToolInfo[]) => {},
       onChange = (tools: ToolInfo[]) => {},
     } = props;
-
+    console.log(tools);
+    const [selectedKey, setSelectedKey] = useState<string>('built-in');
     const onSearch = (v) => {};
 
     const onSelect = (tool: ToolInfo) => {
@@ -60,45 +61,50 @@ export const ToolsModal = React.forwardRef(
               <Menu
                 style={{ border: 'none' }}
                 className="bg-transparent"
-                defaultSelectedKeys={['']}
+                defaultSelectedKeys={[selectedKey]}
+                selectedKeys={[selectedKey]}
+                onSelect={(e) => {
+                  setSelectedKey(e.key);
+                }}
                 items={[
                   {
-                    key: '',
+                    key: 'built-in',
                     label: <span>{t('tools.show_all')}</span>,
                   },
-                  // {
-                  //   key: 'agent',
-                  //   label: <span>{t('tools.agent')}</span>,
-                  //   className: '!h-8 !flex !items-center',
-                  // },
+                  {
+                    key: 'mcp',
+                    label: <span>{t('tools.mcp')}</span>,
+                  },
                 ]}
               />
             </div>
             <ScrollArea className="flex-1 pl-2 my-1 w-full">
               <div className="flex flex-col gap-1">
-                {tools.map((tool) => {
-                  return (
-                    <Button
-                      key={tool.name}
-                      type="text"
-                      className="flex flex-row justify-between items-center h-16"
-                      onClick={() => {
-                        onSelect(tool);
-                      }}
-                    >
-                      <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
-                        <strong>{tool.name}</strong>
-                        <small className="text-gray-500 whitespace-pre-line line-clamp-1">
-                          {tool.description}
-                        </small>
-                      </div>
-                      <FaCheck
-                        color="green"
-                        className={`${selectedTools.some((x) => x.name === tool.name) ? 'opacity-100' : 'opacity-0'}`}
-                      />
-                    </Button>
-                  );
-                })}
+                {tools
+                  .filter((x) => x.type == selectedKey)
+                  .map((tool) => {
+                    return (
+                      <Button
+                        key={tool.id}
+                        type="text"
+                        className="flex flex-row justify-between items-center h-16"
+                        onClick={() => {
+                          onSelect(tool);
+                        }}
+                      >
+                        <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
+                          <strong>{tool.name}</strong>
+                          <small className="text-gray-500 whitespace-pre-line line-clamp-1">
+                            {tool.description}
+                          </small>
+                        </div>
+                        <FaCheck
+                          color="green"
+                          className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
+                        />
+                      </Button>
+                    );
+                  })}
               </div>
             </ScrollArea>
           </div>

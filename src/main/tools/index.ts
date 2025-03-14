@@ -1,4 +1,3 @@
-import { StructuredTool, Tool, ToolParams } from '@langchain/core/tools';
 import { Calculator } from '@langchain/community/tools/calculator';
 import { SearchApi } from '@langchain/community/tools/searchapi';
 
@@ -8,7 +7,7 @@ import {
 } from '@langchain/community/tools/tavily_search';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { Like } from 'typeorm';
+import { In, Like, Repository } from 'typeorm';
 import { DuckDuckGoSearchParameters } from '@langchain/community/tools/duckduckgo_search';
 import { SearxngSearch } from '@langchain/community/tools/searxng_search';
 import {
@@ -34,7 +33,6 @@ import {
 import { FormSchema } from '../../types/form';
 import { isArray, isObject, isString, isUrl } from '../utils/is';
 import * as path from 'path';
-import { RegisterToolSchema } from './RegisterTool';
 import { SocialMediaSearch } from './SocialMediaSearch';
 import { FileToText } from './FileToText';
 import { NodejsVM } from './NodejsVM';
@@ -57,61 +55,110 @@ import { WebSearchEngine } from '@/types/webSearchEngine';
 import { v4 as uuidv4 } from 'uuid';
 import { WebSearchTool } from './WebSearchTool';
 import { ChartjsTool } from './Chartjs';
-import { ZodObject } from 'zod';
+import { z, ZodObject } from 'zod';
 import { BaseTool } from './BaseTool';
 import { KnowledgeBaseQuery } from './KnowledgeBaseQuery';
 import fs from 'fs';
+import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket';
+import { createSmitheryUrl, MultiClient } from '@smithery/sdk';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { McpServers, Tools } from '@/entity/Tools';
 
-export interface ToolInfo {
-  name: string;
-  description: string;
+import {
+  tool as LangchainTool,
+  Tool,
+  StructuredTool,
+} from '@langchain/core/tools';
+
+export interface ToolInfo extends Tools {
+  id: string;
   schema: any;
+  status: 'success' | 'error' | 'pending';
   parameters: object | undefined;
-  tags?: string[] | undefined;
   officialLink?: string | undefined;
   configSchema?: FormSchema[] | undefined;
 }
 
+export interface McpServerInfo extends McpServers {
+  tools: ToolInfo[];
+}
+
 export class ToolsManager {
-  public tools: { name: string; tool: BaseTool; parameters: any }[];
+  public tools: ToolInfo[];
+
+  public builtInToolsClassType: any[] = [];
+
+  public mcpServerInfos: McpServerInfo[] = [];
+
+  public mcpClients: Client[] = [];
+
+  public toolRepository: Repository<Tools>;
+
+  public mcpServerRepository: Repository<McpServers>;
+
+  constructor() {}
 
   public async registerTool(ClassType, params: undefined | any = undefined) {
+    let ts;
     try {
       let tool = Reflect.construct(ClassType, params ? [params] : []);
-      if (params) {
-        const ss = Object.entries(params);
-        const settings = dbManager.dataSource.getRepository(Settings);
-        let ts = await settings.findOne({
-          where: { id: `tools:${tool.name}` },
-        });
-        if (!ts) {
-          ts = new Settings();
-          ts.id = `tools:${tool.name}`;
-          ts.value = JSON.stringify(params);
-          await settings.save(ts);
-        } else {
-          const vj = JSON.parse(ts.value);
+      this.builtInToolsClassType.push({
+        name: tool.name,
+        classType: ClassType,
+      });
+      ts = await this.toolRepository.findOne({
+        where: { name: tool.name },
+      });
+      if (!ts) {
+        ts = new Tools(tool.name, tool.description, 'built-in', params);
+        ts.enabled = false;
+        ts.toolkit_name = tool.toolKitName;
+
+        await this.toolRepository.save(ts);
+      } else {
+        const vj = ts.config ?? {};
+        if (params) {
           Object.keys(params).forEach((key) => {
             if (Object.keys(vj).includes(key)) {
               params[key] = vj[key];
             }
           });
-
-          //params = { ...params, ...JSON.parse(ts.value) };
         }
-        tool = Reflect.construct(ClassType, params ? [params] : []);
-        if (tool.name == 'video_to_text') {
-          const keys = Object.keys(params);
-          for (let index = 0; index < keys.length; index++) {
-            const key = keys[index];
 
-            const metadata = Reflect.getMetadata('toolfield', tool, key);
-          }
-        }
+        //params = { ...params, ...JSON.parse(ts.value) };
+      }
+      if (this.tools.find((x) => x.name == ts.name)) {
+        this.tools = this.tools.filter((x) => x.name != ts.name);
       }
 
-      this.tools.push({ name: tool.name, tool, parameters: params });
+      if (params) {
+        const ss = Object.entries(params);
+        tool = Reflect.construct(ClassType, params ? [params] : []);
+      }
+      if (this.tools.find((x) => x.name == tool.name)) {
+        this.tools = this.tools.filter((x) => x.name != tool.name);
+      }
+      this.tools.push({
+        ...ts,
+        id: ts.name,
+        parameters: params,
+        status: 'success',
+        schema: zodToJsonSchema(tool.schema),
+        officialLink: tool.officialLink,
+        configSchema: tool.configSchema,
+      } as ToolInfo);
     } catch (err) {
+      if (ts) {
+        this.tools.push({
+          ...ts,
+          parameters: params,
+          status: 'error',
+          // schema: zodToJsonSchema(tool.schema),
+          // officialLink: tool.officialLink,
+          // configSchema: tool.configSchema,
+        } as ToolInfo);
+      }
       console.error(`register '${ClassType.name}' tool fail, ${err.message}`);
     }
   }
@@ -143,27 +190,29 @@ export class ToolsManager {
 
   //   this.tools.push({ tool, parameters: default_parameters });
   // }
-  public getInfo(filter: string = undefined): ToolInfo[] {
+  public getList(
+    filter: string = undefined,
+    type: 'all' | 'built-in' | 'mcp' = 'all',
+  ): ToolInfo[] {
     let { tools } = this;
+    let list = [];
+
+    if (type == 'all' || type == 'built-in') {
+      list.push(...tools.filter((x) => x.type == 'built-in'));
+    }
+    if (type == 'all' || type == 'mcp') {
+      for (const mcpServerInfo of this.mcpServerInfos) {
+        list.push(...mcpServerInfo.tools);
+      }
+    }
     if (filter) {
-      tools = tools.filter(
+      list = list.filter(
         (x) =>
           x.name?.toLowerCase().indexOf(filter) > -1 ||
-          x.tool.description?.toLowerCase().indexOf(filter) > -1,
+          x.description?.toLowerCase().indexOf(filter) > -1,
       );
     }
-    const res = tools.map((x) => {
-      const schema = zodToJsonSchema(x.tool.schema);
-      return {
-        name: x.name,
-        description: x.tool.description,
-        schema: schema,
-        parameters: x.parameters,
-        officialLink: x.tool['officialLink'],
-        configSchema: x.tool.configSchema,
-      } as ToolInfo;
-    });
-    return res;
+    return list;
   }
 
   public getTools(): BaseTool[] {
@@ -174,12 +223,206 @@ export class ToolsManager {
     return [];
   };
 
-  public init = async () => {
-    await this.refresh();
-    if (!ipcMain) return;
-    ipcMain.on('tools:getInfo', (event, filter: string = undefined) => {
-      event.returnValue = this.getInfo(filter);
+  public buildTool = async (tool: Tools, config: any): Promise<BaseTool> => {
+    if (tool.type == 'mcp') {
+      let mcpClient = this.mcpClients.find(
+        (x) => x.getServerVersion().name == tool.mcp_id,
+      );
+      if (!mcpClient) {
+        mcpClient = await this.getMcpClient(tool.mcp_id);
+        this.mcpClients.push(mcpClient);
+      }
+      const _tool = (await mcpClient.listTools()).tools.find(
+        (x) => x.name == tool.name.split('@')[0],
+      );
+      console.log(_tool.inputSchema);
+      const schema = this.jsonSchemaToZod(_tool.inputSchema);
+      console.log(zodToJsonSchema(schema));
+      return LangchainTool(
+        async (input): Promise<string> => {
+          const result = {};
+
+          // 遍历输入对象的所有属性
+          for (const key in input) {
+            if (Object.prototype.hasOwnProperty.call(input, key)) {
+              // 如果值是空字符串，则设置为undefined
+              result[key] = input[key] === '' ? undefined : input[key];
+            }
+          }
+          try {
+            const res = await mcpClient.callTool({
+              name: _tool.name,
+              arguments: result,
+            });
+            if (res.content instanceof String) {
+              return res.content.toString();
+            } else if (res.content instanceof Array) {
+              const item = res.content.find((x) => x.type == 'text');
+              if (item) {
+                return item.text;
+              } else {
+                return null;
+              }
+            }
+          } catch (err) {
+            console.error(err);
+            throw new Error(err.message);
+          }
+          return '';
+        },
+        {
+          name: _tool.name,
+          description: _tool.description,
+          schema: schema,
+        },
+      );
+    } else if (tool.type == 'built-in') {
+      const baseTool = Reflect.construct(
+        this.builtInToolsClassType.find((x) => x.name == tool.name).classType,
+        tool.config ? [tool.config] : [],
+      );
+
+      return baseTool;
+    }
+    return null;
+  };
+
+  private jsonSchemaToZod(schema: any) {
+    if (!schema || typeof schema !== 'object') {
+      return z.any();
+    }
+
+    // 处理基本类型
+    if (schema.type === 'string') {
+      let validator;
+      if (schema.enum) {
+        validator = z.enum(schema.enum);
+      } else {
+        validator = z.string();
+        if (schema.pattern)
+          validator = validator.regex(new RegExp(schema.pattern));
+        if (schema.minLength !== undefined)
+          validator = validator.min(schema.minLength);
+        if (schema.maxLength !== undefined)
+          validator = validator.max(schema.maxLength);
+      }
+
+      if (schema.description)
+        validator = validator.describe(schema.description);
+      validator.default = undefined;
+
+      return z.optional(validator);
+    } else if (schema.type === 'number' || schema.type === 'integer') {
+      let validator;
+      if (schema.enum) {
+        validator = z.enum(schema.enum);
+      } else {
+        validator = schema.type === 'integer' ? z.number().int() : z.number();
+        if (schema.minimum !== undefined)
+          validator = validator.gte(schema.minimum);
+        if (schema.maximum !== undefined)
+          validator = validator.lte(schema.maximum);
+      }
+
+      if (schema.description)
+        validator = validator.describe(schema.description);
+      validator.default = undefined;
+      return z.optional(validator);
+    } else if (schema.type === 'boolean') {
+      let validator;
+      if (schema.enum) {
+        validator = z.enum(schema.enum);
+      } else {
+        validator = z.boolean();
+      }
+
+      if (schema.description)
+        validator = validator.describe(schema.description);
+      validator.default = undefined;
+      return z.optional(validator);
+    } else if (schema.type === 'null') {
+      let validator = z.null();
+      if (schema.description)
+        validator = validator.describe(schema.description);
+      validator.default = undefined;
+      return z.optional(validator);
+    } else if (schema.type === 'array') {
+      const itemValidator = schema.items
+        ? this.jsonSchemaToZod(schema.items)
+        : z.any();
+      let validator = z.array(itemValidator);
+      if (schema.minItems !== undefined)
+        validator = validator.min(schema.minItems);
+      if (schema.maxItems !== undefined)
+        validator = validator.max(schema.maxItems);
+      if (schema.description)
+        validator = validator.describe(schema.description);
+      validator.default = undefined;
+      return z.optional(validator);
+    } else if (schema.type === 'object') {
+      const shape = {};
+      if (schema.properties) {
+        for (const [key, propSchema] of Object.entries(schema.properties)) {
+          shape[key] = this.jsonSchemaToZod(propSchema);
+        }
+      }
+
+      let validator = z.object(shape);
+
+      // 处理必填字段
+      if (schema.required && Array.isArray(schema.required)) {
+        const required = {};
+        for (const key of schema.required) {
+          if (shape[key]) {
+            required[key] = shape[key];
+          }
+        }
+        validator = validator.required(required);
+      }
+      if (schema.description)
+        validator = validator.describe(schema.description);
+      return validator;
+    }
+
+    // 处理复合类型
+    if (schema.anyOf) {
+      return z.union(schema.anyOf.map((s) => this.jsonSchemaToZod(s)));
+    } else if (schema.allOf) {
+      return schema.allOf.reduce(
+        (acc, s) => acc.and(this.jsonSchemaToZod(s)),
+        z.object({}),
+      );
+    } else if (schema.oneOf) {
+      return z.union(schema.oneOf.map((s) => this.jsonSchemaToZod(s)));
+    }
+
+    return z.any();
+  }
+
+  public buildTools = async (toolNames: String[]): Promise<BaseTool[]> => {
+    const tools = await this.toolRepository.find({
+      where: { name: In(toolNames) },
     });
+    return Promise.all(tools.map((x) => this.buildTool(x, x.config)));
+  };
+
+  public init = async () => {
+    this.toolRepository = dbManager.dataSource.getRepository(Tools);
+    this.mcpServerRepository = dbManager.dataSource.getRepository(McpServers);
+    await this.refresh();
+    this.refreshMcpList();
+    if (!ipcMain) return;
+    ipcMain.handle(
+      'tools:getList',
+      (
+        event,
+        filter: string = undefined,
+        type: 'all' | 'built-in' | 'mcp' = 'all',
+      ) => this.getList(filter, type),
+    );
+    ipcMain.handle('tools:getMcpList', (event, filter: string = undefined) =>
+      this.getMcpList(filter),
+    );
     ipcMain.handle(
       'tools:invoke',
       async (
@@ -236,6 +479,10 @@ export class ToolsManager {
         outputFormat: 'default' | 'markdown' = 'default',
       ) => this.webSearch(provider, search, limit, outputFormat),
     );
+    ipcMain.handle('tools:addMcp', (event, data: any) => this.addMcp(data));
+    ipcMain.handle('tools:deleteMcp', (event, name: string) =>
+      this.deleteMcp(name),
+    );
   };
 
   public webSearch = async (
@@ -259,7 +506,7 @@ export class ToolsManager {
     this.tools = [];
 
     // await this.registerTool(new CmdTool());
-    //await this.registerTool(ChartjsTool);
+    await this.registerTool(ChartjsTool);
     await this.registerTool(CmdTool);
     await this.registerTool(Calculator);
     await this.registerTool(DateTimeTool);
@@ -281,7 +528,7 @@ export class ToolsManager {
     await this.registerTool(DallE, {
       n: 1, // Default
       modelName: 'dall-e-3', // Default
-      openAIApiKey: 'NULL', // Default
+      apiKey: 'NULL', // Default
     });
     await this.registerTool(RapidOcrTool);
     await this.registerTool(PythonInterpreterTool, {
@@ -345,14 +592,14 @@ export class ToolsManager {
   };
 
   public update = async (toolName: string, arg: any) => {
-    const settings = dbManager.dataSource.getRepository(Settings);
-    let tv = await settings.findOne({ where: { id: `tools:${toolName}` } });
+    const tv = await this.toolRepository.findOne({
+      where: { name: toolName },
+    });
     if (!tv) {
-      tv = new Settings();
-      tv.id = `tools:${toolName}`;
+      throw new Error(`${toolName} not found`);
     }
-    tv.value = JSON.stringify(arg);
-    await settings.save(tv);
+    tv.config = arg;
+    await this.toolRepository.save(tv);
     await this.refresh();
   };
 
@@ -398,17 +645,22 @@ export class ToolsManager {
     arg: any,
     outputFormat: 'default' | 'markdown' = 'default',
   ) => {
-    const tool = this.tools.find((x) => x.name == toolName);
+    const tool = await this.toolRepository.findOne({
+      where: { name: toolName },
+    });
+    //const tool = this.tools.find((x) => x.name == toolName);
+
     if (tool) {
+      const _tool = await this.buildTool(tool, tool.config);
       let output = '';
-      const toolOutputFormat = tool.tool.outputFormat ?? 'markdown';
+      const toolOutputFormat = tool.outputFormat ?? 'markdown';
       if (toolOutputFormat == 'markdown') {
-        const res = await tool.tool.stream(arg);
+        const res = await _tool.stream(arg);
         for await (const chunk of res) {
           output += chunk;
         }
       } else if (toolOutputFormat == 'json') {
-        output = await tool.tool.invoke(arg);
+        output = await _tool.invoke(arg);
       }
 
       console.log(`tool:${toolName}`, output);
@@ -436,6 +688,249 @@ export class ToolsManager {
     }
     return input;
   };
+
+  public addMcp = async (data: {
+    id?: string;
+    name: string;
+    command?: string;
+    env?: any;
+    type: 'sse' | 'command';
+    config?: any;
+    enabled?: boolean;
+  }) => {
+    //const transport = this.createTransport(data.url, {});
+    let mcpClient;
+    try {
+      mcpClient = await this.getMcpClient(
+        undefined,
+        data.command,
+        data.config,
+        data.env,
+        data.type,
+      );
+    } catch {
+      throw new Error('MCP server connect failed');
+    }
+
+    const { name: serverName, version: serverVersion } =
+      await mcpClient.getServerVersion();
+    let ts: McpServers;
+    if (!data.id) {
+      ts = new McpServers(
+        serverName,
+        data.name,
+        undefined,
+        data.type,
+        data.command,
+        data.config,
+        data.env,
+      );
+      ts.version = serverVersion;
+      ts.enabled = data.enabled;
+    } else {
+      ts = await this.mcpServerRepository.findOne({
+        where: { id: data.id },
+      });
+      ts = { ...ts, ...data };
+    }
+    if (ts.enabled) {
+      try {
+        const { tools } = await mcpClient.listTools();
+        ts.id = serverName;
+        const _tools = await this.toolRepository.find({
+          where: { mcp_id: serverName },
+        });
+        if (_tools.length > 0) {
+          await this.toolRepository.delete(_tools.map((x) => x.name));
+        }
+        let toolList = [];
+        for (const tool of tools) {
+          let t = new Tools(
+            `${tool.name}@${ts.id}`,
+            tool.description,
+            'mcp',
+            {},
+          );
+          t.enabled = true;
+          t.mcp_id = ts.id;
+          t.toolkit_name = data.name;
+          toolList.push(t);
+        }
+        await this.toolRepository.save(toolList);
+        await mcpClient.close();
+        ts.enabled = true;
+      } catch (err) {
+        console.error(err);
+        ts.enabled = false;
+      }
+    } else {
+      const client = this.mcpClients.find(
+        (x) => x.getServerVersion().name == ts.id,
+      );
+      if (client) {
+        await client.close();
+        this.mcpClients = this.mcpClients.filter(
+          (x) => x.getServerVersion().name != ts.id,
+        );
+      }
+    }
+
+    await this.mcpServerRepository.save(ts);
+    await this.refreshMcp(ts);
+    // Use the server tools with your LLM application
+
+    // const tool = tools.find((x) => x.name == 'get_file_info');
+    // if (tool) {
+    //   const result = await client.callTool({
+    //     name: tool.name,
+    //     arguments: {
+    //       path: 'C:\\Users\\Administrator\\Pictures\\3a0860be-9851-c0f2-fdef-856d234fa0a - 副本.png',
+    //     },
+    //   });
+    //   console.log(result);
+    // }
+  };
+
+  public deleteMcp = async (id: string) => {
+    const ts = await this.mcpServerRepository.findOne({
+      where: { id: id },
+    });
+    if (ts) {
+      const client = this.mcpClients.find(
+        (x) => x.getServerVersion().name == ts.id,
+      );
+      if (client) {
+        await client.close();
+        this.mcpClients = this.mcpClients.filter(
+          (x) => x.getServerVersion().name != id,
+        );
+      }
+      this.mcpServerInfos = this.mcpServerInfos.filter((x) => x.id != id);
+      await this.mcpServerRepository.delete(ts.id);
+    }
+  };
+
+  public getMcpList = async (filter: string = undefined) => {
+    return this.mcpServerInfos;
+  };
+
+  public refreshMcpList = async () => {
+    const mcpServers = await this.mcpServerRepository.find();
+    const tools = await this.toolRepository.find({
+      where: { type: 'mcp' },
+    });
+    this.mcpServerInfos = mcpServers.map((x) => {
+      return { ...x, tools: [] };
+    });
+    for (const mcpServer of mcpServers) {
+      await this.refreshMcp(mcpServer);
+    }
+  };
+
+  public refreshMcp = async (mcpServer: McpServers): Promise<McpServerInfo> => {
+    this.mcpServerInfos = this.mcpServerInfos.filter(
+      (x) => x.id != mcpServer.id,
+    );
+    let mcpServerInfo;
+    if (!mcpServer.enabled) {
+      mcpServerInfo = {
+        ...mcpServer,
+        tools: [],
+      } as McpServerInfo;
+    } else {
+      const toolInfos: ToolInfo[] = [];
+      try {
+        const client = await this.getMcpClient(
+          mcpServer.id,
+          mcpServer.command,
+          mcpServer.config,
+          mcpServer.env,
+          mcpServer.type as 'sse' | 'command',
+          true,
+        );
+        const { tools: _mcpTools } = await client.listTools();
+        const _tools = await this.toolRepository.find({
+          where: { mcp_id: mcpServer.id, type: 'mcp' },
+        });
+
+        for (const tool of _tools) {
+          const mcpTool = _mcpTools.find(
+            (x) => x.name == tool.name.split('@')[0],
+          );
+          const toolInfo = { ...tool } as ToolInfo;
+          toolInfo.id = tool.name;
+          toolInfo.name = mcpTool.name;
+          toolInfo.description = mcpTool.description;
+          toolInfo.schema = mcpTool.inputSchema;
+          toolInfos.push(toolInfo);
+        }
+        this.mcpClients = this.mcpClients.filter(
+          (x) => x.getServerVersion().name != mcpServer.id,
+        );
+        this.mcpClients.push(client);
+        mcpServer.version = client.getServerVersion().version;
+        await this.mcpServerRepository.save(mcpServer);
+        console.log('loaded success ' + mcpServer.id);
+      } catch (err) {
+        mcpServer.enabled = false;
+        await this.mcpServerRepository.save(mcpServer);
+        console.error('loaded failed ' + mcpServer.id, err);
+      }
+
+      mcpServerInfo = { ...mcpServer, tools: toolInfos };
+    }
+
+    this.mcpServerInfos.push(mcpServerInfo);
+    return mcpServerInfo;
+  };
+
+  private createTransport(smitheryServerUrl, config) {
+    return new WebSocketClientTransport(
+      createSmitheryUrl(`${smitheryServerUrl}/ws`, config),
+    );
+  }
+
+  private async getMcpClient(
+    mcpName?: string,
+    commandAndArgs?: string,
+    config?: any,
+    env?: any,
+    type: 'sse' | 'command' = 'command',
+    renew: boolean = false,
+  ) {
+    let client = mcpName
+      ? this.mcpClients.find((y) => y.getServerVersion().name == mcpName)
+      : undefined;
+    if (!client || renew) {
+      client = new Client({ name: 'Test Client', version: '0.0.1' });
+
+      const command = commandAndArgs.split(' ')[0];
+      const args = commandAndArgs.split(' ').slice(1);
+      if (Object.keys(config).length > 0) {
+        args.push('--config', JSON.stringify(config));
+      }
+      let transport;
+      if (type == 'command') {
+        transport = new StdioClientTransport({
+          command: command,
+          args,
+          env,
+        });
+      } else if (type == 'sse') {
+        transport = new WebSocketClientTransport(
+          createSmitheryUrl(`${command}`, config),
+        );
+      }
+      transport.onclose = () => {
+        this.mcpClients = this.mcpClients.filter(
+          (x) => x.getServerVersion().name != mcpName,
+        );
+      };
+      await client.connect(transport);
+    }
+
+    return client;
+  }
 }
 
 export const toolsManager = new ToolsManager();

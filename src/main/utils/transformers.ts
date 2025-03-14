@@ -16,6 +16,7 @@ import {
   ChineseCLIPModel,
   cos_sim,
 } from '@huggingface/transformers';
+import { borderColor } from 'tailwindcss/defaultTheme';
 
 export interface TransformersParams {
   task: string;
@@ -59,46 +60,20 @@ export class Transformers {
       writable: true,
       value: undefined,
     });
-    // Object.defineProperty(this, 'pipelinePromise', {
-    //   enumerable: true,
-    //   configurable: true,
-    //   writable: true,
-    //   value: void 0,
-    // });
+
     this.modelName = fields?.modelName ?? this.modelName;
     this.task = fields?.task ?? this.task;
-    // this.TransformersApi = Function(
-    //   'return import("@huggingface/transformers")',
-    // )();
   }
 
   async rmbg(fileOrUrl: string) {
-    // const { AutoProcessor, RawImage, AutoModel, env } =
-    //   await this.TransformersApi;
-
     env.localModelPath = path.join(getModelsPath(), 'other');
     env.allowRemoteModels = false;
 
     this._model = await AutoModel.from_pretrained(this.modelName, {
-      dtype: 'fp32',
-      //quantized: false,
+      dtype: 'q4f16',
       local_files_only: true,
     });
-    this._processor = await AutoProcessor.from_pretrained(this.modelName, {
-      // Do not require config.json to be present in the repository
-      // config: {
-      //   do_normalize: true,
-      //   do_pad: false,
-      //   do_rescale: true,
-      //   do_resize: true,
-      //   image_mean: [0.5, 0.5, 0.5],
-      //   feature_extractor_type: 'ImageFeatureExtractor',
-      //   image_std: [1, 1, 1],
-      //   resample: 2,
-      //   rescale_factor: 0.00392156862745098,
-      //   size: { width: 1024, height: 1024 },
-      // },
-    });
+    this._processor = await AutoProcessor.from_pretrained(this.modelName, {});
 
     this._rawImage = RawImage;
     let image = null;
@@ -110,24 +85,25 @@ export class Transformers {
     }
 
     const ar = image.width / image.height;
-    const [cw, ch] = ar > 720 / 480 ? [720, 720 / ar] : [480 * ar, 480];
     const { pixel_values } = await this._processor(image);
 
-    // Predict alpha matte
-    const { output } = await this._model({ input: pixel_values });
+    let output;
+    if (this.modelName == 'rmbg-1.4') {
+      output = (await this._model({ input: pixel_values })).output;
+    } else if (this.modelName == 'rmbg-2.0') {
+      output = (await this._model({ pixel_values })).alphas;
+    }
+
     const mask = await RawImage.fromTensor(
       output[0].mul(255).to('uint8'),
     ).resize(image.width, image.height);
     const png = new PNG({ width: image.width, height: image.height });
 
-    // const png = PNG.sync.read(image.data.buffer);
     for (let y = 0; y < image.height; y++) {
       for (let x = 0; x < image.width; x++) {
         const maskIndex = y * image.width + x;
         const imageIndex = (y * image.width + x) * 3;
         const pngIndex = (y * image.width + x) * 4;
-
-        // 复制RGB值
         png.data[pngIndex] = image.data[imageIndex];
         png.data[pngIndex + 1] = image.data[imageIndex + 1];
         png.data[pngIndex + 2] = image.data[imageIndex + 2];
@@ -205,5 +181,122 @@ export class Transformers {
     const inputs = await this._processor(img);
 
     const re = await this._model(inputs);
+  }
+
+  async doclayout(fileOrUrl: string): Promise<
+    {
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      score: number;
+      label: string;
+      index: number;
+    }[]
+  > {
+    env.localModelPath = path.join(getModelsPath(), 'other');
+    env.allowRemoteModels = false;
+    const model = await AutoModel.from_pretrained(this.modelName);
+    const processor = await AutoProcessor.from_pretrained(this.modelName, {});
+    let image;
+    if (isUrl(fileOrUrl)) image = await RawImage.fromURL(fileOrUrl);
+    else if (fs.statSync(fileOrUrl).isFile()) {
+      const data = fs.readFileSync(fileOrUrl);
+      const blob = new Blob([data]);
+      image = await RawImage.fromBlob(blob);
+    }
+    const { pixel_values } = await processor(image);
+    const output = await model({ images: pixel_values });
+    const permuted = output.output0[0];
+    //const permuted = output.output0[0].transpose(1, 0);
+    const result = [];
+    const threshold = 0.3;
+    const [scaledHeight, scaledWidth] = pixel_values.dims.slice(-2);
+    for (const [xc, yc, w, h, ...scores] of permuted.tolist()) {
+      // Get pixel values, taking into account the original image size
+      const x1 = (xc / scaledWidth) * image.width;
+      const y1 = (yc / scaledHeight) * image.height;
+      const x2 = (w / scaledWidth) * image.width;
+      const y2 = (h / scaledHeight) * image.height;
+
+      const score = scores[0];
+      if (score > threshold) {
+        const label = model.config.id2label[scores[1]];
+        result.push({
+          x1,
+          x2,
+          y1,
+          y2,
+          score,
+          label,
+          index: scores[1],
+        });
+      }
+    }
+
+    // const image_draw = sharp(fileOrUrl);
+    // const metadata = await image_draw.metadata();
+
+    // const { width, height } = metadata;
+
+    // 创建一个新的画布，大小为原图加上边框
+    // const newWidth = width + borderWidth * 2;
+    // const newHeight = height + borderWidth * 2;
+    // const borderWidth = 2;
+    // const borderColor = '#ff0000';
+    // const draw = [
+    //   ...result.map((item) => {
+    //     const _item = {
+    //       x1: Math.round(item.x1),
+    //       y1: Math.round(item.y1),
+    //       x2: Math.round(item.x2),
+    //       y2: Math.round(item.y2),
+    //       score: item.score,
+    //       label: item.label,
+    //       index: item.index,
+    //     };
+    //     return {
+    //       input: Buffer.from(
+    //         `<svg width="${_item.x2 - _item.x1}" height="${_item.y2 - _item.y1 + 20}">
+    //       <rect x="0" y="0" width="${_item.x2 - _item.x1}" height="${_item.y2 - _item.y1}"
+    //             stroke="${borderColor}" stroke-width="${borderWidth}" fill="none" />
+    //       <text x="5" y="${_item.y2 - _item.y1 + 15}" font-family="Arial" font-size="12" fill="${borderColor}">
+    //       [${_item.index}] ${_item.label} (${(_item.score * 100).toFixed(1)}%)
+    //       </text>
+    //     </svg>`,
+    //       ),
+    //       top: Math.round(item.y1),
+    //       left: Math.round(item.x1),
+    //     };
+    //   }),
+    // ];
+    return result;
+    // const outputImagePath = path.join(getModelsPath(), 'other', 'output.png');
+
+    // // 创建一个Promise来处理图像并返回base64
+    // return new Promise((resolve, reject) => {
+    //   sharp(fileOrUrl)
+    //     .composite(draw)
+    //     .toBuffer()
+    //     .then((outputBuffer) => {
+    //       // 保存文件
+    //       fs.writeFileSync(outputImagePath, outputBuffer);
+    //       console.log('边框和文字已成功绘制，图片保存为:', outputImagePath);
+
+    //       // 转换为base64并返回
+    //       const base64Image = `data:image/${metadata.format || 'png'};base64,${outputBuffer.toString('base64')}`;
+    //       resolve({
+    //         result,
+    //         base64Image,
+    //         outputPath: outputImagePath,
+    //       });
+    //       return base64Image; // 返回值以修复linter错误
+    //     })
+    //     .catch((err) => {
+    //       console.error('处理图片时出错:', err);
+    //       reject(err);
+    //       throw err; // 抛出错误以修复linter错误
+    //     });
+    // });
   }
 }

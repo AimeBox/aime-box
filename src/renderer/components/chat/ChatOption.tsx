@@ -73,7 +73,7 @@ const ChatOption = React.forwardRef(
         }
         const kbList = window.electron.db.getMany('knowledgebase', {});
         setKbList(kbList);
-        const toolList = window.electron.tools.getInfo();
+        const toolList = await window.electron.tools.getList();
         setToolList(toolList);
       } else {
         if (chatId) {

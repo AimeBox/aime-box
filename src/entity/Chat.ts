@@ -9,7 +9,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { ChatMode } from '@/types/chat';
+import { ChatInputAttachment, ChatMode } from '@/types/chat';
 
 export class ChatOptions {
   system?: string | undefined;
@@ -84,6 +84,9 @@ export class Chat {
   // eslint-disable-next-line no-use-before-define
   @OneToMany((type) => ChatMessage, (chatMessage) => chatMessage.chat) // note: we will create author property in the Photo class below
   chatMessages?: ChatMessage[];
+
+  @OneToMany((type) => ChatFile, (chatFile) => chatFile.chat) // note: we will create author property in the Photo class below
+  chatFiles?: ChatFile[];
 
   @Column('json', { nullable: true })
   options?: any;
@@ -207,4 +210,36 @@ export class ChatMessage {
     this.input_tokens = usage_metadata?.input_tokens;
     this.output_tokens = usage_metadata?.output_tokens;
   }
+}
+
+@Entity('chat_file')
+export class ChatFile {
+  constructor(id?: string, chatId?: string, file?: ChatInputAttachment) {
+    this.id = id || uuidv4();
+    this.chatId = chatId;
+    this.file = file;
+  }
+
+  @PrimaryColumn()
+  id!: string;
+
+  @Column({ nullable: false })
+  chatId!: string;
+
+  @ManyToOne((type) => Chat, (chat) => chat.chatFiles, {
+    nullable: false,
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  } as RelationOptions)
+  @JoinColumn()
+  chat!: Chat;
+
+  @Column('json')
+  file!: any;
+
+  @Column({ nullable: true })
+  content?: string;
+
+  @Column('json', { nullable: true })
+  additional_kwargs?: any;
 }

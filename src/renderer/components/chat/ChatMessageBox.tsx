@@ -33,6 +33,7 @@ import {
   Spin,
   Divider,
   Input,
+  Image,
 } from 'antd';
 import React, { Fragment, createElement, useEffect, useState } from 'react';
 import { ChatMessage } from '../../../entity/Chat';
@@ -169,10 +170,8 @@ const ChatMessageBox = React.forwardRef(
                   )}
                   {value.role == 'tool' && (
                     <span className="flex flex-row items-center mr-2 text-lg">
-                      {
-                        value?.content?.find((x) => x.type == 'tool_call')
-                          ?.tool_call_name
-                      }
+                      {value?.content?.find((x) => x.type == 'tool_call')
+                        ?.tool_call_name ?? value.model}
                     </span>
                   )}
                   <span className="invisible text-xs font-medium text-gray-400 group-hover:visible">
@@ -186,30 +185,36 @@ const ChatMessageBox = React.forwardRef(
                   {!edit && (
                     <>
                       {/* <ReactMarkdown>{textContent}</ReactMarkdown> */}
-                      {value?.content.map((x) => {
-                        return (
-                          <>
-                            {x.type == 'text' && (
-                              <div className="p-1">
-                                <Markdown value={x.text} key={x} />
-                              </div>
-                            )}
-                            {x.type == 'image_url' && (
-                              <img
-                                src={x.image_url.url}
-                                key={x}
-                                className="rounded-2xl shadow max-h-[200px] object-contain"
-                              />
-                            )}
-                            {x.type == 'file' && (
-                              <a href={x.file_url} key={x}>
-                                {x.file_name}
-                              </a>
-                            )}
-                          </>
-                        );
-                      })}
-
+                      <div className="flex flex-row flex-wrap gap-2">
+                        {value?.content.map((x) => {
+                          return (
+                            <>
+                              {x.type == 'text' && (
+                                <div className="p-1 w-full">
+                                  <Markdown value={x.text} key={x} />
+                                </div>
+                              )}
+                              {x.type == 'image_url' && (
+                                <div
+                                  className="overflow-hidden rounded-2xl shadow max-h-[200px]"
+                                  key={x}
+                                >
+                                  <Image
+                                    src={x.image_url.url}
+                                    className="max-h-[200px] object-contain"
+                                    alt=""
+                                  />
+                                </div>
+                              )}
+                              {x.type == 'file' && (
+                                <a href={x.file_url} key={x}>
+                                  {x.file_name}
+                                </a>
+                              )}
+                            </>
+                          );
+                        })}
+                      </div>
                       {/* <div className="p-1">
                         {value?.content
                           ?.filter((x) => x.type == 'text')

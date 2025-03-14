@@ -5,21 +5,26 @@ import { DataSource } from 'typeorm';
 import path from 'path';
 import Settings from '../../entity/Settings';
 import { Providers } from '../../entity/Providers';
-import { Chat, ChatMessage } from '../../entity/Chat';
+import { Chat, ChatFile, ChatMessage } from '../../entity/Chat';
 import { KnowledgeBase, KnowledgeBaseItem } from '../../entity/KnowledgeBase';
 import { TypeormSaver } from './TypeormSaver';
-import { CheckPoints } from '../../entity/CheckPoints';
+import {
+  LanggraphWrites,
+  LanggraphCheckPoints,
+} from '../../entity/CheckPoints';
 import { MemoyHistory } from '../../entity/Memoy';
 import { getDataPath } from '../utils/path';
 import { Plugins } from '@/entity/Plugins';
 import { Prompt, PromptGroup } from '@/entity/Prompt';
 import { Agent } from '@/entity/Agent';
+import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
+import { McpServers, Tools } from '@/entity/Tools';
 
 export class DBManager {
   // defaultDb: Database;
   dataSource: DataSource;
 
-  langgraphMemory: TypeormSaver;
+  langgraphSaver: TypeormSaver;
 
   constructor() {
     this.dataSource = new DataSource({
@@ -32,14 +37,18 @@ export class DBManager {
         Providers,
         Chat,
         ChatMessage,
+        ChatFile,
         KnowledgeBase,
         KnowledgeBaseItem,
-        CheckPoints,
+        LanggraphCheckPoints,
+        LanggraphWrites,
         MemoyHistory,
         Plugins,
         Prompt,
         PromptGroup,
         Agent,
+        Tools,
+        McpServers,
       ],
       migrations: [],
       subscribers: [],
@@ -49,9 +58,11 @@ export class DBManager {
   public init = async () => {
     this.dataSource = await this.dataSource.initialize();
     try {
-      this.langgraphMemory = new TypeormSaver(this.dataSource);
-      this.langgraphMemory.getTuple({});
-    } catch {}
+      this.langgraphSaver = new TypeormSaver(this.dataSource);
+      this.langgraphSaver.getTuple({});
+    } catch (err) {
+      console.error(err);
+    }
 
     if (!ipcMain) return;
     ipcMain.on('db:table', async (event) => {

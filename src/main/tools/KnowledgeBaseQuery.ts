@@ -22,7 +22,8 @@ export class KnowledgeBaseQuery extends BaseTool {
 
   name: string = 'knowledgebase-query';
 
-  description: string = 'input the question to query from knowledgebase';
+  description: string =
+    'find the context related to the question from the knowledge base.';
 
   knowledgebaseIds?: string[] | undefined;
 

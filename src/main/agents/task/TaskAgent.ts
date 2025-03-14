@@ -56,7 +56,7 @@ export class TaskAgent implements BaseAgent {
   };
 
   invoke = async (input: any) => {
-    const tools = toolsManager.getInfo();
+    const tools = toolsManager.getList();
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',
@@ -120,7 +120,7 @@ export class TaskGraphAgent implements BaseAgent {
   };
 
   invoke = async (input: any) => {
-    const tools = toolsManager.getInfo();
+    const tools = toolsManager.getList();
     const prompt = ChatPromptTemplate.fromMessages([
       [
         'system',

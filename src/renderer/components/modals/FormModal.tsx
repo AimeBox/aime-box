@@ -41,6 +41,7 @@ export interface FormModalRef extends FormInstance {
     schemas?: FormSchema[] | undefined,
   ) => void;
   closeModal: () => void;
+  updateSchema: (field: string, schema: FormSchema) => void;
 }
 const FormModal = forwardRef(
   (
@@ -54,7 +55,7 @@ const FormModal = forwardRef(
     const [eventTarget, setEventTarget] = useState(new EventTarget());
     const [open, setOpen] = useState(props.open);
     const [form] = Form.useForm();
-    const [formModel, setFormModel] = useState(undefined);
+    const [formModel, setFormModel] = useState({});
     const [schemas, setSchemas] = useState(props.schemas);
 
     const [title, setTitle] = useState(props.title);
@@ -91,7 +92,8 @@ const FormModal = forwardRef(
           setFormModel(data);
           form.setFieldsValue(data);
         } else {
-          setFormModel(undefined);
+          setFormModel({});
+          form.setFieldsValue({});
         }
         setOpen(open);
       });
@@ -107,6 +109,14 @@ const FormModal = forwardRef(
       eventTarget.dispatchEvent(e);
       setOpen(false);
     };
+    const updateSchema = (field: string, schema: FormSchema) => {
+      const _schemas = [...schemas];
+      const index = schemas.findIndex((x) => x.field === field);
+      if (index > -1) {
+        _schemas[index] = schema;
+      }
+      setSchemas(_schemas);
+    };
     // const setFieldsValue = (values: Record<string, any>) => {
     //   form.setFieldsValue(values);
     // };
@@ -116,6 +126,7 @@ const FormModal = forwardRef(
     useImperativeHandle(ref, () => ({
       openModal,
       closeModal,
+      updateSchema,
       ...form,
     }));
     const onFinish = async () => {
@@ -138,7 +149,6 @@ const FormModal = forwardRef(
       //setFormModel(allFields);
       changedFields.forEach((item) => {
         if (item.validated) {
-          //debugger;
           formModel[item.name[0]] = item?.value;
         }
       });

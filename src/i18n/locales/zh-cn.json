@@ -99,7 +99,8 @@
   },
   "enable": "是否启用",
   "prompts": {
-    "create_prompt": "创建提示词"
+    "create_prompt": "创建提示词",
+    "select_prompt": "选择提示词"
   },
   "chat": {
     "prompts": "提示词",
@@ -107,7 +108,8 @@
     "tool": "工具",
     "knowledgebase": "知识库",
     "fileChat": "文档对话",
-    "newchat": "新建聊天"
+    "newchat": "新建聊天",
+    "export_image": "导出图片"
   },
   "language": {
     "english": "英语",
@@ -135,6 +137,18 @@
   "knowledgebase": {
     "create_knowledgebase": "创建知识库",
     "edit_knowledgebase": "修改知识库",
-    "select_knowledgebase": "选择知识库"
+    "select_knowledgebase": "选择知识库",
+    "chunkSize": "分块长度",
+    "sitemap": "网站地图",
+    "folders": "文件夹",
+    "files": "文件",
+    "text": "文本",
+    "web": "网页",
+    "chunkOverlap": "重叠长度",
+    "recursive": "遍历文件夹"
+  },
+  "tools": {
+    "addMcp": "添加MCP",
+    "tool_config": "工具配置"
   }
 }

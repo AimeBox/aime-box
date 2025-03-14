@@ -57,7 +57,9 @@ export function ResponseCard({ value, className }: ResponseCardProps) {
 
   const [markdown, setMarkdown] = useState(toMarkdown(value));
 
-  useEffect(() => {}, []);
+  useEffect(() => {
+    setMarkdown(toMarkdown(value));
+  }, [value]);
   return (
     <div
       className={cn(

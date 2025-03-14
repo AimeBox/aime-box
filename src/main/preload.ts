@@ -5,10 +5,11 @@ import {
   ipcRenderer,
   IpcRendererEvent,
   OpenDialogOptions,
+  SaveDialogOptions,
 } from 'electron';
 import { Chat, ChatOptions } from '../entity/Chat';
 import { Providers } from '../entity/Providers';
-import { ToolInfo } from './tools';
+import { McpServerInfo, ToolInfo } from './tools';
 import {
   KnowledgeBaseCreateInput,
   KnowledgeBaseDocument,
@@ -16,7 +17,7 @@ import {
   KnowledgeBaseUpdateInput,
 } from './knowledgebase';
 import { GlobalSettings } from './settings';
-import { ChatInputExtend, ChatMode } from '@/types/chat';
+import { ChatInputAttachment, ChatInputExtend, ChatMode } from '@/types/chat';
 import { Prompt, PromptGroup } from '@/entity/Prompt';
 
 const electronHandler = {
@@ -52,6 +53,8 @@ const electronHandler = {
     },
   },
   app: {
+    showSaveDialog: (arg: SaveDialogOptions) =>
+      ipcRenderer.invoke('app:showSaveDialog', arg),
     showOpenDialog: (
       arg: OpenDialogOptions,
     ): Promise<
@@ -123,6 +126,12 @@ const electronHandler = {
     },
   },
   chat: {
+    getChatPage: (input: {
+      filter?: string;
+      skip: number;
+      pageSize: number;
+      sort?: string | undefined;
+    }) => ipcRenderer.invoke('chat:getChatPage', input),
     create: (
       mode: ChatMode,
       providerModel?: string,
@@ -136,8 +145,12 @@ const electronHandler = {
       options,
     ): Promise<Chat> =>
       ipcRenderer.invoke('chat:update', chatId, title, model, options),
-    export(input: { chatId: string; savePath: string }) {
-      const res = ipcRenderer.sendSync('chat:export', input);
+    export: async (
+      type: string,
+      chatId: string,
+      input: { savePath?: string; image?: string },
+    ) => {
+      const res = await ipcRenderer.invoke('chat:export', type, chatId, input);
       return res;
     },
     getChat: (chatId: string) =>
@@ -149,6 +162,10 @@ const electronHandler = {
     }) {
       ipcRenderer.send('chat:chat-resquest', input);
     },
+    chatFileCreate: (input: { chatId: string; files: ChatInputAttachment[] }) =>
+      ipcRenderer.invoke('chat:chat-file-create', input),
+    chatFileUpdate: (input: { chatFileId: string; data: any }) =>
+      ipcRenderer.invoke('chat:chat-file-update', input),
     cancel: (chatId: string) => ipcRenderer.invoke('chat:cancel', chatId),
     chatResquestSync(input: {
       chatId: string;
@@ -280,10 +297,14 @@ const electronHandler = {
     },
   },
   tools: {
-    getInfo(filter: string | undefined = undefined): ToolInfo[] {
-      const res = ipcRenderer.sendSync('tools:getInfo', filter);
-      return res as ToolInfo[];
-    },
+    getList: (
+      filter: string | undefined = undefined,
+      type: 'all' | 'built-in' | 'mcp' = 'all',
+    ): Promise<ToolInfo[]> => ipcRenderer.invoke('tools:getList', filter, type),
+    getMcpList: (
+      filter: string | undefined = undefined,
+    ): Promise<McpServerInfo[]> =>
+      ipcRenderer.invoke('tools:getMcpList', filter),
     update(input) {
       const res = ipcRenderer.sendSync('tools:update', input);
       return res;
@@ -311,14 +332,18 @@ const electronHandler = {
         limit,
         outputFormat,
       ),
+    addMcp: (data: { name: string; url: string }) =>
+      ipcRenderer.invoke('tools:addMcp', data),
+    deleteMcp: (name: string) => ipcRenderer.invoke('tools:deleteMcp', name),
   },
   agents: {
     getList(filter?: string) {
       const res = ipcRenderer.sendSync('agent:getList', filter);
       return res;
     },
-    update: (name: string, config: any) =>
-      ipcRenderer.invoke('agent:update', name, config),
+    create: (data: any) => ipcRenderer.invoke('agent:create', data),
+    update: (data: any) => ipcRenderer.invoke('agent:update', data),
+    delete: (id: string) => ipcRenderer.invoke('agent:delete', id),
     invoke(llmProvider: string, name: string, input: any) {
       const res = ipcRenderer.sendSync(
         'agent:invoke',

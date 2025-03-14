@@ -1,4 +1,4 @@
-import { Button, Divider, Input, Popconfirm, Skeleton } from 'antd';
+import { Button, Divider, Input, Popconfirm, Skeleton, Tag } from 'antd';
 import { ForwardedRef, ReactNode, forwardRef, useRef, useState } from 'react';
 import { FaEdit, FaPlus, FaSearch, FaTrashAlt } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
@@ -17,6 +17,9 @@ export interface ListProps {
   dataLength?: number | null;
   hasMore?: boolean | null;
   loadMoreData?: () => void | null;
+  filterTags?: string[] | ReactNode | null;
+  selectedFilterTags?: string[] | null;
+  onFilterTagsChange?: (tags: string[]) => void | null;
 }
 
 const List = forwardRef((props: ListProps) => {
@@ -29,6 +32,9 @@ const List = forwardRef((props: ListProps) => {
     dataLength = 0,
     hasMore = false,
     loadMoreData,
+    filterTags,
+    selectedFilterTags,
+    onFilterTagsChange,
   } = props;
 
   const scrollAreaRef = useRef();
@@ -66,6 +72,27 @@ const List = forwardRef((props: ListProps) => {
                 <Button icon={<FaPlus />} onClick={onAdd}></Button>
               )}
             </div>
+          </li>
+        )}
+        {filterTags && (
+          <li className="flex justify-center p-2">
+            {filterTags instanceof Array ? (
+              <div className="flex flex-row gap-2 w-full">
+                {filterTags.map((tag) => (
+                  <Tag.CheckableTag
+                    key={tag}
+                    checked={selectedFilterTags?.includes(tag)}
+                    onChange={(checked) => {
+                      onFilterTagsChange?.(checked ? [tag] : []);
+                    }}
+                  >
+                    {tag}
+                  </Tag.CheckableTag>
+                ))}
+              </div>
+            ) : (
+              filterTags
+            )}
           </li>
         )}
         <ScrollArea

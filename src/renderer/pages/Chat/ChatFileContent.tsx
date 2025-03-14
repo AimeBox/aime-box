@@ -1,5 +1,5 @@
 import ChatQuickInput from '@/renderer/components/chat/ChatQuickInput';
-import { Chat, ChatMessage } from '@/entity/Chat';
+import { Chat, ChatFile, ChatMessage } from '@/entity/Chat';
 import ChatMessageBox from '@/renderer/components/chat/ChatMessageBox';
 import ProviderSelect from '@/renderer/components/providers/ProviderSelect';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
@@ -15,15 +15,25 @@ import {
   Tag,
   Tooltip,
 } from 'antd';
-import { FaPaperclip, FaPaperPlane, FaStop, FaTrashAlt } from 'react-icons/fa';
+import {
+  FaArrowLeft,
+  FaArrowRight,
+  FaPaperclip,
+  FaPaperPlane,
+  FaStop,
+  FaTrashAlt,
+} from 'react-icons/fa';
 import { FaGear } from 'react-icons/fa6';
 import { Editor, EditorRef } from '@/renderer/components/common/Editor';
 import { useEffect, useRef, useState } from 'react';
 import { t } from 'i18next';
-import DocumentView from '@/renderer/components/common/DocumentView';
+import DocumentView, {
+  DocumentViewRef,
+} from '@/renderer/components/common/DocumentView';
 import { isUrl } from '@/main/utils/is';
 import Link from 'antd/es/typography/Link';
 import { useLocation } from 'react-router-dom';
+import { ChatInputAttachment } from '@/types/chat';
 
 export default function ChatFileContent() {
   const location = useLocation();
@@ -36,21 +46,19 @@ export default function ChatFileContent() {
   const [currentModel, setCurrentModel] = useState<string | undefined>(
     undefined,
   );
-  const [currentFile, setCurrentFile] = useState<string | undefined>(undefined);
-  const [currentFileExt, setCurrentFileExt] = useState<string | undefined>(
+  const [files, setFiles] = useState<ChatFile[]>([]);
+  const [currentFile, setCurrentFile] = useState<ChatFile | undefined>(
     undefined,
   );
-  const [currentFileTranscript, setCurrentFileTranscript] = useState<
-    string | undefined
-  >(undefined);
+
   const [currentFileSummary, setCurrentFileSummary] = useState<
     string | undefined
   >(undefined);
   const [currentFileUrl, setCurrentFileUrl] = useState<string | undefined>(
     undefined,
   );
+  const documentRef = useRef<DocumentViewRef>(null);
 
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<EditorRef>(null);
   const onDelete = async (chatMessage: ChatMessage) => {};
   const onChangeCurrentModel = async (currentModel: string) => {};
@@ -75,7 +83,9 @@ export default function ChatFileContent() {
     // });
   };
   const getChat = async (id: string) => {
-    let res = await window.electron.chat.getChat(id);
+    let res = (await window.electron.chat.getChat(id)) as Chat & {
+      status: string;
+    };
     console.log(res);
     if (!res.model) {
       const defaultLLM = await window.electron.providers.getDefaultLLM();
@@ -91,12 +101,11 @@ export default function ChatFileContent() {
 
     setCurrentChat((chat) => {
       registerEvent(res.id);
-      if (res.options && res.options.files && res.options.files.length > 0) {
-        setCurrentFile(res.options.files[0].path);
-        setCurrentFileExt(res.options.files[0].ext);
+      if (res.chatFiles && res.chatFiles.length > 0) {
+        setFiles(res.chatFiles);
+        setCurrentFile(res.chatFiles[0]);
       } else {
         setCurrentFile(undefined);
-        setCurrentFileExt(undefined);
       }
       return res;
     });
@@ -124,9 +133,10 @@ export default function ChatFileContent() {
       console.log('已删除监听');
     };
   }, [location.pathname]);
-  const onSelectFile = async () => {
+  const onSelectFile = async (exts: string[]) => {
     const res = await window.electron.app.showOpenDialog({
-      properties: ['openFile'],
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Files', extensions: exts }],
     });
     if (res && res.length > 0) {
       setCurrentFileExt(res[0].ext);
@@ -136,67 +146,147 @@ export default function ChatFileContent() {
         currentChat?.id,
         res[0].name,
         currentModel,
-        options,
+        currentChat.options,
       );
-
-      setCurrentFile(res[0].path);
-      if (
-        res[0].ext == '.mp4' ||
-        res[0].ext == '.wav' ||
-        res[0].ext == '.mp3'
-      ) {
-        onTranscript(res[0].path);
-      }
+      await window.electron.chat.chatFileCreate({
+        chatId: currentChat?.id,
+        files: res,
+      });
+      await getChat(currentChat?.id);
     }
   };
 
   const onTranscript = async (fileOrUrl: string) => {
-    const result = await window.electron.tools.invoke('speech_to_text', {
+    const result = await window.electron.tools.invoke('speech-to-text', {
       fileOrUrl: fileOrUrl,
     });
-    setCurrentFileTranscript(result);
+    return result;
   };
+
+  const onFileLoaded = async () => {
+    if (currentFile?.file?.ext == '.pdf') {
+      if (!currentFile?.additional_kwargs?.docLayout) {
+        const images = await documentRef.current?.getImages();
+        console.log(images);
+      }
+    } else if (
+      currentFile?.file?.ext == '.mp4' ||
+      currentFile?.file?.ext == '.wav' ||
+      currentFile?.file?.ext == '.mp3'
+    ) {
+      if (!currentFile?.additional_kwargs?.transcript) {
+        const transcript = await onTranscript(currentFile?.file?.path);
+        await window.electron.chat.chatFileUpdate({
+          chatFileId: currentFile?.id,
+          data: {
+            additional_kwargs: {
+              transcript: transcript,
+            },
+          },
+        });
+        await getChat(currentChat?.id);
+        const _currentFile = {
+          ...currentFile,
+          additional_kwargs: {
+            transcript: transcript,
+          },
+        };
+        setCurrentFile(_currentFile);
+      }
+    }
+  };
+
   return (
     <Splitter className="flex flex-row h-full">
       <Splitter.Panel min={360}>
-        {currentFile && currentFileExt == '.pdf' && (
+        {currentFile && currentFile.file?.ext == '.pdf' && (
           <DocumentView
-            file={currentFile}
+            ref={documentRef}
+            files={files.map((file) => file.file)}
             className="flex justify-center items-center w-full h-full"
+            onLoadSuccess={onFileLoaded}
           />
         )}
         {currentFile &&
-          (currentFileExt == '.mp4' ||
-            currentFileExt == '.wav' ||
-            currentFileExt == '.mp3') && (
+          (currentFile.file?.ext == '.mp4' ||
+            currentFile.file?.ext == '.wav' ||
+            currentFile.file?.ext == '.mp3') && (
             <Splitter
               className="flex flex-col p-4 w-full h-full"
               layout="vertical"
             >
               <Splitter.Panel
                 min={100}
-                defaultSize={currentFileExt == '.mp4' ? undefined : 100}
+                defaultSize={currentFile.file?.ext == '.mp4' ? undefined : 100}
               >
-                <div className="flex flex-col p-2 h-full">
-                  {currentFileExt == '.mp4' && (
-                    <video src={currentFile} className="w-full h-full" controls>
+                <div className="flex relative flex-col p-2 h-full group">
+                  <Button
+                    type="text"
+                    shape="circle"
+                    className="z-10 absolute top-[calc(50%_-_16px)] left-0 opacity-0 group-hover:opacity-100"
+                    icon={<FaArrowLeft />}
+                    disabled={
+                      files.findIndex((file) => file.id == currentFile?.id) == 0
+                    }
+                    onClick={() => {
+                      setCurrentFile(
+                        files[
+                          files.findIndex(
+                            (file) => file.id == currentFile?.id,
+                          ) - 1
+                        ],
+                      );
+                    }}
+                  />
+                  {currentFile.file?.ext == '.mp4' && (
+                    <video
+                      onLoadedData={onFileLoaded}
+                      src={currentFile.file.path}
+                      className="w-full h-full"
+                      controls
+                    >
                       <track kind="captions" />
                     </video>
                   )}
-                  {(currentFileExt == '.wav' || currentFileExt == '.mp3') && (
+                  {(currentFile.file?.ext == '.wav' ||
+                    currentFile.file?.ext == '.mp3') && (
                     <>
-                      <audio src={currentFile} controls className="w-full">
+                      <audio
+                        onLoadedData={onFileLoaded}
+                        src={currentFile.file.path}
+                        controls
+                        className="w-full"
+                      >
                         <track kind="captions" />
                       </audio>
                       <Link
-                        href={currentFile}
+                        href={currentFile.file.path}
                         target="_blank"
                         className="w-fit"
                       >
-                        {currentFile}
+                        {currentFile.file.path}
                       </Link>
                     </>
                   )}
+                  <Button
+                    type="text"
+                    shape="circle"
+                    className="z-10 absolute top-[calc(50%_-_16px)] right-0 opacity-0 group-hover:opacity-100"
+                    icon={<FaArrowRight />}
+                    disabled={
+                      files.findIndex((file) => file.id == currentFile?.id) ==
+                      files.length - 1
+                    }
+                    onClick={() => {
+                      setCurrentFile(
+                        files[
+                          files.findIndex(
+                            (file) => file.id == currentFile?.id,
+                          ) + 1
+                        ],
+                      );
+                    }}
+                  />
                 </div>
               </Splitter.Panel>
 
@@ -212,7 +302,7 @@ export default function ChatFileContent() {
                 </Tabs>
                 <div className="overflow-y-scroll flex-1">
                   <div className="whitespace-pre-line">
-                    {currentFileTranscript}
+                    {currentFile?.additional_kwargs?.transcript}
                   </div>
                 </div>
               </Splitter.Panel>
@@ -224,12 +314,24 @@ export default function ChatFileContent() {
             <div className="flex flex-col gap-2 w-[300px]">
               <Alert
                 rootClassName="cursor-pointer"
-                onClick={onSelectFile}
+                onClick={() => onSelectFile(['pdf'])}
+                message={
+                  <div className="flex flex-col gap-2 items-center">
+                    <strong>Select a PDF file</strong>
+                  </div>
+                }
+                type="info"
+                className="w-full"
+              />
+              <Divider className="!my-2">Or</Divider>
+              <Alert
+                rootClassName="cursor-pointer"
+                onClick={() => onSelectFile(['mp4', 'mp3', 'wav'])}
                 message={
                   <div className="flex flex-col gap-2 items-center">
                     <strong>Select a file</strong>
                     <small className="text-gray-500">
-                      (Support PDF, MP4, MP3, WAV)
+                      (Support MP4, MP3, WAV)
                     </small>
                   </div>
                 }

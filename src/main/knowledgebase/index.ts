@@ -23,7 +23,7 @@ import { TextLoader } from 'langchain/document_loaders/fs/text';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { ImageLoader } from '../loaders/ImageLoader';
-
+import { SitemapLoader } from '@langchain/community/document_loaders/web/sitemap';
 import {
   DirectoryLoader,
   UnknownHandling,
@@ -368,7 +368,7 @@ export class KnowledgeBaseManager {
       const notificationId = uuidv4();
       notificationManager.create({
         id: notificationId,
-        title: notificationId,
+        title: '导入文件',
         type: 'progress',
         description: '导入中...',
         percent: 0,
@@ -472,6 +472,64 @@ export class KnowledgeBaseManager {
         KnowledgeBaseSourceType.Text,
         input.config,
       );
+    } else if (input.config.sitemap) {
+      try {
+        const loader = new SitemapLoader(input.config.sitemap);
+        const docs = await loader.load();
+        const sitemap = await loader.parseSitemap();
+        const notificationId = uuidv4();
+        notificationManager.create({
+          id: notificationId,
+          title: '导入知识库',
+          type: 'progress',
+          description: '导入中...',
+          percent: 0,
+          duration: undefined,
+          closeEnable: false,
+        } as NotificationMessage);
+      } catch {
+        notificationManager.sendNotification(
+          `${input.config.sitemap} 导入失败`,
+          'error',
+        );
+        return;
+      }
+
+      for (let index = 0; index < sitemap.length; index++) {
+        const { loc } = sitemap[index];
+        try {
+          const doc = await urlToMarkdown(loc.trim());
+          notificationManager.update({
+            id: notificationId,
+            title: '导入知识库',
+            type: 'progress',
+            description: `正在导入[${loc.trim()}]`,
+            percent: (index / sitemap.length) * 100,
+            duration: undefined,
+            closeEnable: false,
+          } as NotificationMessage);
+          await this.insertRecord(
+            kb.id,
+            doc,
+            KnowledgeBaseSourceType.Web,
+            input.config,
+          );
+        } catch {
+          notificationManager.sendNotification(
+            `${loc.trim()} 导入失败`,
+            'error',
+          );
+        }
+      }
+      notificationManager.update({
+        id: notificationId,
+        title: '导入知识库',
+        type: 'progress',
+        description: `导入完成`,
+        percent: 100,
+        duration: 3,
+        closeEnable: true,
+      } as NotificationMessage);
     }
   };
 

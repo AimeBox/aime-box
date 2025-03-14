@@ -32,7 +32,7 @@ export class RemoveBackground extends StructuredTool {
   async _call(input: z.infer<typeof this.schema>): Promise<string> {
     const buffer = await new Transformers({
       task: 'image-segmentation',
-      modelName: 'rmbg-1.4',
+      modelName: 'rmbg-2.0',
     }).rmbg(input.pathOrUrl);
     if (input.outputFormat == 'base64') {
       const base64String = buffer.toString('base64');

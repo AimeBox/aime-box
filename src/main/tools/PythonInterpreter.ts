@@ -141,7 +141,11 @@ export class PythonInterpreterTool extends BaseTool {
         mode: 'text',
         pythonPath: this.pythonPath,
         pythonOptions: ['-u'], // get print results in real-time
-        encoding: 'utf8',
+        encoding: 'binary',
+        parser: (data) => {
+          console.log(data);
+          return data;
+        },
         //scriptPath: 'path/to/my/scripts',
         //args: ['value1', 'value2', 'value3'],
       } as Options;
@@ -157,10 +161,14 @@ export class PythonInterpreterTool extends BaseTool {
         pythonScriptFilePath = path.join(tempDir, 'main.py');
         isFile = true;
       }
+
       await new Promise((resolve) => setTimeout(resolve, 5000));
       if (isFile) {
-        const res = await PythonShell.run(pythonScriptFilePath, options);
-        return res.join('\r\n');
+        const res = await runCommand(
+          `${this.pythonPath} ${pythonScriptFilePath}`,
+        );
+        //const res = await PythonShell.run(pythonScriptFilePath, options);
+        return res.toString().trim();
       } else {
         const res = await PythonShell.runString(input.script, options);
         return res.join('\r\n');

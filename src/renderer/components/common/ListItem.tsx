@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 export interface ListItemProps {
   children?: ReactNode;
-  title?: string;
+  title?: ReactNode | string;
   subTitle?: string | ReactNode;
   href?: string;
   active?: boolean;
@@ -55,6 +55,7 @@ export const ListItem = forwardRef((props: ListItemProps) => {
               <small className="text-gray-500 whitespace-normal line-clamp-1">
                 {subTitle}
               </small>
+              {children}
             </div>
           </div>
         </div>
