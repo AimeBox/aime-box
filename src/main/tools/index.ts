@@ -228,9 +228,14 @@ export class ToolsManager {
       let mcpClient = this.mcpClients.find(
         (x) => x.getServerVersion().name == tool.mcp_id,
       );
-      if (!mcpClient) {
-        mcpClient = await this.getMcpClient(tool.mcp_id);
-        this.mcpClients.push(mcpClient);
+      if (!mcpClient || mcpClient.transport === undefined) {
+        const mcpServer = await this.mcpServerRepository.findOne({
+          where: { id: tool.mcp_id },
+        });
+        await this.refreshMcp(mcpServer);
+        mcpClient = this.mcpClients.find(
+          (x) => x.getServerVersion().name == tool.mcp_id,
+        );
       }
       const _tool = (await mcpClient.listTools()).tools.find(
         (x) => x.name == tool.name.split('@')[0],
@@ -901,7 +906,7 @@ export class ToolsManager {
     let client = mcpName
       ? this.mcpClients.find((y) => y.getServerVersion().name == mcpName)
       : undefined;
-    if (!client || renew) {
+    if (!client || client.transport === undefined || renew) {
       client = new Client({ name: 'Test Client', version: '0.0.1' });
 
       const command = commandAndArgs.split(' ')[0];

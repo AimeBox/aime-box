@@ -1,7 +1,7 @@
 {
   "name": "aime-box",
   "description": "Aime Box is a tool agent box for producer.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "keywords": [
     "agent",
