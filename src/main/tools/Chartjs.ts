@@ -55,6 +55,7 @@ export class ChartjsTool extends Tool {
     options?: Partial<CallOptions>,
   ): Promise<IterableReadableStream<any>> {
     async function* generateStream() {
+      throw new Error('not implemented');
       const t = new Transformers({
         task: 'object-detection',
         modelName: 'doclayout_yolo',

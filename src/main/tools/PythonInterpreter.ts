@@ -70,6 +70,7 @@ export class PythonInterpreterTool extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
+    let tempDir;
     try {
       if (!this.pythonPath) {
         try {
@@ -86,11 +87,19 @@ export class PythonInterpreterTool extends BaseTool {
         return 'not found python';
       }
       console.log(`Python Path: ${this.pythonPath}`);
-      fs.mkdirSync(path.join(getTmpPath(), 'sandbox'), { recursive: true });
-      const tempDir = fs.mkdtempSync(
-        path.join(getTmpPath(), 'sandbox', `sandbox-`),
-      );
-      await this.createVenv(path.join(tempDir, 'venv'));
+
+      if (config?.configurable?.chatRootPath) {
+        tempDir = path.join(config?.configurable?.chatRootPath, 'sandbox');
+        fs.mkdirSync(tempDir, { recursive: true });
+      } else {
+        fs.mkdirSync(path.join(getTmpPath(), 'sandbox'), { recursive: true });
+        tempDir = fs.mkdtempSync(
+          path.join(getTmpPath(), 'sandbox', `sandbox-`),
+        );
+      }
+      if (!fs.existsSync(path.join(tempDir, 'venv'))) {
+        await this.createVenv(path.join(tempDir, 'venv'));
+      }
       if (platform == 'win32') {
         this.pythonPath = path.join(tempDir, 'venv', 'Scripts', 'python.exe');
       } else if (platform == 'darwin') {
@@ -114,7 +123,9 @@ export class PythonInterpreterTool extends BaseTool {
             isSuccess = true;
             break;
           } catch {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            await new Promise((resolve) => {
+              setTimeout(resolve, 2000);
+            });
           }
         }
         if (!isSuccess) {
@@ -130,7 +141,9 @@ export class PythonInterpreterTool extends BaseTool {
           isSuccess = true;
           break;
         } catch {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          await new Promise((resolve) => {
+            setTimeout(resolve, 2000);
+          });
         }
       }
       if (!isSuccess) {
@@ -167,6 +180,9 @@ export class PythonInterpreterTool extends BaseTool {
         const res = await runCommand(
           `${this.pythonPath} ${pythonScriptFilePath}`,
         );
+        if (res.toString().trim() == '') {
+          return 'you should use print() in script!';
+        }
         //const res = await PythonShell.run(pythonScriptFilePath, options);
         return res.toString().trim();
       } else {
@@ -186,8 +202,8 @@ export class PythonInterpreterTool extends BaseTool {
 
       return out.trim();
     } finally {
-      if (!this.keepVenv) {
-        fs.rmSync(path.join(getTmpPath(), 'sandbox'), { recursive: true });
+      if (!this.keepVenv && tempDir && fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true });
       }
     }
     return null;

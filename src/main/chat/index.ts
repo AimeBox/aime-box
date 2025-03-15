@@ -76,8 +76,9 @@ import { createSupervisor } from '@langchain/langgraph-supervisor';
 import { Agent } from '@/entity/Agent';
 import { AgentExecutor } from 'langchain/agents';
 import { writeFile } from 'node:fs/promises';
-import { chatCallbacks } from './callbacks';
+import { runAgent } from './runAgent';
 import { InMemoryStore } from '@langchain/langgraph';
+import { isString } from '../utils/is';
 // const repository = dbManager.dataSource.getRepository(Chat);
 
 export interface ChatInfo extends Chat {
@@ -521,16 +522,44 @@ export class ChatManager {
     this.runningTasks.set(chatId, controller);
 
     const callbacks = {
-      handleMessageCreated: async (message: AIMessage | ToolMessage) => {
-        let msg = new ChatMessage(
-          message.id,
-          lastMesssageId,
-          chat,
-          modelName,
-          isToolMessage(message) ? 'tool' : 'assistant',
-          [{ type: 'text', text: message.content }],
-          ChatStatus.RUNNING,
-        );
+      handleMessageCreated: async (
+        message: AIMessage | ToolMessage | HumanMessage,
+      ) => {
+        let role;
+        if (isAIMessage(message)) {
+          role = 'assistant';
+        } else if (isToolMessage(message)) {
+          role = 'tool';
+        } else if (isHumanMessage(message)) {
+          role = 'user';
+        }
+        let msg;
+        if (role == 'user') {
+          msg = new ChatMessage(
+            message.id,
+            lastMesssageId,
+            chat,
+            modelName,
+            role,
+            isString(message.content)
+              ? [{ type: 'text', text: message.content }]
+              : message.content,
+            ChatStatus.SUCCESS,
+          );
+        } else {
+          msg = new ChatMessage(
+            message.id,
+            lastMesssageId,
+            chat,
+            modelName,
+            role,
+            isString(message.content)
+              ? [{ type: 'text', text: message.content }]
+              : message.content,
+            ChatStatus.RUNNING,
+          );
+        }
+
         msg.provider_type = message.additional_kwargs[
           'provider_type'
         ] as string;
@@ -598,6 +627,7 @@ export class ChatManager {
         event(`chat:message-changed:${chatId}`, msg);
       },
     };
+    await fs.mkdir(this.getChatPath(chatId), { recursive: true });
     try {
       if (chat.mode == 'agent' && chat.agent) {
         // agent 模式
@@ -609,6 +639,7 @@ export class ChatManager {
             chat.options,
             callbacks,
             controller.signal,
+            { chatRootPath: this.getChatPath(chatId) },
           );
         } else if (agent.type == 'react') {
           await this.chatReact(
@@ -617,6 +648,7 @@ export class ChatManager {
             chat.options,
             callbacks,
             controller.signal,
+            { chatRootPath: this.getChatPath(chatId) },
           );
         }
       } else {
@@ -627,9 +659,11 @@ export class ChatManager {
           chat.options,
           callbacks,
           controller.signal,
+          { chatRootPath: this.getChatPath(chatId) },
         );
       }
     } catch (err) {
+      notificationManager.sendNotification(err.message, 'error');
       console.error(err);
     }
 
@@ -707,6 +741,7 @@ export class ChatManager {
     options?: ChatOptions | undefined,
     callbacks?: any | undefined,
     signal?: AbortSignal | undefined,
+    configurable?: Record<string, any> | undefined,
   ) {
     const handlerMessageCreated = callbacks?.['handleMessageCreated'];
     //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
@@ -718,37 +753,182 @@ export class ChatManager {
     const { provider, modelName } = getProviderModel(providerModel);
     const providerInfo = await providersManager.getProviders();
     const providerType = providerInfo.find((x) => x.name == provider)?.type;
-    const llm = await getChatModel(provider, modelName, options, tools);
+    const llm = await getChatModel(provider, modelName, options);
 
     //const checkpointer = dbManager.langgraphSaver;
     const reactAgent = createReactAgent({
       llm: llm,
       tools,
+      //prompt: options?.system,
       //checkpointer: checkpointer,
     });
-    let lastMessage;
-    try {
-      const eventStream = await reactAgent.streamEvents(
-        { messages },
-        {
-          version: 'v2',
-          signal,
-          callbacks: chatCallbacks(
-            modelName,
-            providerType,
-            handlerMessageCreated,
-            handlerMessageStream,
-            handlerMessageError,
-            handlerMessageFinished,
-          ),
-        },
-      );
-      for await (const { event, tags, data } of eventStream) {
-        console.log(event, tags, data);
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    await runAgent(
+      reactAgent,
+      messages,
+      signal,
+      configurable,
+      modelName,
+      providerType,
+      {
+        handlerMessageCreated,
+        handlerMessageFinished,
+        handlerMessageStream,
+        handlerMessageError,
+      },
+    );
+    // let _lastMessage;
+    // try {
+    //   const eventStream = await reactAgent.streamEvents(
+    //     { messages },
+    //     {
+    //       version: 'v2',
+    //       signal,
+    //       // callbacks:
+    //       // chatCallbacks(
+    //       //   modelName,
+    //       //   providerType,
+    //       //   handlerMessageCreated,
+    //       //   handlerMessageStream,
+    //       //   handlerMessageError,
+    //       //   handlerMessageFinished,
+    //       // ),
+    //       //   [
+    //       //   ...chatCallbacks(
+    //       //     modelName,
+    //       //     providerType,
+    //       //     handlerMessageCreated,
+    //       //     handlerMessageStream,
+    //       //     handlerMessageError,
+    //       //     handlerMessageFinished,
+    //       //   ),
+    //       //   {
+    //       //     handleLLMStart(llm, prompts: string[]) {
+    //       //       console.log('handleLLMStart', {
+    //       //         prompts,
+    //       //       });
+    //       //     },
+    //       //   },
+    //       // ],
+    //     },
+    //   );
+    //   const _toolCalls = [];
+    //   const _messages = [];
+    //   for await (const { event, tags, data } of eventStream) {
+    //     if (event == 'on_chat_model_start') {
+    //       console.log('on_chat_model_start', data);
+    //       _lastMessage =
+    //         data.input.messages[0][data.input.messages[0].length - 1];
+    //       if (isHumanMessage(_lastMessage)) {
+    //         await handlerMessageCreated?.(_lastMessage);
+    //         _messages.push(_lastMessage);
+    //       }
+    //       const aiMessage = new AIMessage({
+    //         id: uuidv4(),
+    //         content: '',
+    //         additional_kwargs: {
+    //           model: modelName,
+    //           provider_type: providerType,
+    //         },
+    //       });
+    //       await handlerMessageCreated?.(aiMessage);
+    //       _lastMessage = aiMessage;
+    //       _messages.push(aiMessage);
+    //     } else if (event == 'on_chat_model_stream') {
+    //       console.log('on_chat_model_start', data);
+
+    //       if (data.chunk.content && _lastMessage) {
+    //         if (isAIMessage(_lastMessage)) {
+    //           _lastMessage.content += data.chunk.content;
+    //           await handlerMessageStream?.(_lastMessage);
+    //         }
+    //       }
+    //     } else if (event == 'on_chat_model_end') {
+    //       console.log('on_chat_model_start', data);
+    //       if (data.output && _lastMessage) {
+    //         _lastMessage.content = data.output.content;
+    //         _lastMessage.tool_calls = data.output.tool_calls;
+    //         if (_lastMessage.tool_calls && _lastMessage.tool_calls.length > 0) {
+    //           _toolCalls.push(..._lastMessage.tool_calls);
+    //         }
+    //         _lastMessage.usage_metadata = data.output.usage_metadata;
+    //         await handlerMessageFinished?.(_lastMessage);
+    //       }
+    //     } else if (event == 'on_tool_start') {
+    //       console.log('on_tool_start', data);
+    //       const toolCall = _toolCalls.shift();
+    //       const toolMessage = new ToolMessage({
+    //         id: uuidv4(),
+    //         content: '',
+    //         tool_call_id: toolCall.id,
+    //         name: toolCall.name,
+    //         additional_kwargs: {
+    //           provider_type: undefined,
+    //           model: toolCall.name,
+    //         },
+    //       });
+    //       await handlerMessageCreated?.(toolMessage);
+    //       _lastMessage = toolMessage;
+    //       _messages.push(toolMessage);
+    //     } else if (event == 'on_tool_end') {
+    //       console.log('on_tool_end', data);
+    //       let _isToolMessage = false;
+    //       try {
+    //         _isToolMessage = isToolMessage(data.output);
+    //       } catch {}
+    //       if (_isToolMessage) {
+    //         const msg = _messages.find(
+    //           (x) => x.tool_call_id == data.output.tool_call_id,
+    //         );
+    //         msg.content = data.output.content;
+    //         msg.tool_call_id = data.output.tool_call_id;
+    //         msg.name = data.output.name;
+    //         msg.status = ChatStatus.SUCCESS;
+    //         msg.additional_kwargs = {
+    //           provider_type: undefined,
+    //           model: data.output.name,
+    //         };
+    //         await handlerMessageFinished?.(msg);
+    //         _lastMessage = msg;
+    //       } else {
+    //         //lastMessage.content = output.content;
+    //         _lastMessage.status = ChatStatus.SUCCESS;
+    //         _lastMessage.additional_kwargs = {
+    //           provider_type: undefined,
+    //           model: _lastMessage.name,
+    //         };
+    //         await handlerMessageFinished?.(_lastMessage);
+    //       }
+    //     } else if (
+    //       event == 'on_chain_end' ||
+    //       tags.find((x) => x.startsWith('graph:'))
+    //     ) {
+    //       if (
+    //         data?.output?.messages?.length > 0 &&
+    //         isToolMessage(data.output.messages[0])
+    //       ) {
+    //         const msg = _messages.find(
+    //           (x) => x.tool_call_id == data.output.messages[0].tool_call_id,
+    //         );
+    //         if (msg.status === undefined) {
+    //           msg.content = data.output.messages[0].content;
+    //           msg.status = data.output.messages[0].status;
+    //           await handlerMessageFinished?.(msg);
+    //         }
+    //       }
+    //     } else {
+    //       console.log(event, tags, data);
+    //     }
+    //   }
+    // } catch (err) {
+    //   if (_lastMessage) {
+    //     if (isToolMessage(_lastMessage)) {
+    //       _lastMessage.status = ChatStatus.ERROR;
+    //     }
+    //     _lastMessage.additional_kwargs['error'] = err.message || err.name;
+    //     await handlerMessageError?.(_lastMessage);
+    //   }
+    //   console.error(err);
+    // }
   }
 
   public async chatSupervisor(
@@ -757,6 +937,7 @@ export class ChatManager {
     options?: ChatOptions | undefined,
     callbacks?: any | undefined,
     signal?: AbortSignal | undefined,
+    configurable?: Record<string, any> | undefined,
   ) {
     const { provider, modelName } = getProviderModel(agent.model);
     const providerInfo = await providersManager.getProviders();
@@ -769,28 +950,43 @@ export class ChatManager {
     const handlerMessageFinished = callbacks?.['handleMessageFinished'];
     const handlerMessageStream = callbacks?.['handleMessageStream'];
     const handlerMessageError = callbacks?.['handleMessageError'];
-    try {
-      const eventStream = await workflow.streamEvents(
-        { messages },
-        {
-          version: 'v2',
-          signal,
-          callbacks: chatCallbacks(
-            modelName,
-            providerType,
-            handlerMessageCreated,
-            handlerMessageStream,
-            handlerMessageError,
-            handlerMessageFinished,
-          ),
-        },
-      );
-      for await (const { event, tags, data } of eventStream) {
-        //console.log(event, tags, data);
-      }
-    } catch (err) {
-      console.error(err);
-    }
+
+    await runAgent(
+      workflow,
+      messages,
+      signal,
+      configurable,
+      modelName,
+      providerType,
+      {
+        handlerMessageCreated,
+        handlerMessageFinished,
+        handlerMessageStream,
+        handlerMessageError,
+      },
+    );
+    // try {
+    //   const eventStream = await workflow.streamEvents(
+    //     { messages },
+    //     {
+    //       version: 'v2',
+    //       signal,
+    //       callbacks: chatCallbacks(
+    //         modelName,
+    //         providerType,
+    //         handlerMessageCreated,
+    //         handlerMessageStream,
+    //         handlerMessageError,
+    //         handlerMessageFinished,
+    //       ),
+    //     },
+    //   );
+    //   for await (const { event, tags, data } of eventStream) {
+    //     //console.log(event, tags, data);
+    //   }
+    // } catch (err) {
+    //   console.error(err);
+    // }
   }
 
   public async chatReact(
@@ -799,6 +995,7 @@ export class ChatManager {
     options?: ChatOptions | undefined,
     callbacks?: any | undefined,
     signal?: AbortSignal | undefined,
+    configurable?: Record<string, any> | undefined,
   ) {
     const handlerMessageCreated = callbacks?.['handleMessageCreated'];
     //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
@@ -816,28 +1013,43 @@ export class ChatManager {
       agent,
       new InMemoryStore(),
     );
-    try {
-      const eventStream = await reactAgent.streamEvents(
-        { messages },
-        {
-          version: 'v2',
-          signal,
-          callbacks: chatCallbacks(
-            modelName,
-            providerType,
-            handlerMessageCreated,
-            handlerMessageStream,
-            handlerMessageError,
-            handlerMessageFinished,
-          ),
-        },
-      );
-      for await (const { event, tags, data } of eventStream) {
-        console.log(event, tags, data);
-      }
-    } catch (err) {
-      console.error(err);
-    }
+
+    await runAgent(
+      reactAgent,
+      messages,
+      signal,
+      configurable,
+      modelName,
+      providerType,
+      {
+        handlerMessageCreated,
+        handlerMessageFinished,
+        handlerMessageStream,
+        handlerMessageError,
+      },
+    );
+    // try {
+    //   const eventStream = await reactAgent.streamEvents(
+    //     { messages },
+    //     {
+    //       version: 'v2',
+    //       signal,
+    //       callbacks: chatCallbacks(
+    //         modelName,
+    //         providerType,
+    //         handlerMessageCreated,
+    //         handlerMessageStream,
+    //         handlerMessageError,
+    //         handlerMessageFinished,
+    //       ),
+    //     },
+    //   );
+    //   for await (const { event, tags, data } of eventStream) {
+    //     console.log(event, tags, data);
+    //   }
+    // } catch (err) {
+    //   console.error(err);
+    // }
   }
 
   public async cancelChat(chatId: string) {

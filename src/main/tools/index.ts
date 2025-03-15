@@ -280,7 +280,7 @@ export class ToolsManager {
       const baseTool = Reflect.construct(
         this.builtInToolsClassType.find((x) => x.name == tool.name).classType,
         tool.config ? [tool.config] : [],
-      );
+      ) as BaseTool;
 
       return baseTool;
     }
