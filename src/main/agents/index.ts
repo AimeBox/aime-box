@@ -17,7 +17,7 @@ import { Tool } from '@langchain/core/tools';
 import { ScriptAssistant } from './script_assistant/ScriptAssistant';
 import { FormSchema } from '@/types/form';
 import { TranslateAgent } from './translate/TranslateAgent';
-import { PlanningAgent } from './planning/PlanningAgent';
+import { PlannerAgent } from './planner/PlannerAgent';
 import { Like, Repository } from 'typeorm';
 import {
   createReactAgent,
@@ -44,8 +44,8 @@ export class AgentManager {
     this.agentRepository = dbManager.dataSource.getRepository(Agent);
     this.registerAgent(ExtractAgent);
     this.registerAgent(ScriptAssistant);
-    this.registerAgent(TranslateAgent);
-    this.registerAgent(PlanningAgent);
+    //this.registerAgent(TranslateAgent);
+    this.registerAgent(PlannerAgent);
     if (!ipcMain) return;
     ipcMain.on('agent:getList', async (event, filter?: string) => {
       event.returnValue = await this.getList(filter);
@@ -138,9 +138,18 @@ export class AgentManager {
       where: { id },
     });
     if (!agent) throw new Error('找不到该agent');
+    let configSchema;
+    if (agent.type == 'built-in') {
+      configSchema = this.agents.find((x) => x.info.name == agent.name)?.info
+        .configSchema;
+    }
+
     return {
       ...agent,
-      configSchema: this.getAgentConfigSchema(agent),
+      config: agent.config || {},
+      hidden: false,
+      static: agent.type == 'built-in',
+      configSchema: configSchema,
     };
   }
 
@@ -155,17 +164,38 @@ export class AgentManager {
       custom_agents = await this.agentRepository.find();
     } else {
       custom_agents = await this.agentRepository.find({
-        where: { name: Like(`%${filter}%`), description: Like(`%${filter}%`) },
+        where: {
+          name: Like(`%${filter.toLowerCase()}%`),
+          description: Like(`%${filter.toLowerCase()}%`),
+        },
       });
     }
-    const custom_agents_info = custom_agents.map((agent) => {
-      return {
+    const custom_agents_info = [];
+    for (const agent of custom_agents) {
+      let configSchema;
+      let config;
+      if (agent.type == 'built-in') {
+        if (!this.agents.find((x) => x.info.name == agent.name)) {
+          continue;
+        }
+        config = await this.agents
+          .find((x) => x.info.name == agent.name)
+          ?.agent.getConfig();
+        configSchema = this.agents.find((x) => x.info.name == agent.name)?.info
+          .configSchema;
+      }
+      custom_agents_info.push({
         ...agent,
         hidden: false,
-        static: false,
-        configSchema: this.getAgentConfigSchema(agent),
-      };
-    });
+        static: agent.type == 'built-in',
+        config: config,
+        configSchema: configSchema,
+      });
+    }
+
+    // const custom_agents_info = await Promise.all(
+    //   custom_agents.map(async (agent) => {}),
+    // );
     return [...custom_agents_info];
   }
 
@@ -174,24 +204,36 @@ export class AgentManager {
       const agent = Reflect.construct(ClassType, []) as BaseAgent;
       const agentRepository = dbManager.dataSource.getRepository(Agent);
       let ts = await agentRepository.findOne({
-        where: { name: agent.name },
+        where: { id: agent.name.toLowerCase() },
       });
       if (!ts) {
-        ts = new Agent(agent.name, agent.description, '', '', [], [], '', {});
+        ts = new Agent(
+          agent.name.toLowerCase(),
+          agent.name,
+          agent.description,
+          '',
+          'built-in',
+          [],
+          [],
+          '',
+          {},
+        );
 
         await agentRepository.save(ts);
       }
       this.agents = this.agents.filter((x) => x.info.name != agent.name);
-      agent.config = ts.config;
+      //agent.config = ts.config;
+      const config = await agent.getConfig();
+      console.log(agent.name, config);
       this.agents.push({
         info: {
-          id: agent.name,
+          id: ts.id,
           static: true,
           name: agent.name,
           description: agent.description,
           hidden: agent.hidden,
           tags: agent.tags,
-          config: ts.config,
+          config: config,
           configSchema: agent.configSchema,
         },
         agent,
@@ -203,6 +245,7 @@ export class AgentManager {
 
   public async createAgent(data: any) {
     const agent = new Agent(
+      undefined,
       data.name,
       data.description,
       data.prompt,
@@ -233,16 +276,7 @@ export class AgentManager {
         throw new Error('不能将自身作为AI助手');
       }
     } else {
-      agent = new Agent(
-        data.name,
-        data.description,
-        data.prompt,
-        data.type,
-        data.tools,
-        data.agents,
-        data.model,
-        data.config,
-      );
+      throw new Error('agent id is required');
     }
     const agentInfo = await this.getAgent(agent.id);
     if (agentInfo.type == 'react' || agentInfo.type == 'supervisor') {
@@ -267,48 +301,52 @@ export class AgentManager {
   }
 
   public async buildAgent(agent: Agent, store?: BaseStore) {
-    const { provider, modelName } = getProviderModel(agent.model);
-    const model = await getChatModel(provider, modelName, agent.config);
-
-    const tools = await toolsManager.buildTools(agent?.tools);
-    if (agent.type == 'react') {
-      const reactAgent = createReactAgent({
-        llm: model,
-        tools: tools,
-        name: agent.name,
-        store: store,
-        checkpointSaver: dbManager.langgraphSaver,
-        prompt:
-          agent.prompt ||
-          'You are a ai agent, you can use the tools to help you answer the question.',
-      });
-      return reactAgent;
-    } else if (agent.type == 'supervisor') {
-      const agents = [];
-      for (const agentId of agent.agents) {
-        const _agent = await this.agentRepository.findOne({
-          where: { id: agentId },
+    if (agent.type == 'react' || agent.type == 'supervisor') {
+      const { provider, modelName } = getProviderModel(agent.model);
+      const model = await getChatModel(provider, modelName, agent.config);
+      const tools = await toolsManager.buildTools(agent?.tools);
+      if (agent.type == 'react') {
+        const reactAgent = createReactAgent({
+          llm: model,
+          tools: tools,
+          name: agent.name,
+          store: store,
+          checkpointSaver: dbManager.langgraphSaver,
+          prompt:
+            agent.prompt ||
+            'You are a ai agent, you can use the tools to help you answer the question.',
         });
-        const workflow = await this.buildAgent(_agent);
-        agents.push(workflow);
+        return reactAgent;
+      } else if (agent.type == 'supervisor') {
+        const agents = [];
+        for (const agentId of agent.agents) {
+          const _agent = await this.agentRepository.findOne({
+            where: { id: agentId },
+          });
+          const workflow = await this.buildAgent(_agent);
+          agents.push(workflow);
+        }
+
+        const supervisorAgent = createSupervisor({
+          supervisorName: agent.name,
+          agents: agents,
+          llm: model,
+          tools: tools,
+
+          prompt: agent.prompt,
+          outputMode: (agent.supervisorOutputMode ||
+            'last_message') as OutputMode,
+        });
+
+        return supervisorAgent.compile({
+          name: agent.name,
+          store,
+          checkpointer: dbManager.langgraphSaver,
+        });
       }
-
-      const supervisorAgent = createSupervisor({
-        supervisorName: agent.name,
-        agents: agents,
-        llm: model,
-        tools: tools,
-
-        prompt: agent.prompt,
-        outputMode: (agent.supervisorOutputMode ||
-          'last_message') as OutputMode,
-      });
-
-      return supervisorAgent.compile({
-        name: agent.name,
-        store,
-        checkpointer: dbManager.langgraphSaver,
-      });
+    } else if (agent.type == 'built-in') {
+      const _agent = this.agents.find((x) => x.info.name == agent.name);
+      return await _agent.agent.createAgent();
     }
     return null;
   }

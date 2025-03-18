@@ -17,6 +17,9 @@ import { getDataPath } from '../utils/path';
 import { chromium } from 'playwright';
 
 import fetch from 'node-fetch';
+import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
+import { t } from 'i18next';
 
 export interface IdeogramParameters extends ToolParams {
   apiKey: string;
@@ -26,7 +29,7 @@ export interface IdeogramParameters extends ToolParams {
   model: string;
 }
 
-export class Ideogram extends StructuredTool {
+export class Ideogram extends BaseTool {
   schema = z.object({
     prompt: z.string().describe('The prompt to use to generate the image.'),
     negative_prompt: z
@@ -66,61 +69,50 @@ export class Ideogram extends StructuredTool {
     //   ),
   });
 
-  static lc_name() {
-    return 'Ideogram';
-  }
+  configSchema: FormSchema[] = [
+    {
+      label: 'Api Key',
+      field: 'apiKey',
+      component: 'InputPassword',
+    },
+    {
+      label: 'Api Base',
+      field: 'apiBase',
+      defaultValue: 'https://api.ideogram.ai',
+      component: 'Input',
+    },
+    {
+      label: t('common.model'),
+      field: 'model',
+      component: 'Select',
+      defaultValue: 'V_2',
+      componentProps: {
+        options: [
+          { label: 'V_1', value: 'V_1' },
+          { label: 'V_1_TURBO', value: 'V_1_TURBO' },
+          { label: 'V_2', value: 'V_2' },
+          { label: 'V_2_TURBO', value: 'V_2_TURBO' },
+          { label: 'V_2A', value: 'V_2A' },
+          { label: 'V_2A_TURBO', value: 'V_2A_TURBO' },
+        ],
+      },
+    },
+  ];
 
-  name: string;
+  name: string = 'ideogram';
 
-  description: string;
+  description: string = 'Generate images with Ideogram';
 
-  officialLink: string;
+  officialLink: string = 'https://ideogram.ai/manage-api';
 
-  apiKey: string;
+  apiKey: string = 'NULL';
 
-  apiBase: string;
+  apiBase: string = 'https://api.ideogram.ai';
 
-  model: string;
+  model: string = 'V_2';
 
   constructor(params?: IdeogramParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'Ideogram',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'view web page',
-    });
-    Object.defineProperty(this, 'apiKey', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'NULL',
-    });
-    Object.defineProperty(this, 'apiBase', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'https://api.ideogram.ai',
-    });
-    Object.defineProperty(this, 'model', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'V_2',
-    });
-    Object.defineProperty(this, 'officialLink', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'https://ideogram.ai/manage-api',
-    });
-
     this.apiKey = params?.apiKey;
     this.apiBase = params?.apiBase;
     this.model = params?.model;

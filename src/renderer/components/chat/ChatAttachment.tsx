@@ -25,7 +25,7 @@ export default function ChatAttachment({
         <div
           className="flex overflow-hidden flex-row flex-1 gap-1 items-center text-sm font-medium dark:text-gray-100"
           onClick={() => {
-            window.electron.ipcRenderer.sendSync('app:openPath', value.path);
+            window.electron.app.openPath(value.path);
           }}
         >
           <div>

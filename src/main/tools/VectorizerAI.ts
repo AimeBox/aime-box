@@ -3,9 +3,12 @@ import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import { PassThrough } from 'stream';
 import { Transformers } from '../utils/transformers';
-import { ToolField } from './ToolField';
 import FormData from 'form-data';
 import fetch, { Response } from 'node-fetch';
+import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
+import { z } from 'zod';
+import { t } from 'i18next';
 
 export interface VectorizerParameters extends ToolParams {
   apiKeyName: string;
@@ -15,75 +18,54 @@ export interface VectorizerParameters extends ToolParams {
   mode: string;
 }
 
-export class Vectorizer extends Tool {
-  static lc_name() {
-    return 'vectorizer';
-  }
+export class Vectorizer extends BaseTool {
+  schema = z.object({
+    image: z.string().describe('The image to vectorize'),
+  });
+  configSchema: FormSchema[] = [
+    {
+      label: 'Api Key Name',
+      field: 'apiKeyName',
+      component: 'Input',
+    },
+    {
+      label: 'Api Key',
+      field: 'apiKey',
+      component: 'InputPassword',
+    },
+    {
+      label: t('common.mode'),
+      field: 'mode',
+      component: 'Select',
+      defaultValue: 'production',
+      componentProps: {
+        options: [
+          { label: 'Test', value: 'test' },
+          { label: 'Preview', value: 'preview' },
+          { label: 'Production', value: 'production' },
+        ],
+      },
+    },
+  ];
 
-  name: string;
+  name: string = 'vectorizer';
 
-  description: string;
+  description: string =
+    'A tool to quickly and easily convert PNG and JPG images to SVG vector graphics';
 
   apiKeyName: string;
 
   apiKey: string;
 
-  officialLink: string;
+  officialLink: string = 'https://vectorizer.ai/account';
 
-  @ToolField({
-    field: 'mode',
-    component: 'Select',
-    componentProps: {
-      options: [
-        { value: 'test', label: '测试' },
-        { value: 'preview', label: '预览' },
-        { value: 'production', label: '生产' },
-      ],
-    },
-  })
   mode: string;
 
   constructor(params?: VectorizerParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'vectorizer',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: '一个将 PNG 和 JPG 图像快速轻松地转换为 SVG 矢量图的工具',
-    });
-    Object.defineProperty(this, 'apiKey', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: undefined,
-    });
-    Object.defineProperty(this, 'apiKeyName', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: undefined,
-    });
-    Object.defineProperty(this, 'mode', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'test',
-    });
-    Object.defineProperty(this, 'officialLink', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'https://vectorizer.ai/account',
-    });
     this.apiKey = params?.apiKey;
     this.apiKeyName = params?.apiKeyName;
-    this.mode = params?.mode;
+    this.mode = params?.mode || 'production';
   }
 
   async _call(input: string, runManager, config): Promise<string> {

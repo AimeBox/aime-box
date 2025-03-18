@@ -85,7 +85,7 @@ export const AgentsModal = React.forwardRef(
                     >
                       <div className="flex overflow-hidden flex-col flex-1 items-start whitespace-nowrap text-ellipsis">
                         <strong>{agent.name}</strong>
-                        <small className="text-gray-500">
+                        <small className="text-left text-gray-500 whitespace-break-spaces">
                           {agent.description}
                         </small>
                       </div>

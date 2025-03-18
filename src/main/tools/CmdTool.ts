@@ -27,7 +27,7 @@ export class CmdTool extends BaseTool {
 
   name: string = 'cmd';
 
-  description: string = 'run cmd commands on windows system.';
+  description: string = 'run powershell.exe commands on windows system.';
 
   ask_human_input: boolean = false;
 

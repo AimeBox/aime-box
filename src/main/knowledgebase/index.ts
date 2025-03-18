@@ -473,11 +473,13 @@ export class KnowledgeBaseManager {
         input.config,
       );
     } else if (input.config.sitemap) {
+      const notificationId = uuidv4();
+      let sitemap = [];
       try {
         const loader = new SitemapLoader(input.config.sitemap);
         const docs = await loader.load();
-        const sitemap = await loader.parseSitemap();
-        const notificationId = uuidv4();
+        sitemap = await loader.parseSitemap();
+
         notificationManager.create({
           id: notificationId,
           title: '导入知识库',

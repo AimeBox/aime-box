@@ -211,7 +211,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                     ))}
                   </div>
                 </div>
-                <div className="flex flex-col gap-2 p-4 bg-gray-100 rounded-2xl">
+                {/* <div className="flex flex-col gap-2 p-4 bg-gray-100 rounded-2xl">
                   <div className="flex flex-row justify-between">
                     <div className="flex flex-row gap-2 items-center">
                       <FaTools></FaTools>
@@ -259,7 +259,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                       </Tag>
                     ))}
                   </div>
-                </div>
+                </div> */}
 
                 <div className="flex flex-col gap-2 p-4 bg-gray-100 rounded-2xl">
                   <div className="flex flex-row justify-between">

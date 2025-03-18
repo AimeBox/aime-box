@@ -5,7 +5,7 @@ import {
   Route,
 } from 'react-router-dom';
 import 'tailwindcss/tailwind.css';
-import icon from '../../assets/icon.svg';
+import icon from '../../assets/icon.png';
 import './App.css';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import store from './store';

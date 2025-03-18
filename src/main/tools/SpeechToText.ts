@@ -2,16 +2,7 @@ import { Tool, ToolParams, StructuredTool } from '@langchain/core/tools';
 import fs from 'fs';
 import os from 'os';
 import ffmpeg from 'fluent-ffmpeg';
-// import { PassThrough } from 'stream';
-// import { WaveFile } from 'wavefile';
-// import { Transformers } from '../utils/transformers';
-
 import path from 'path';
-// import { OpenAIWhisperAudio } from '@langchain/community/document_loaders/fs/openai_whisper_audio';
-// import { type ClientOptions } from '@langchain/openai';
-import { ToolField } from './ToolField';
-// import settingsManager from '../settings';
-// import sherpa_onnx from 'sherpa-onnx-node';
 import { getModelsPath } from '../utils/path';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';

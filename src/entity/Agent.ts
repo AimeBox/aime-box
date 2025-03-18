@@ -13,16 +13,17 @@ import {
 @Entity('agent')
 export class Agent {
   constructor(
+    id: string,
     name: string,
     description?: string,
     prompt?: string,
-    type?: string | 'react' | 'supervisor',
+    type?: string | 'react' | 'supervisor' | 'built-in',
     tools?: any[],
     agents?: any[],
     model?: string,
     config?: any,
   ) {
-    this.id = uuidv4();
+    this.id = id || uuidv4();
     this.name = name;
     this.description = description;
     this.prompt = prompt;

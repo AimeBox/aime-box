@@ -55,7 +55,7 @@ export function Markdown(props: MarkdownProps) {
       //.use(rehypeSanitize)
       .use(rehypeHighlight)
 
-      .use(rehypeMermaid, { strategy: 'img-svg' })
+      .use(rehypeMermaid, { strategy: 'inline-svg' })
 
       .use(rehypeStringify)
 

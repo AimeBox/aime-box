@@ -65,7 +65,9 @@ export default function ipcListener(mainWindow: BrowserWindow) {
       resourcesPath: process.resourcesPath,
       cwd: process.cwd(),
       execPath: process.execPath,
+      type: process.type,
       systemVersion: process.getSystemVersion(),
+      isPackaged: app.isPackaged,
     };
   });
   ipcMain.on(

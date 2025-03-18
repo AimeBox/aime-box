@@ -12,20 +12,30 @@ export const runCommandSync = (command: string) => {
   }
   throw new Error('Unsupported platform');
 };
-export const runCommand = async (command: string): Promise<string> => {
-  let file;
-  if (platform == 'win32') {
-    file = 'powershell.exe';
-  } else if (platform == 'darwin') {
-    file = 'bash';
-  } else if (platform == 'linux') {
-    file = 'bash';
+export const runCommand = async (
+  command: string,
+  file?: string,
+): Promise<string> => {
+  let _file = file;
+  if (!_file) {
+    if (platform == 'win32') {
+      _file = 'cmd.exe';
+    } else if (platform == 'darwin') {
+      _file = 'bash';
+    } else if (platform == 'linux') {
+      _file = 'bash';
+    }
   }
 
   return new Promise((resolve, reject) => {
+    const commands = [];
+    if (_file == 'cmd.exe') {
+      commands.push('/c');
+    }
+    commands.push(command);
     const child = execFile(
-      file,
-      [command],
+      _file,
+      commands,
       {
         encoding: 'buffer',
         // stdio: ['pipe', 'pipe', 'pipe'],

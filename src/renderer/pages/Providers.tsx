@@ -13,6 +13,7 @@ import {
   Radio,
   Space,
   Button,
+  Divider,
 } from 'antd';
 import { useEffect, useState } from 'react';
 import {
@@ -158,18 +159,35 @@ export default function Connections() {
     }
   };
   const onManagerModel = async (data: Providers) => {
+    messageApi.loading({
+      type: 'loading',
+      content: 'loading...',
+      duration: 0,
+    });
     const models = await window.electron.providers.getModels(data.id);
     setModels(models);
     setCurrentData(data);
     formModels.resetFields();
     formModels.setFieldsValue({ models: models });
     setOpenModels(true);
+    messageApi.destroy();
   };
   const onSubmitModels = async (data: Providers) => {
     const models = formModels.getFieldValue('models');
     data.models = models;
     await window.electron.providers.createOrUpdate(data);
     setOpenModels(false);
+  };
+
+  const onSearch = (value: string) => {
+    formModels.resetFields();
+    if (!value) formModels.setFieldsValue({ models: models });
+    else {
+      const filteredModels = models.filter((model) =>
+        model.name.toLowerCase().includes(value.toLowerCase()),
+      );
+      formModels.setFieldsValue({ models: filteredModels });
+    }
   };
 
   useEffect(() => {
@@ -362,7 +380,14 @@ export default function Connections() {
             <small>{currentData?.api_base}</small>
           </div>
         </div>
-
+        <Input
+          placeholder="Search"
+          onChange={(e) => {
+            onSearch(e.target.value);
+          }}
+          allowClear
+        />
+        <div className="mt-2"></div>
         <Form
           form={formModels}
           layout="vertical"

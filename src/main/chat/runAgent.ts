@@ -9,6 +9,7 @@ import {
 } from '@langchain/core/messages';
 import { CompiledStateGraph } from '@langchain/langgraph';
 import { v4 as uuidv4 } from 'uuid';
+import { notificationManager } from '../app/NotificationManager';
 
 export const runAgent = async (
   agent: any,
@@ -37,37 +38,53 @@ export const runAgent = async (
   let _lastMessage;
   try {
     const eventStream = await agent.streamEvents(
-      { messages },
+      { messages, current_time: new Date().toISOString() },
       {
         version: 'v2',
         signal,
         configurable: { thread_id: uuidv4(), ...(configurable || {}) },
       },
     );
-    const _toolCalls = [];
+    let _toolCalls = [];
+    let _toolStart = [];
     const _messages = [];
     for await (const { event, tags, data } of eventStream) {
+      if (tags.includes('ignore')) {
+        continue;
+      }
       if (event == 'on_chat_model_start') {
-        console.log('on_chat_model_start', data);
+        console.log('on_chat_model_start', data, tags);
         _lastMessage =
           data.input.messages[0][data.input.messages[0].length - 1];
         if (isHumanMessage(_lastMessage)) {
           await callbacks?.handlerMessageCreated?.(_lastMessage);
           _messages.push(_lastMessage);
+          const aiMessage = new AIMessage({
+            id: uuidv4(),
+            content: '',
+            additional_kwargs: {
+              model: modelName,
+              provider_type: providerType,
+            },
+          });
+          await callbacks?.handlerMessageCreated?.(aiMessage);
+          _lastMessage = aiMessage;
+          _messages.push(aiMessage);
+        } else {
+          const aiMessage = new AIMessage({
+            id: uuidv4(),
+            content: '',
+            additional_kwargs: {
+              model: modelName,
+              provider_type: providerType,
+            },
+          });
+          await callbacks?.handlerMessageCreated?.(aiMessage);
+          _lastMessage = aiMessage;
+          _messages.push(aiMessage);
         }
-        const aiMessage = new AIMessage({
-          id: uuidv4(),
-          content: '',
-          additional_kwargs: {
-            model: modelName,
-            provider_type: providerType,
-          },
-        });
-        await callbacks?.handlerMessageCreated?.(aiMessage);
-        _lastMessage = aiMessage;
-        _messages.push(aiMessage);
       } else if (event == 'on_chat_model_stream') {
-        // console.log('on_chat_model_stream', data);
+        //console.log('on_chat_model_stream', data);
 
         if (data.chunk.content && _lastMessage) {
           if (isAIMessage(_lastMessage)) {
@@ -76,12 +93,14 @@ export const runAgent = async (
           }
         }
       } else if (event == 'on_chat_model_end') {
-        console.log('on_chat_model_end', data);
+        console.log('on_chat_model_end', data, tags);
         if (data.output && _lastMessage) {
           _lastMessage.content = data.output.content;
           _lastMessage.tool_calls = data.output.tool_calls;
           if (_lastMessage.tool_calls && _lastMessage.tool_calls.length > 0) {
+            _toolCalls = [];
             _toolCalls.push(..._lastMessage.tool_calls);
+            _toolStart = [];
           }
           _lastMessage.usage_metadata = data.output.usage_metadata;
           await callbacks?.handlerMessageFinished?.(_lastMessage);
@@ -103,10 +122,13 @@ export const runAgent = async (
           await callbacks?.handlerMessageCreated?.(toolMessage);
           _lastMessage = toolMessage;
           _messages.push(toolMessage);
+          _toolStart.push(toolMessage);
         }
       } else if (event == 'on_tool_end') {
         console.log('on_tool_end', data);
         let _isToolMessage = false;
+        const tooStart = _toolStart.shift();
+
         try {
           _isToolMessage = isToolMessage(data.output);
         } catch {}
@@ -125,13 +147,24 @@ export const runAgent = async (
           await callbacks?.handlerMessageFinished?.(msg);
           _lastMessage = msg;
         } else {
-          //lastMessage.content = output.content;
-          _lastMessage.status = ChatStatus.SUCCESS;
-          _lastMessage.additional_kwargs = {
-            provider_type: undefined,
-            model: _lastMessage.name,
-          };
-          await callbacks?.handlerMessageFinished?.(_lastMessage);
+          const _toolMessage =
+            data.output?.update?.messages[
+              data.output.update.messages.length - 1
+            ];
+          if (_toolMessage) {
+            const msg = _messages.find(
+              (x) => x.tool_call_id == _toolMessage.tool_call_id,
+            );
+            //lastMessage.content = output.content;
+            msg.content = _toolMessage.content;
+            msg.status = ChatStatus.SUCCESS;
+            msg.additional_kwargs = {
+              provider_type: undefined,
+              model: msg.name,
+            };
+            await callbacks?.handlerMessageFinished?.(msg);
+            _lastMessage = msg;
+          }
         }
       } else if (
         event == 'on_chain_end' ||
@@ -141,6 +174,7 @@ export const runAgent = async (
           data?.output?.messages?.length > 0 &&
           isToolMessage(data.output.messages[0])
         ) {
+          const tooStart = _toolStart.shift();
           const msg = _messages.find(
             (x) => x.tool_call_id == data.output.messages[0].tool_call_id,
           );
@@ -151,8 +185,8 @@ export const runAgent = async (
           }
         }
       } else {
-        //console.log(event, tags, data);
       }
+      console.log(event, tags, data);
     }
   } catch (err) {
     if (_lastMessage) {
@@ -162,6 +196,6 @@ export const runAgent = async (
       _lastMessage.additional_kwargs['error'] = err.message || err.name;
       await callbacks?.handlerMessageError?.(_lastMessage);
     }
-    console.error(err);
+    throw err;
   }
 };

@@ -55,7 +55,7 @@ export class McpServers {
     id: string,
     name: string,
     description?: string,
-    type?: 'sse' | 'command',
+    type?: 'sse' | 'stdio' | 'ws',
     command?: string,
 
     config?: any,

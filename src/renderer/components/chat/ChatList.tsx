@@ -39,7 +39,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [addButtonOpen, setAddButtonOpen] = useState(false);
-
+  const [isPackaged, setIsPackaged] = useState(true);
   const navigate = useNavigate();
   const getData = async (clear = false) => {
     const res = await window.electron.chat.getChatPage({
@@ -93,6 +93,8 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
   useEffect(() => {
     const id = location.pathname.split('/')[2];
     setCurrentChatId(id);
+    const appInfo = window.electron.app.info();
+    setIsPackaged(appInfo.isPackaged);
   }, [location]);
 
   const handleTitleChanged = (chat: Chat) => {
@@ -143,17 +145,19 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
               >
                 {t('chat.newchat')}
               </Button>
-              <Button
-                type="text"
-                block
-                icon={<FaRegMessage />}
-                onClick={() => {
-                  setAddButtonOpen(false);
-                  onNewChat('file');
-                }}
-              >
-                {t('chat.fileChat')}
-              </Button>
+              {!isPackaged && (
+                <Button
+                  type="text"
+                  block
+                  icon={<FaRegMessage />}
+                  onClick={() => {
+                    setAddButtonOpen(false);
+                    onNewChat('file');
+                  }}
+                >
+                  {t('chat.fileChat')}
+                </Button>
+              )}
             </div>
           }
         >

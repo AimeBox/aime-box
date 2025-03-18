@@ -10,7 +10,7 @@ import { t } from 'i18next';
 export default function AgentPage() {
   const [categories, setCategories] = useState<any[]>([
     // { key: 'custom', name: t('custom') },
-    { key: '', name: t('all') },
+    { key: 'all', name: t('common.all') },
   ]);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');

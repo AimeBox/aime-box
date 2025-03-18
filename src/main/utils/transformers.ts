@@ -70,7 +70,7 @@ export class Transformers {
     env.allowRemoteModels = false;
 
     this._model = await AutoModel.from_pretrained(this.modelName, {
-      dtype: 'q4f16',
+      dtype: this.modelName == 'rmbg-2.0' ? 'q4f16' : 'fp16',
       local_files_only: true,
     });
     this._processor = await AutoProcessor.from_pretrained(this.modelName, {});

@@ -13,6 +13,7 @@ import { app } from 'electron';
 import { PythonShell, Options } from 'python-shell';
 import fs from 'fs';
 import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
 
 export interface ComfyuiToolParameters extends ToolParams {
   defaultApiBase?: string;
@@ -22,6 +23,15 @@ export class ComfyuiTool extends BaseTool {
   schema = z.object({
     fileOrCode: z.string().describe('The file or code to run'),
   });
+
+  configSchema: FormSchema[] = [
+    {
+      label: 'defaultApiBase',
+      field: 'defaultApiBase',
+      component: 'Input',
+      defaultValue: 'http://127.0.0.1:8188',
+    },
+  ];
 
   static lc_name() {
     return this.name;

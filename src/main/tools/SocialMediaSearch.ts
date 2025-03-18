@@ -209,19 +209,20 @@ export class SocialMediaSearch extends BaseTool {
   }
 
   async xhs_check_login() {
-    const browser_context = await chromium.launchPersistentContext(
-      this.userDataDir,
-      {
-        channel: 'msedge',
-        headless: false,
-        proxy: this.httpProxy
-          ? {
-              server: `${this.httpProxy}`,
-            }
-          : undefined,
-        args: ['--disable-blink-features=AutomationControlled'],
-      },
-    );
+    // const browser_context = await chromium.launchPersistentContext(
+    //   this.userDataDir,
+    //   {
+    //     channel: 'msedge',
+    //     headless: false,
+    //     proxy: this.httpProxy
+    //       ? {
+    //           server: `${this.httpProxy}`,
+    //         }
+    //       : undefined,
+    //     args: ['--disable-blink-features=AutomationControlled'],
+    //   },
+    // );
+    const browser_context = await this.getBrowserContext();
     const page = await browser_context.newPage();
     await page.goto('https://www.xiaohongshu.com/explore');
     await page.waitForTimeout(2000);

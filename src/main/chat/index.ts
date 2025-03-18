@@ -37,7 +37,6 @@ import {
   ChatStatus,
 } from '../../entity/Chat';
 import { Providers } from '../../entity/Providers';
-import { chatWithReActAgent } from '../agents/react/ReActAgent';
 import { chatWithAdvancedRagAgent } from '../agents/rag/AdvancedRagAgent';
 import { getChatModel } from '../llm';
 import {
@@ -82,6 +81,7 @@ import { isString } from '../utils/is';
 // const repository = dbManager.dataSource.getRepository(Chat);
 
 export interface ChatInfo extends Chat {
+  totalToken?: number;
   status: string;
 }
 
@@ -361,6 +361,9 @@ export class ChatManager {
     const output = {
       ...res,
       status: this.runningTasks.has(chatId) ? 'running' : 'idle',
+      totalToken: res.chatMessages
+        .map((x) => x.total_tokens)
+        .reduce((acc, curr) => acc + curr, 0),
     };
     return output;
   }
@@ -491,9 +494,9 @@ export class ChatManager {
 
     const headHistory = [] as BaseMessage[];
     if (chat.options) {
-      if (chat.options.allwaysClear) {
-        messages = [];
-      }
+      // if (chat.options.allwaysClear) {
+      //   messages = [];
+      // }
       if (chat.options?.system) {
         headHistory.push(
           new SystemMessage({ id: uuidv4(), content: chat.options?.system }),
@@ -642,13 +645,20 @@ export class ChatManager {
             { chatRootPath: this.getChatPath(chatId) },
           );
         } else if (agent.type == 'react') {
-          await this.chatReact(
+          await this.chatReact(agent, messages, {
+            providerModel: chat.model,
+            options: chat.options,
+            callbacks,
+            signal: controller.signal,
+            configurable: { chatRootPath: this.getChatPath(chatId) },
+          });
+        } else if (agent.type == 'built-in') {
+          await this.chatBuiltIn(
             agent,
             messages,
             chat.options,
             callbacks,
             controller.signal,
-            { chatRootPath: this.getChatPath(chatId) },
           );
         }
       } else {
@@ -666,9 +676,21 @@ export class ChatManager {
       notificationManager.sendNotification(err.message, 'error');
       console.error(err);
     }
-
+    if (chat.options.allwaysClear) {
+      const msg = await this.chatMessageRepository.findOne({
+        where: { chatId: chatId },
+        relations: { chat: true },
+        order: { timestamp: 'DESC' },
+      });
+      if (msg) {
+        msg.divider = true;
+        await this.chatMessageRepository.save(msg);
+        event(`chat:message-changed:${chatId}`, msg);
+      }
+    }
     if (controller) {
       this.runningTasks.delete(chatId);
+      event(`chat:changed:${chatId}`, chat);
     }
     console.info('chat end');
     event(`chat:end`, chat);
@@ -718,19 +740,21 @@ export class ChatManager {
   }
 
   public async buildTools(options?: ChatOptions) {
-    const tools = [] as BaseTool[];
-    if (options?.agentNames && options?.agentNames.length > 0) {
-      const agents = agentManager.agents.filter((x) =>
-        options?.agentNames.includes(x.info.name),
-      );
-      tools.push(...agents.map((x) => x.agent));
-    }
+    let tools = [] as BaseTool[];
+    // if (options?.agentNames && options?.agentNames.length > 0) {
+    //   const agents = agentManager.agents.filter((x) =>
+    //     options?.agentNames.includes(x.info.name),
+    //   );
+    //   tools.push(...agents.map((x) => x.agent));
+    // }
 
     if (options?.toolNames && options?.toolNames.length > 0) {
       tools.push(...(await toolsManager.buildTools(options?.toolNames)));
     }
     if (options?.kbList && options?.kbList.length > 0) {
-      tools.push(new KnowledgeBaseQuery({ knowledgebaseIds: options.kbList }));
+      const kbq = new KnowledgeBaseQuery({ knowledgebaseIds: options.kbList });
+      tools = tools.filter((x) => x.name != kbq.name);
+      tools.push(kbq);
     }
     return tools;
   }
@@ -931,7 +955,7 @@ export class ChatManager {
     // }
   }
 
-  public async chatSupervisor(
+  public async chatBuiltIn(
     agent: Agent,
     messages: BaseMessage[],
     options?: ChatOptions | undefined,
@@ -942,17 +966,14 @@ export class ChatManager {
     const { provider, modelName } = getProviderModel(agent.model);
     const providerInfo = await providersManager.getProviders();
     const providerType = providerInfo.find((x) => x.name == provider)?.type;
-
-    const model = await getChatModel(provider, modelName, options);
-    const workflow = await agentManager.buildAgent(agent, new InMemoryStore());
+    const _agent = await agentManager.buildAgent(agent);
     const handlerMessageCreated = callbacks?.['handleMessageCreated'];
     //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
     const handlerMessageFinished = callbacks?.['handleMessageFinished'];
     const handlerMessageStream = callbacks?.['handleMessageStream'];
     const handlerMessageError = callbacks?.['handleMessageError'];
-
     await runAgent(
-      workflow,
+      _agent,
       messages,
       signal,
       configurable,
@@ -965,50 +986,74 @@ export class ChatManager {
         handlerMessageError,
       },
     );
-    // try {
-    //   const eventStream = await workflow.streamEvents(
-    //     { messages },
-    //     {
-    //       version: 'v2',
-    //       signal,
-    //       callbacks: chatCallbacks(
-    //         modelName,
-    //         providerType,
-    //         handlerMessageCreated,
-    //         handlerMessageStream,
-    //         handlerMessageError,
-    //         handlerMessageFinished,
-    //       ),
-    //     },
-    //   );
-    //   for await (const { event, tags, data } of eventStream) {
-    //     //console.log(event, tags, data);
-    //   }
-    // } catch (err) {
-    //   console.error(err);
-    // }
+  }
+
+  public async chatSupervisor(
+    agent: Agent,
+    messages: BaseMessage[],
+    config: {
+      providerModel: string;
+      options?: ChatOptions | undefined;
+      callbacks?: any | undefined;
+      signal?: AbortSignal | undefined;
+      configurable?: Record<string, any> | undefined;
+    },
+  ) {
+    const { provider, modelName } = getProviderModel(
+      config?.providerModel || agent.model,
+    );
+    const providerInfo = await providersManager.getProviders();
+    const providerType = providerInfo.find((x) => x.name == provider)?.type;
+
+    const model = await getChatModel(provider, modelName, config?.options);
+    const workflow = await agentManager.buildAgent(agent, new InMemoryStore());
+    const handlerMessageCreated = config?.callbacks?.['handleMessageCreated'];
+    //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
+    const handlerMessageFinished = config?.callbacks?.['handleMessageFinished'];
+    const handlerMessageStream = config?.callbacks?.['handleMessageStream'];
+    const handlerMessageError = config?.callbacks?.['handleMessageError'];
+
+    await runAgent(
+      workflow,
+      messages,
+      config?.signal,
+      config?.configurable,
+      modelName,
+      providerType,
+      {
+        handlerMessageCreated,
+        handlerMessageFinished,
+        handlerMessageStream,
+        handlerMessageError,
+      },
+    );
   }
 
   public async chatReact(
     agent: Agent,
     messages: BaseMessage[],
-    options?: ChatOptions | undefined,
-    callbacks?: any | undefined,
-    signal?: AbortSignal | undefined,
-    configurable?: Record<string, any> | undefined,
+    config: {
+      providerModel: string;
+      options?: ChatOptions | undefined;
+      callbacks?: any | undefined;
+      signal?: AbortSignal | undefined;
+      configurable?: Record<string, any> | undefined;
+    },
   ) {
-    const handlerMessageCreated = callbacks?.['handleMessageCreated'];
+    const handlerMessageCreated = config?.callbacks?.['handleMessageCreated'];
     //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
-    const handlerMessageFinished = callbacks?.['handleMessageFinished'];
-    const handlerMessageStream = callbacks?.['handleMessageStream'];
-    const handlerMessageError = callbacks?.['handleMessageError'];
+    const handlerMessageFinished = config?.callbacks?.['handleMessageFinished'];
+    const handlerMessageStream = config?.callbacks?.['handleMessageStream'];
+    const handlerMessageError = config?.callbacks?.['handleMessageError'];
 
-    const { provider, modelName } = getProviderModel(agent.model);
+    const { provider, modelName } = getProviderModel(
+      config?.providerModel || agent.model,
+    );
     const providerInfo = await providersManager.getProviders();
     const providerType = providerInfo.find((x) => x.name == provider)?.type;
     const tools = await toolsManager.buildTools(agent?.tools);
 
-    const model = await getChatModel(provider, modelName, options);
+    const model = await getChatModel(provider, modelName, config?.options);
     const reactAgent = await agentManager.buildAgent(
       agent,
       new InMemoryStore(),
@@ -1017,8 +1062,8 @@ export class ChatManager {
     await runAgent(
       reactAgent,
       messages,
-      signal,
-      configurable,
+      config?.signal,
+      config?.configurable,
       modelName,
       providerType,
       {

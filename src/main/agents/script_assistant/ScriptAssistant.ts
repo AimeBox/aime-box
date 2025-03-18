@@ -349,4 +349,8 @@ export class ScriptAssistant extends BaseAgent {
     const stream = IterableReadableStream.fromAsyncGenerator(generateStream());
     return stream;
   }
+
+  async createAgent() {
+    return this;
+  }
 }

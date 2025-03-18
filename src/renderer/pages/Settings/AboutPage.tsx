@@ -1,4 +1,4 @@
-import { Input, Menu, Select } from 'antd';
+import { Collapse, Input, Menu, Select } from 'antd';
 import { t } from 'i18next';
 import React, { useEffect, useState } from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
@@ -8,6 +8,10 @@ import { isUrl } from '@/main/utils/is';
 import i18n from '@/i18n';
 
 export default function AboutPage() {
+  const [appInfo, setAppInfo] = useState<any>({});
+  useEffect(() => {
+    setAppInfo(window.electron.app.info());
+  }, []);
   return (
     <>
       <div className="p-4 shadow">
@@ -19,6 +23,23 @@ export default function AboutPage() {
           <div className="text-sm text-gray-500">
             Aime Box is a tool agent box for producer.
           </div>
+          <Collapse
+            items={[
+              {
+                key: '1',
+                label: 'App Info',
+                children: (
+                  <pre>
+                    {Object.keys(appInfo).map((key) => (
+                      <div key={key}>
+                        <strong>{key}</strong>: {appInfo[key]?.toString()}
+                      </div>
+                    ))}
+                  </pre>
+                ),
+              },
+            ]}
+          />
         </div>
       </div>
     </>

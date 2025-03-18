@@ -84,11 +84,12 @@ export default function Tools() {
       field: 'type',
       component: 'Select',
       required: true,
-      defaultValue: 'command',
+      defaultValue: 'stdio',
       componentProps: {
         options: [
-          { value: 'command', label: 'Command' },
-          { value: 'sse', label: 'SSE' },
+          { value: 'stdio', label: 'stdio' },
+          { value: 'sse', label: 'sse' },
+          { value: 'ws', label: 'websocket' },
         ],
       },
     },
@@ -129,7 +130,10 @@ export default function Tools() {
     const toolSettinSchemas = [] as FormSchema[];
     if (tool.configSchema) {
       for (const schema of tool.configSchema) {
-        schema.defaultValue = tool.config[schema.field];
+        if (Object.keys(tool.config ?? {}).includes(schema.field)) {
+          schema.defaultValue = tool.config[schema.field];
+        }
+
         toolSettinSchemas.push(schema);
       }
     } else {
@@ -501,7 +505,8 @@ export default function Tools() {
                             </small>
                           </div>
                         </div>
-                        {item.parameters && (
+                        {(item.parameters ||
+                          item?.configSchema?.length > 0) && (
                           <div className="">
                             <div className="flex self-center space-x-1.5">
                               <button

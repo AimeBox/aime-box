@@ -36,7 +36,7 @@ export default function Settings() {
             items={[
               {
                 key: 'general',
-                icon: <FaInfoCircle />,
+
                 label: (
                   <Link to="/settings/general">
                     {t('settings.general_settings')}
@@ -46,7 +46,7 @@ export default function Settings() {
               },
               {
                 key: 'defaultModel',
-                icon: <FaInfoCircle />,
+
                 label: (
                   <Link to="/settings/defaultModel">
                     {t('settings.defaultModel')}
@@ -55,7 +55,7 @@ export default function Settings() {
               },
               {
                 key: 'defaultWebSearchEngine',
-                icon: <FaSearch />,
+
                 label: (
                   <Link to="/settings/defaultWebSearchEngine">
                     {t('settings.defaultWebSearchEngine')}
@@ -64,7 +64,7 @@ export default function Settings() {
               },
               {
                 key: 'localModelManager',
-                icon: <FaSearch />,
+
                 label: (
                   <Link to="/settings/localModelManager">
                     {t('settings.localModelManager')}
@@ -73,7 +73,7 @@ export default function Settings() {
               },
               {
                 key: 'about',
-                icon: <FaInfoCircle />,
+
                 label: <Link to="/settings/about">{t('settings.about')}</Link>,
               },
             ]}

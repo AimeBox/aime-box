@@ -51,8 +51,8 @@ export default function AgentConfigDrawer(props: AgentConfigDrawerProps) {
   };
 
   const onFinish = async (config: Record<string, any>) => {
-    console.log(config);
-    await window.electron.agents.update(value.name, config);
+    const data = { ...value, config: config };
+    await window.electron.agents.update(data);
     props?.onChange?.(value);
   };
 

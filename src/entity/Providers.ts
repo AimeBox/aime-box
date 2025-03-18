@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryColumn } from 'typeorm';
+import { Entity, Column, PrimaryColumn, Index } from 'typeorm';
 
 export enum ProviderType {
   OLLAMA = 'ollama',
@@ -20,6 +20,7 @@ export class Providers {
   id!: string;
 
   @Column()
+  @Index({ unique: true })
   name!: string;
 
   @Column({ enum: ProviderType })

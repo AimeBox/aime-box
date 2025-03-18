@@ -15,6 +15,8 @@ import fetch from 'node-fetch';
 import { getEnvironmentVariable } from '@langchain/core/utils/env';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import settingsManager from '../settings';
+import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
 
 export interface TavilySearchParameters extends ToolParams {
   apiKey: string;
@@ -22,16 +24,31 @@ export interface TavilySearchParameters extends ToolParams {
   kwargs?: Record<string, unknown>;
 }
 
-export class TavilySearchTool extends Tool {
-  static lc_name() {
-    return 'TavilySearch';
-  }
+export class TavilySearchTool extends BaseTool {
+  schema = z.object({
+    query: z.string().describe('The search query to search for.'),
+  });
 
-  name: string;
+  configSchema: FormSchema[] = [
+    {
+      label: 'Api Key',
+      field: 'apiKey',
+      component: 'InputPassword',
+    },
+    {
+      label: 'Max Results',
+      field: 'maxResults',
+      component: 'InputNumber',
+      defaultValue: 5,
+    },
+  ];
 
-  description: string;
+  name: string = 'tavily_search';
 
-  officialLink: string;
+  description: string =
+    'A search engine optimized for comprehensive, accurate, and trusted results. Useful for when you need to answer questions about current events. Input should be a search query.';
+
+  officialLink: string = 'https://app.tavily.com/home';
 
   apiKey: string;
 
@@ -42,53 +59,20 @@ export class TavilySearchTool extends Tool {
   constructor(fields?: TavilySearchParameters) {
     super(fields);
     const { apiKey } = fields ?? {};
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'tavily_search',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value:
-        'A search engine optimized for comprehensive, accurate, and trusted results. Useful for when you need to answer questions about current events. Input should be a search query.',
-    });
-    Object.defineProperty(this, 'officialLink', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'https://app.tavily.com/home',
-    });
-    Object.defineProperty(this, 'maxResults', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 5,
-    });
-    Object.defineProperty(this, 'apiKey', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: void 0,
-    });
-    Object.defineProperty(this, 'kwargs', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: {},
-    });
     this.maxResults = fields?.maxResults ?? this.maxResults;
     this.kwargs = fields?.kwargs ?? this.kwargs;
     this.apiKey = fields?.apiKey ?? getEnvironmentVariable('TAVILY_API_KEY');
   }
 
-  async _call(input: string, runManager, config): Promise<any> {
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<any> {
     const proxy = settingsManager.getPorxy();
 
     const body = {
-      query: input,
+      query: input.query,
       max_results: this.maxResults,
       api_key: this.apiKey,
     };

@@ -31,6 +31,8 @@ import { env } from '@huggingface/transformers';
 import serverManager from './server/serverManager';
 import { appManager } from './app/AppManager';
 import promptsManager from './prompts';
+import fs from 'fs';
+import { exec } from 'node:child_process';
 
 dbManager
   .init()
@@ -195,7 +197,18 @@ const createWindow = async () => {
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
     event.preventDefault(); // 取消内部跳转
-    shell.openExternal(url); // 在外部浏览器打开
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url); // 在外部浏览器打开
+    } else if (url.startsWith('file:///')) {
+      event.preventDefault();
+      let filePath = url.substring(8);
+      filePath = decodeURI(filePath);
+      if (fs.statSync(filePath).isFile()) {
+        shell.openPath(filePath);
+      } else if (fs.statSync(filePath).isDirectory()) {
+        exec(`explorer ${filePath}`);
+      }
+    }
   });
   ipcListener(mainWindow);
   mainWindow.loadURL(resolveHtmlPath('index.html'));

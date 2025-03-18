@@ -63,6 +63,7 @@ import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/webso
 import { createSmitheryUrl, MultiClient } from '@smithery/sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { McpServers, Tools } from '@/entity/Tools';
 
 import {
@@ -70,6 +71,9 @@ import {
   Tool,
   StructuredTool,
 } from '@langchain/core/tools';
+import { runCommand } from '../utils/exec';
+import { Translate } from './Translate';
+import { TavilySearchTool } from './TavilySearch';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -168,28 +172,6 @@ export class ToolsManager {
     this.tools = this.tools.filter((x) => x.tool.name != name);
   }
 
-  // public async registerTool(
-  //   tool: Tool,
-  //   default_parameters: any | undefined = undefined,
-  // ) {
-  //   if (default_parameters) {
-  //     const settings = dbManager.dataSource.getRepository(Settings);
-  //     let ts = await settings.findOne({ where: { id: 'tools:' + tool.name } });
-  //     if (!ts) {
-  //       ts = new Settings();
-  //       ts.id = 'tools:' + tool.name;
-  //       ts.value = JSON.stringify(default_parameters);
-  //       await settings.save(ts);
-  //     }
-  //     const parameters = JSON.parse(ts.value);
-  //     Object.keys(parameters).forEach((key) => {
-  //       tool[key] = parameters[key];
-  //     });
-  //     default_parameters = parameters;
-  //   }
-
-  //   this.tools.push({ tool, parameters: default_parameters });
-  // }
   public getList(
     filter: string = undefined,
     type: 'all' | 'built-in' | 'mcp' = 'all',
@@ -405,10 +387,13 @@ export class ToolsManager {
   }
 
   public buildTools = async (toolNames: String[]): Promise<BaseTool[]> => {
-    const tools = await this.toolRepository.find({
-      where: { name: In(toolNames) },
-    });
-    return Promise.all(tools.map((x) => this.buildTool(x, x.config)));
+    if (isArray(toolNames)) {
+      const tools = await this.toolRepository.find({
+        where: { name: In(toolNames) },
+      });
+      return Promise.all(tools.map((x) => this.buildTool(x, x.config)));
+    }
+    return [];
   };
 
   public init = async () => {
@@ -515,7 +500,7 @@ export class ToolsManager {
     await this.registerTool(CmdTool);
     await this.registerTool(Calculator);
     await this.registerTool(DateTimeTool);
-
+    await this.registerTool(Translate);
     // await this.registerTool(SearchApi, { apiKey: 'NULL' });
     // await this.registerTool(TavilySearchResults, {
     //   apiKey: 'NULL',
@@ -594,6 +579,7 @@ export class ToolsManager {
     });
     await this.registerTool(WebSearchTool);
     await this.registerTool(KnowledgeBaseQuery);
+    await this.registerTool(TavilySearchTool);
   };
 
   public update = async (toolName: string, arg: any) => {
@@ -699,7 +685,7 @@ export class ToolsManager {
     name: string;
     command?: string;
     env?: any;
-    type: 'sse' | 'command';
+    type: 'sse' | 'stdio' | 'ws';
     config?: any;
     enabled?: boolean;
   }) => {
@@ -711,9 +697,10 @@ export class ToolsManager {
         data.command,
         data.config,
         data.env,
-        data.type,
+        data.type as 'sse' | 'stdio' | 'ws',
       );
-    } catch {
+    } catch (err) {
+      console.error(err);
       throw new Error('MCP server connect failed');
     }
 
@@ -850,7 +837,7 @@ export class ToolsManager {
           mcpServer.command,
           mcpServer.config,
           mcpServer.env,
-          mcpServer.type as 'sse' | 'command',
+          mcpServer.type as 'sse' | 'stdio' | 'ws',
           true,
         );
         const { tools: _mcpTools } = await client.listTools();
@@ -900,12 +887,13 @@ export class ToolsManager {
     commandAndArgs?: string,
     config?: any,
     env?: any,
-    type: 'sse' | 'command' = 'command',
+    type: 'sse' | 'stdio' | 'ws' = 'stdio',
     renew: boolean = false,
   ) {
     let client = mcpName
       ? this.mcpClients.find((y) => y.getServerVersion().name == mcpName)
       : undefined;
+
     if (!client || client.transport === undefined || renew) {
       client = new Client({ name: 'Test Client', version: '0.0.1' });
 
@@ -915,22 +903,43 @@ export class ToolsManager {
         args.push('--config', JSON.stringify(config));
       }
       let transport;
-      if (type == 'command') {
-        transport = new StdioClientTransport({
-          command: command,
-          args,
-          env,
-        });
+      if (type == 'stdio') {
+        if (command.startsWith('python')) {
+          const pythonPath = (
+            await runCommand(`python -c 'import sys;print(sys.executable)'`)
+          )
+            .toString()
+            .trim();
+          const cwd = path.dirname(pythonPath);
+
+          transport = new StdioClientTransport({
+            command: command,
+            args,
+            env,
+            cwd,
+          });
+          transport.c;
+        } else {
+          transport = new StdioClientTransport({
+            command: command,
+            args,
+            env,
+          });
+        }
       } else if (type == 'sse') {
+        transport = new SSEClientTransport(
+          createSmitheryUrl(`${command}`, config),
+        );
+      } else if (type == 'ws') {
         transport = new WebSocketClientTransport(
           createSmitheryUrl(`${command}`, config),
         );
       }
-      transport.onclose = () => {
-        this.mcpClients = this.mcpClients.filter(
-          (x) => x.getServerVersion().name != mcpName,
-        );
-      };
+      // transport.onclose = () => {
+      //   this.mcpClients = this.mcpClients.filter(
+      //     (x) => x.getServerVersion().name != mcpName,
+      //   );
+      // };
       await client.connect(transport);
     }
 
@@ -939,5 +948,3 @@ export class ToolsManager {
 }
 
 export const toolsManager = new ToolsManager();
-
-// export const AToolField: PropertyDecorator = (formSchema: FormSchema) => {};

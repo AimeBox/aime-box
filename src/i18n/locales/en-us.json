@@ -46,20 +46,13 @@
   "chat.editTitle": "Edit Title",
   "kb.rerank_score": "rerank score",
   "kb.score": "score",
-  "sidebar.chat": "Chat",
   "chat.newchat": "New Chat",
-  "sidebar.prompts": "Prompts",
   "chat.chat_options.tools": "Tools",
   "chat.chat_options.base_setting": "Base",
   "chat.chat_options.temperature": "temperature",
   "chat.chat_options.streaming": "streaming",
   "chat.chat_options.system_prompt": "system prompt",
   "chat.chat_options.knowledge_base": "knowledge base",
-  "sidebar.knowledgebase": "Knowledge Base",
-  "sidebar.providers": "Providers",
-  "sidebar.tools": "Tools",
-  "sidebar.agent": "Agent",
-  "sidebar.home": "Home",
   "tool.add_tool": "Add Tool",
   "tools.show_all": "All",
   "chat.chat_options.clear": "clear",
@@ -123,6 +116,41 @@
   },
   "tools": {
     "addMcp": "Add Mcp",
-    "tool_config": "Tool Config"
+    "tool_config": "Tool Config",
+    "mcp": "Mcp"
+  },
+  "common": {
+    "edit": "Edit",
+    "create": "Create",
+    "delete_confirm": "Confirm deletion?",
+    "all": "All",
+    "prompt": "Prompt",
+    "model": "Model",
+    "mode": "Mode"
+  },
+  "agents": {
+    "name": "Name",
+    "description": "Description",
+    "prompt": "System Prompt",
+    "model": "Model",
+    "type": "Type",
+    "type_react": "ReAct",
+    "type_supervisor": "Supervisor",
+    "tools": "Tools",
+    "agents": "Agents",
+    "supervisorOutputMode": "Output Mode",
+    "supervisorOutputMode_full_history": "Full History",
+    "supervisorOutputMode_last_message": "Last Message"
+  },
+  "sidebar": {
+    "settings": "Settings",
+    "theme": "Theme",
+    "chat": "Chat",
+    "prompts": "Prompts",
+    "knowledgebase": "Knowledge Base",
+    "providers": "Providers",
+    "tools": "Tools",
+    "agent": "Agent",
+    "home": "Home"
   }
 }

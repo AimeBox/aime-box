@@ -47,13 +47,14 @@ export class DallE extends BaseTool {
   configSchema?: FormSchema[] = [
     {
       field: 'apiKey',
-      component: 'Input',
+      component: 'InputPassword',
       label: 'API Key',
     },
     {
       field: 'model',
       component: 'Select',
       label: 'Model',
+      defaultValue: 'dall-e-3',
       componentProps: {
         options: [
           { label: 'Dall-E 3', value: 'dall-e-3' },

@@ -94,7 +94,7 @@ export const ToolsModal = React.forwardRef(
                       >
                         <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
                           <strong>{tool.name}</strong>
-                          <small className="text-gray-500 whitespace-pre-line line-clamp-1">
+                          <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
                             {tool.description}
                           </small>
                         </div>

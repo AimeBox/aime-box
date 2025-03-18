@@ -95,6 +95,9 @@ const FormModal = forwardRef((props: FormItemProps, ref) => {
         {props.schema.component === 'InputTextArea' && (
           <TextArea {...props.schema.componentProps} />
         )}
+        {props.schema.component === 'InputPassword' && (
+          <Input.Password {...props.schema.componentProps} />
+        )}
         {props.schema.component === 'Select' && (
           <Select {...props.schema.componentProps} />
         )}

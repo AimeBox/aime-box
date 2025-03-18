@@ -14,10 +14,13 @@ import settingsManager from '@/main/settings';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { getChatModel } from '@/main/llm';
 import { ChatMessage } from '@langchain/core/messages';
-import { ChatPromptTemplate } from '@langchain/core/prompts';
+import {
+  ChatPromptTemplate,
+  MessagesPlaceholder,
+} from '@langchain/core/prompts';
 
 export class TranslateAgent extends BaseAgent {
-  name: string = 'Translate';
+  name: string = 'translate';
 
   description: string = '翻译专家,将文本翻译成目标语言';
 
@@ -37,7 +40,7 @@ export class TranslateAgent extends BaseAgent {
 
   configSchema: FormSchema[] = [
     {
-      label: t('model'),
+      label: t('common.model'),
       field: 'model',
       component: 'ProviderSelect',
       componentProps: {
@@ -45,7 +48,7 @@ export class TranslateAgent extends BaseAgent {
       },
     },
     {
-      label: t('prompt'),
+      label: t('common.prompt'),
       field: 'prompt',
       component: 'InputTextArea',
     },
@@ -68,7 +71,7 @@ Translate the above text enclosed with <translate_input> into {target_language} 
 
   constructor(options: {
     provider: string;
-    model: string;
+    modelName: string;
     options: ChatOptions;
   }) {
     super(options);
@@ -91,13 +94,14 @@ Translate the above text enclosed with <translate_input> into {target_language} 
     input: z.infer<typeof this.schema> | string,
     options?: RunnableConfig,
   ): Promise<IterableReadableStream<any>> {
+    const _config = await this.getConfig();
     const { provider, modelName } =
-      getProviderModel(this.config.model) ??
+      getProviderModel(_config.model) ??
       getProviderModel(settingsManager.getSettings().defaultLLM);
     this.llm = await getChatModel(provider, modelName);
     const that = this;
     const prompt_template = ChatPromptTemplate.fromMessages([
-      ['user', this.config.prompt],
+      ['user', _config.prompt],
     ]);
     let text;
     let target_language;
@@ -126,5 +130,20 @@ ${context}
 
     const stream = IterableReadableStream.fromAsyncGenerator(generateStream());
     return stream;
+  }
+
+  async createAgent() {
+    const _config = await this.getConfig();
+    let prompt = ChatPromptTemplate.fromMessages([
+      ['system', _config.prompt],
+      new MessagesPlaceholder('messages'),
+    ]);
+    const { provider, modelName } = getProviderModel(_config.model);
+    const llm = await getChatModel(provider, modelName);
+
+    // prompt = await prompt.partial({
+    //   system_message: _config.prompt,
+    // });
+    return prompt.pipe(llm);
   }
 }

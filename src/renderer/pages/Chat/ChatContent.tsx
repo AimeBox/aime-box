@@ -44,14 +44,15 @@ import { GlobalContext } from '@/renderer/context/GlobalContext';
 import { Editor, EditorRef } from '@/renderer/components/common/Editor';
 import { ChatInputAttachment } from '@/types/chat';
 import ChatAttachment from '@/renderer/components/chat/ChatAttachment';
-import html2canvas from 'html2canvas';
+import domtoimage from 'dom-to-image';
+import { ChatInfo } from '@/main/chat';
 
 export default function ChatContent() {
   const location = useLocation();
   const [emojiOpen, setEmojiOpen] = useState<boolean>(false);
-  const [currentChat, setCurrentChat] = useState<
-    (Chat & { status: string }) | undefined
-  >(undefined);
+  const [currentChat, setCurrentChat] = useState<ChatInfo | undefined>(
+    undefined,
+  );
   const [openChatOptionsDrawer, setOpenChatOptionsDrawer] =
     useState<boolean>(false);
   const [currentModel, setCurrentModel] = useState<string | undefined>(
@@ -86,10 +87,17 @@ export default function ChatContent() {
     if (!res.model) {
       if (res.mode == 'agent' || res.mode == 'supervisor') {
         const agent = await window.electron.db.get('agent', res.agent);
-        await window.electron.db.update('chat', { model: agent.model } as any, {
-          id: res.id,
-        });
-        res = await window.electron.chat.getChat(id);
+        console.log(agent);
+        if (agent?.model) {
+          await window.electron.db.update(
+            'chat',
+            { model: agent.model } as any,
+            {
+              id: res.id,
+            },
+          );
+          res = await window.electron.chat.getChat(id);
+        }
       } else if (res.mode == 'default') {
         const defaultLLM = await window.electron.providers.getDefaultLLM();
         if (defaultLLM) {
@@ -273,14 +281,19 @@ export default function ChatContent() {
 
   const onExport = async () => {};
   const onExportImage = async () => {
-    const canvas = await html2canvas(document.querySelector('#chat-content'), {
-      scrollY: -window.scrollY, // 处理滚动区域
-      useCORS: true, // 如果需要加载跨域图片
-    });
-    const image = canvas.toDataURL('image/png');
-    await window.electron.chat.export('image', currentChat.id, {
-      image: image,
-    });
+    try {
+      const dataUrl = await domtoimage.toJpeg(
+        document.querySelector('#chat-content'),
+        {
+          bgcolor: '#ffffff',
+        },
+      );
+      await window.electron.chat.export('image', currentChat.id, {
+        image: dataUrl,
+      });
+    } catch (err) {
+      console.error(err);
+    }
   };
   const onSetDivider = async (chatMessage: ChatMessage, value: boolean) => {
     await window.electron.db.update(
@@ -328,8 +341,9 @@ export default function ChatContent() {
                       className="flex-1 w-full text-lg"
                       onBlur={handleChangedTitle}
                     />
-                    <small className="ml-3 text-xs text-gray-400 opacity-0 group-hover:opacity-100">
+                    <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400 opacity-0 group-hover:opacity-100">
                       {currentChat.id}
+                      <span>token: {currentChat.totalToken}</span>
                     </small>
                   </div>
 

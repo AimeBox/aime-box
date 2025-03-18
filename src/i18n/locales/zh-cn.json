@@ -56,10 +56,7 @@
   "theme": "主题",
   "kb.score": "相似度",
   "kb.rerank_score": "重排得分",
-  "sidebar.chat": "聊天",
-  "sidebar.providers": "模型供应商",
   "chat.newchat": "新聊天",
-  "sidebar.prompts": "提示词管理",
   "chat.chat_options.pre_prompt_setting": "预设提示词",
   "chat.chat_options.tools": "工具",
   "chat.chat_options.base_setting": "基础设置",
@@ -69,10 +66,6 @@
   "chat.chat_options.config": "聊天设置",
   "chat.chat_options.reset": "重置",
   "chat.chat_options.knowledge_base": "知识库",
-  "sidebar.knowledgebase": "知识库管理",
-  "sidebar.tools": "工具管理",
-  "sidebar.agent": "AI助手",
-  "sidebar.home": "主页",
   "tool.add_tool": "添加工具",
   "tools.show_all": "全部",
   "chat.chat_options.clear": "清空",
@@ -149,6 +142,41 @@
   },
   "tools": {
     "addMcp": "添加MCP",
-    "tool_config": "工具配置"
+    "tool_config": "工具配置",
+    "mcp": "Mcp"
+  },
+  "common": {
+    "edit": "编辑",
+    "create": "创建",
+    "delete_confirm": "是否确认删除?",
+    "all": "全部",
+    "prompt": "提示词",
+    "model": "模型",
+    "mode": "模式"
+  },
+  "agents": {
+    "name": "名称",
+    "description": "描述",
+    "prompt": "系统提示词",
+    "model": "模型",
+    "type": "类型",
+    "type_react": "ReAct",
+    "type_supervisor": "主管",
+    "tools": "工具",
+    "agents": "助手",
+    "supervisorOutputMode": "输出消息模式",
+    "supervisorOutputMode_full_history": "所有历史消息",
+    "supervisorOutputMode_last_message": "最后的消息"
+  },
+  "sidebar": {
+    "settings": "设置",
+    "theme": "主题",
+    "chat": "聊天",
+    "providers": "模型供应商",
+    "prompts": "提示词管理",
+    "knowledgebase": "知识库管理",
+    "tools": "工具管理",
+    "agent": "AI助手",
+    "home": "主页"
   }
 }
