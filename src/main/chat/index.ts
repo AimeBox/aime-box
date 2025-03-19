@@ -676,7 +676,7 @@ export class ChatManager {
       notificationManager.sendNotification(err.message, 'error');
       console.error(err);
     }
-    if (chat.options.allwaysClear) {
+    if (chat?.options?.allwaysClear === true) {
       const msg = await this.chatMessageRepository.findOne({
         where: { chatId: chatId },
         relations: { chat: true },
