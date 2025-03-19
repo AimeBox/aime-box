@@ -1,7 +1,20 @@
+# 0.1.3 (2025.03.19)
+### 优化
+- 优化mcp工具调用能力
+- 优化agent界面
+- 模型查询
+- 删除普通chat模式下的agents选择功能
+- 暂时清除file chat模式
+- 优化几个tools
+- 更新extract agent
+- 新增一个planner(来自langmanus)
+- 图片导出改用dom-to-image
+- 添加一个Logo
+  
 # 0.1.2 (2025.03.15)
 ### 修复
 - 消息显示bug
-- 
+  
 # 0.1.1 (2025.03.14)
 ### 新增
 - **MCP** 支持MCP工具调用能力

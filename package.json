@@ -157,7 +157,6 @@
     "typeorm": "^0.3.20",
     "unbzip2-stream": "^1.4.3",
     "vm2": "^3.9.19",
-    "xlsx": "^0.18.5",
     "yahoo-finance": "^0.3.8",
     "zhipuai-sdk-nodejs-v4": "^0.1.12",
     "zod-to-json-schema": "^3.24.3"
