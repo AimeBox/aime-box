@@ -132,6 +132,7 @@ export default function ChatContent() {
       extend: { attachments: attachments },
     });
     editorRef.current?.clear();
+    setAttachments([]);
     scrollToBottom(false);
   };
 
@@ -353,7 +354,7 @@ export default function ChatContent() {
                       trigger="click"
                       content={
                         <div className="flex flex-col w-full">
-                          <Button
+                          {/* <Button
                             icon={<FaFileExport />}
                             type="text"
                             block
@@ -362,7 +363,7 @@ export default function ChatContent() {
                             }}
                           >
                             {t('chat.export')}
-                          </Button>
+                          </Button> */}
                           <Button
                             icon={<FaFileExport />}
                             type="text"

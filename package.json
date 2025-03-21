@@ -304,6 +304,12 @@
         "nsis"
       ]
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
     "linux": {
       "target": [
         "AppImage"

@@ -58,6 +58,20 @@ export default class MenuBuilder {
         );
         menu.append(
           new MenuItem({
+            label: t('paste'),
+            role: 'paste',
+            accelerator: 'Ctrl+V',
+          }),
+        );
+        menu.append(
+          new MenuItem({
+            label: t('cut'),
+            role: 'cut',
+            accelerator: 'Ctrl+X',
+          }),
+        );
+        menu.append(
+          new MenuItem({
             label: t('selectAll'),
             role: 'selectAll',
             accelerator: 'Ctrl+A',

@@ -14,7 +14,7 @@ import { concat } from '@langchain/core/utils/stream';
 
 import { In, Like, Repository } from 'typeorm';
 import * as fs from 'node:fs/promises';
-import ExcelJS from 'exceljs';
+import ExcelJS, { config } from 'exceljs';
 import {
   BaseMessage,
   SystemMessage,
@@ -77,7 +77,7 @@ import { AgentExecutor } from 'langchain/agents';
 import { writeFile } from 'node:fs/promises';
 import { runAgent } from './runAgent';
 import { InMemoryStore } from '@langchain/langgraph';
-import { isString } from '../utils/is';
+import { isArray, isString } from '../utils/is';
 // const repository = dbManager.dataSource.getRepository(Chat);
 
 export interface ChatInfo extends Chat {
@@ -419,8 +419,8 @@ export class ChatManager {
             type: 'video_path',
             video_path: attachment.path,
           });
-        } else {
-          res.content.push({ type: attachment.type, path: attachment.path });
+        } else if (attachment.type == 'file') {
+          res.content.push(attachment);
         }
       }
     }
@@ -562,7 +562,7 @@ export class ChatManager {
             ChatStatus.RUNNING,
           );
         }
-
+        msg.additional_kwargs = message.additional_kwargs;
         msg.provider_type = message.additional_kwargs[
           'provider_type'
         ] as string;
@@ -636,14 +636,13 @@ export class ChatManager {
         // agent 模式
         const agent = await agentManager.getAgent(chat.agent);
         if (agent.type == 'supervisor') {
-          await this.chatSupervisor(
-            agent,
-            messages,
-            chat.options,
+          await this.chatSupervisor(agent, messages, {
+            providerModel: chat.model,
+            options: chat.options,
             callbacks,
-            controller.signal,
-            { chatRootPath: this.getChatPath(chatId) },
-          );
+            signal: controller.signal,
+            configurable: { chatRootPath: this.getChatPath(chatId) },
+          });
         } else if (agent.type == 'react') {
           await this.chatReact(agent, messages, {
             providerModel: chat.model,
@@ -786,20 +785,18 @@ export class ChatManager {
       //prompt: options?.system,
       //checkpointer: checkpointer,
     });
-    await runAgent(
-      reactAgent,
-      messages,
+    await runAgent(reactAgent, messages, {
       signal,
       configurable,
       modelName,
       providerType,
-      {
+      callbacks: {
         handlerMessageCreated,
         handlerMessageFinished,
         handlerMessageStream,
         handlerMessageError,
       },
-    );
+    });
     // let _lastMessage;
     // try {
     //   const eventStream = await reactAgent.streamEvents(
@@ -972,20 +969,18 @@ export class ChatManager {
     const handlerMessageFinished = callbacks?.['handleMessageFinished'];
     const handlerMessageStream = callbacks?.['handleMessageStream'];
     const handlerMessageError = callbacks?.['handleMessageError'];
-    await runAgent(
-      _agent,
-      messages,
+    await runAgent(_agent, messages, {
       signal,
       configurable,
       modelName,
       providerType,
-      {
+      callbacks: {
         handlerMessageCreated,
         handlerMessageFinished,
         handlerMessageStream,
         handlerMessageError,
       },
-    );
+    });
   }
 
   public async chatSupervisor(
@@ -1013,20 +1008,19 @@ export class ChatManager {
     const handlerMessageStream = config?.callbacks?.['handleMessageStream'];
     const handlerMessageError = config?.callbacks?.['handleMessageError'];
 
-    await runAgent(
-      workflow,
-      messages,
-      config?.signal,
-      config?.configurable,
+    await runAgent(workflow, messages, {
+      signal: config?.signal,
+      configurable: config?.configurable,
       modelName,
       providerType,
-      {
+      recursionLimit: agent.recursionLimit,
+      callbacks: {
         handlerMessageCreated,
         handlerMessageFinished,
         handlerMessageStream,
         handlerMessageError,
       },
-    );
+    });
   }
 
   public async chatReact(
@@ -1059,20 +1053,19 @@ export class ChatManager {
       new InMemoryStore(),
     );
 
-    await runAgent(
-      reactAgent,
-      messages,
-      config?.signal,
-      config?.configurable,
+    await runAgent(reactAgent, messages, {
+      signal: config?.signal,
+      configurable: config?.configurable,
       modelName,
       providerType,
-      {
+      recursionLimit: agent.recursionLimit,
+      callbacks: {
         handlerMessageCreated,
         handlerMessageFinished,
         handlerMessageStream,
         handlerMessageError,
       },
-    );
+    });
     // try {
     //   const eventStream = await reactAgent.streamEvents(
     //     { messages },
@@ -1118,8 +1111,15 @@ export class ChatManager {
           }),
         );
       } else if (x.role == 'user') {
-        if (x.content)
-          list.push(new HumanMessage({ id: x.id, content: x.content }));
+        if (x.content) {
+          let content;
+          if (isArray(x.content)) {
+            content = x.content.filter((z) => z.type != 'file');
+          } else {
+            content = x.content;
+          }
+          list.push(new HumanMessage({ id: x.id, content }));
+        }
       } else if (x.role == 'tool') {
         const tool_call = x.content.find((x) => x.type == 'tool_call');
         if (

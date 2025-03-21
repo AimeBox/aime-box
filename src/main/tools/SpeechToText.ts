@@ -60,8 +60,8 @@ export class SpeechToText extends BaseTool {
 
     this.ffmpegPath = params?.ffmpegPath;
     if (!this.ffmpegPath || !fs.existsSync(this.ffmpegPath)) {
-      if (process.env.FFMPEG_PATH) {
-        this.ffmpegPath = path.join(process.env.FFMPEG_PATH, 'ffmpeg.exe');
+      if (process.env.FFMPEG_PATH && fs.existsSync(process.env.FFMPEG_PATH)) {
+        this.ffmpegPath = path.join(process.env.FFMPEG_PATH);
       }
     }
     this.model = params?.model;
@@ -180,7 +180,9 @@ export class SpeechToText extends BaseTool {
     // Please download test files from
     // https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models
     let config = null;
-    if (this.model == 'sense-voice@local') {
+    if (
+      this.model == 'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17@local'
+    ) {
       config = {
         featConfig: {
           sampleRate: 16000,
@@ -209,7 +211,7 @@ export class SpeechToText extends BaseTool {
           debug: 1,
         },
       };
-    } else if (this.model == 'whisper-large-v3@local') {
+    } else if (this.model == 'sherpa-onnx-whisper-large-v3@local') {
       config = {
         featConfig: {
           sampleRate: 16000,
@@ -243,7 +245,7 @@ export class SpeechToText extends BaseTool {
           debug: 1,
         },
       };
-    } else if (this.model == 'whisper-small@local') {
+    } else if (this.model == 'sherpa-onnx-whisper-small@local') {
       config = {
         featConfig: {
           sampleRate: 16000,

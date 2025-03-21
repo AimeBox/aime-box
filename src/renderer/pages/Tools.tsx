@@ -33,7 +33,7 @@ import { Markdown } from '../components/common/Markdown';
 import { ResponseCard } from '@/renderer/components/common/ResponseCard';
 import { ScrollArea } from '../components/ui/scroll-area';
 import Content from '../components/layout/Content';
-import { FaRegMessage } from 'react-icons/fa6';
+import { FaArrowRotateLeft, FaRegMessage } from 'react-icons/fa6';
 import { t } from 'i18next';
 import { ListItem } from '../components/common/ListItem';
 import { cat } from '@huggingface/transformers';
@@ -407,6 +407,15 @@ export default function Tools() {
       setMcpLoading(false);
     }
   };
+  const onRefreshMcp = async (item: McpServerInfo) => {
+    try {
+      await window.electron.tools.refreshMcp(currentMcp?.id);
+      await getMcps();
+      message.success('Refresh MCP server success');
+    } catch (err) {
+      message.error(err.message);
+    }
+  };
 
   const onDeleteMcp = (item: McpServerInfo) => {
     window.electron.tools.deleteMcp(item.id);
@@ -606,6 +615,13 @@ export default function Tools() {
                         <div className="flex flex-row flex-1 gap-2 justify-end mr-4">
                           <Button
                             type="text"
+                            icon={<FaArrowRotateLeft />}
+                            onClick={() => {
+                              onRefreshMcp(currentMcp);
+                            }}
+                          ></Button>
+                          <Button
+                            type="text"
                             icon={<FaEdit />}
                             onClick={() => {
                               onOpenAddMcp(currentMcp);
@@ -645,8 +661,8 @@ export default function Tools() {
 
                             children: (
                               <BasicForm
-                                loading={invoking}
-                                ref={toolTestFormRef}
+                                //loading={invoking}
+                                ref={toolTestFormRef[item.name]}
                                 schemas={converFormSchemas(item)}
                                 layout="vertical"
                                 onFinish={async (value) => {

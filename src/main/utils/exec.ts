@@ -1,4 +1,4 @@
-import { execFile, execFileSync } from 'node:child_process';
+import { exec, execFile, execFileSync, spawn } from 'node:child_process';
 import { platform } from 'node:process';
 import iconv from 'iconv-lite';
 
@@ -30,9 +30,53 @@ export const runCommand = async (
   return new Promise((resolve, reject) => {
     const commands = [];
     if (_file == 'cmd.exe') {
-      commands.push('/c');
+      //commands.push('/c');
     }
+    const env = { ...process.env };
+    console.log(env.Path.split(';').join('\n'));
     commands.push(command);
+    // const cmd = spawn(commands.join(' ')); // /c 执行后关闭窗口；/k 是保持窗口打开
+
+    // cmd.stdout.on('data', (data) => {
+    //   console.log(`输出: ${data}`);
+    //   resolve(data);
+    // });
+
+    // cmd.stderr.on('data', (data) => {
+    //   console.error(`错误: ${data}`);
+    //   reject(new Error(`Error:\n${data}`));
+    // });
+
+    // cmd.on('close', (code) => {
+    //   console.log(`子进程退出，退出码 ${code}`);
+    // });
+    // return;
+    const child2 = exec(
+      'cmd.exe /c ' + commands.join(' '),
+      {
+        encoding: 'buffer',
+      },
+      (error, stdout, stderr) => {
+        const res_out = iconv.decode(stdout, 'cp936');
+        const res_err = iconv.decode(stderr, 'cp936');
+        if (error) {
+          if (res_err) {
+            reject(new Error(`Error:\n${res_err}`));
+            return;
+          }
+          if (res_out) {
+            reject(new Error(`${res_out}`));
+            return;
+          }
+
+          reject(new Error(`${error.message}`));
+          return;
+        }
+        const out = iconv.decode(stdout, 'cp936');
+        resolve(out);
+      },
+    );
+    return;
     const child = execFile(
       _file,
       commands,

@@ -218,7 +218,7 @@ const electronHandler = {
     downloadModel: (task, model) =>
       ipcRenderer.send('settings:downloadModel', task, model),
     deleteLocalModel: (task, model) =>
-      ipcRenderer.sendSync('settings:deleteLocalModel', task, model),
+      ipcRenderer.invoke('settings:deleteLocalModel', task, model),
   },
   store: {
     get(key: string) {
@@ -335,6 +335,7 @@ const electronHandler = {
     addMcp: (data: { name: string; url: string }) =>
       ipcRenderer.invoke('tools:addMcp', data),
     deleteMcp: (name: string) => ipcRenderer.invoke('tools:deleteMcp', name),
+    refreshMcp: (name: string) => ipcRenderer.invoke('tools:refreshMcp', name),
   },
   agents: {
     getList(filter?: string) {

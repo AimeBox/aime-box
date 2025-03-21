@@ -201,6 +201,9 @@ export class ChatMessage {
   @Column({ nullable: true })
   time_cost?: number;
 
+  @Column('json', { nullable: true })
+  additional_kwargs?: any;
+
   public setUsage(usage_metadata: {
     total_tokens?: number;
     input_tokens?: number;

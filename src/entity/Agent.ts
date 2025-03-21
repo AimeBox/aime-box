@@ -21,6 +21,7 @@ export class Agent {
     tools?: any[],
     agents?: any[],
     model?: string,
+    recursionLimit?: number,
     config?: any,
   ) {
     this.id = id || uuidv4();
@@ -31,6 +32,7 @@ export class Agent {
     this.tools = tools;
     this.agents = agents;
     this.model = model;
+    this.recursionLimit = recursionLimit;
     this.config = config;
     this.static = false;
   }
@@ -74,4 +76,7 @@ export class Agent {
 
   @Column({ nullable: true })
   supervisorOutputMode?: string;
+
+  @Column({ nullable: true })
+  recursionLimit?: number;
 }

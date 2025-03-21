@@ -3,6 +3,7 @@ import {
   Divider,
   Input,
   Menu,
+  message,
   Modal,
   ModalProps,
   Skeleton,
@@ -50,11 +51,19 @@ export const KnowledgeBaseModal = React.forwardRef(
     const onSearch = (v) => {};
 
     const getGroups = async () => {
-      const res = window.electron.db.getMany<KnowledgeBase>(
-        'knowledgebase',
-        {},
-      );
-      setKnowledgeBases(res);
+      setLoading(true);
+      try {
+        const res = window.electron.db.getMany<KnowledgeBase>(
+          'knowledgebase',
+          {},
+        );
+        setKnowledgeBases(res);
+      } catch (e) {
+        console.error(e);
+        message.error(e.message);
+      } finally {
+        setLoading(false);
+      }
     };
 
     return (

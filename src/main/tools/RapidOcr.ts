@@ -13,6 +13,7 @@ import path from 'path';
 import { app } from 'electron';
 import fs from 'fs';
 import { getModelsPath } from '../utils/path';
+import { BaseTool } from './BaseTool';
 
 // const getModelsPath = (...paths: string[]): string => {
 //   return path.join(
@@ -24,47 +25,29 @@ import { getModelsPath } from '../utils/path';
 // };
 export interface RapidOcrToolParameters extends ToolParams {}
 
-export class RapidOcrTool extends Tool {
-  static lc_name() {
-    return 'RapidOcrTool';
-  }
+export class RapidOcrTool extends BaseTool {
+  schema = z.object({
+    filePath: z.string().describe('the path of the image file'),
+  });
 
-  name: string;
+  name: string = 'ocr';
 
-  description: string;
+  description: string = 'an ocr tool that accurately extracts text from images';
 
   constructor(params?: RapidOcrToolParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'ocr',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'an ocr tool that accurately extracts text from images',
-    });
-
-    // Object.defineProperty(this, 'schema', {
-    //   enumerable: true,
-    //   configurable: true,
-    //   writable: true,
-    //   value: z.object({
-    //     input: z.string().brand<'FileInfo'>(),
-    //   }),
-    // });
   }
 
   async _call(
-    filePath: string | string[],
+    filePath: z.infer<typeof this.schema>,
     runManager,
     config,
   ): Promise<string> {
+    if (!fs.existsSync(path.join(getModelsPath(), 'RapidOCR-json_v0.2.0'))) {
+      return 'model not found';
+    }
     try {
-      if (isString(filePath)) {
+      if (isString(filePath) || fs.statSync(filePath).isFile()) {
         const json_res = (await new Promise((resolve, reject) => {
           const process = spawn('RapidOCR-json.exe', {
             cwd: path.join(getModelsPath(), 'RapidOCR-json_v0.2.0'),
@@ -125,6 +108,8 @@ export class RapidOcrTool extends Tool {
         // } else {
         //   return json_res.data;
         // }
+      } else {
+        return 'Please provide a valid file path';
       }
     } catch (err) {
       const out = iconv.decode(

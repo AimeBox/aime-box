@@ -141,10 +141,11 @@ class SettingsManager {
     ipcMain.on('settings:getLocalModels', async (event) => {
       event.returnValue = await this.getLocalModels();
     });
-    ipcMain.on('settings:downloadModel', (event, task, model) =>
-      this.downloadModel(task, model),
-    );
-    ipcMain.on('settings:deleteLocalModel', (event, task, model) =>
+    ipcMain.on('settings:downloadModel', (event, task, model) => {
+      this.downloadModel(task, model);
+      event.returnValue = null;
+    });
+    ipcMain.handle('settings:deleteLocalModel', (event, task, model) =>
       this.deleteLocalModel(task, model),
     );
   }
@@ -272,13 +273,17 @@ class SettingsManager {
     },
   ) {
     const dir = path.join(this.settingsCache.localModelPath, task, model.id);
-    fs.rmdirSync(`${dir}`, { recursive: true });
+    fs.rmSync(`${dir}`, { recursive: true });
   }
 
   private async getProxyFetch() {
     const agent = await this.getHttpAgent();
     if (!agent) {
-      return undefined; // 使用默认的fetch
+      return async (url: RequestInfo | URL, init?: RequestInit) => {
+        return nodeFetch(url.toString(), {
+          ...init,
+        } as RequestInit);
+      }; // 使用默认的fetch
     }
 
     // 返回一个包装了代理的fetch函数
@@ -358,7 +363,7 @@ class SettingsManager {
                   item.path,
                   false,
                 );
-                fileStream.write(chunk);
+                //fileStream.write(chunk);
               });
               response.body.on('end', () => {
                 fileStream.end();
@@ -375,45 +380,6 @@ class SettingsManager {
                 resolve(null);
               });
             });
-
-            // if (!value) {
-            //   if (!value) {
-            //     break;
-            //   }
-            //   downloadedLength += value.length;
-            //   fs.appendFileSync(
-            //     path.join(`${dir}.tmp`, item.path),
-            //     Buffer.from(value),
-            //   );
-            //   notificationManager.progress(
-            //     id,
-            //     title,
-            //     (downloadedLength / totalSize) * 100,
-            //     item.path,
-            //     false,
-            //   );
-            // }
-
-            // const reader = response.body.getReader();
-            // while (true) {
-            //   const { done, value } = await reader.read();
-            //   if (done) {
-            //     break;
-            //   }
-
-            //   downloadedLength += value.length;
-            //   fs.appendFileSync(
-            //     path.join(`${dir}.tmp`, item.path),
-            //     Buffer.from(value),
-            //   );
-            //   notificationManager.progress(
-            //     id,
-            //     title,
-            //     (downloadedLength / totalSize) * 100,
-            //     item.path,
-            //     false,
-            //   );
-            // }
           }
         }
         fs.renameSync(`${dir}.tmp`, `${dir}`);
@@ -429,8 +395,13 @@ class SettingsManager {
           'download fail',
         );
 
-        if (fs.existsSync(`${dir}.tmp`))
-          fs.rmdirSync(`${dir}.tmp`, { recursive: true });
+        // if (fs.existsSync(`${dir}.tmp`))
+        //   fs.rmSync(`${dir}.tmp`, {
+        //     recursive: true,
+        //     force: true,
+        //     maxRetries: 3,
+        //     retryDelay: 100,
+        //   });
       } finally {
         this.downloadingModels = this.downloadingModels.filter(
           (x) => x.id != model.id,
@@ -439,7 +410,7 @@ class SettingsManager {
     } else if (model.type == 'github') {
       try {
         notificationManager.progress(id, model.id, 0, '准备下载...', false);
-
+        const fetch = await this.getProxyFetch();
         const response = await fetch(model.download);
         const contentLength = response.headers.get('Content-Length').toString();
         totalSize = parseInt(contentLength);
@@ -460,26 +431,38 @@ class SettingsManager {
         fs.mkdirSync(`${dir}.tmp`, { recursive: true });
         this.downloadingModels.push(model);
 
-        const reader = response.body.getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
+        const outputPath = path.join(`${dir}.tmp`, filename);
+        const fileStream = fs.createWriteStream(outputPath);
+        response.body.pipe(fileStream);
 
-          downloadedLength += value.length;
-          fs.appendFileSync(
-            path.join(`${dir}.tmp`, filename),
-            Buffer.from(value),
-          );
-          notificationManager.progress(
-            id,
-            title,
-            (downloadedLength / totalSize) * 100,
-            filename,
-            false,
-          );
-        }
+        if (!response.ok) throw new Error('下载失败');
+        await new Promise<null>((resolve, reject) => {
+          response.body.on('data', (chunk) => {
+            downloadedLength += chunk.length;
+            notificationManager.progress(
+              id,
+              title,
+              (downloadedLength / totalSize) * 100,
+              filename,
+              false,
+            );
+            //fileStream.write(chunk);
+          });
+          response.body.on('end', () => {
+            fileStream.end();
+          });
+
+          // 响应错误处理
+          response.body.on('error', (err) => {
+            fileStream.destroy();
+            fs.unlink(outputPath, () => {});
+            reject(err);
+          });
+
+          fileStream.on('finish', () => {
+            resolve(null);
+          });
+        });
         notificationManager.progress(id, title, 100, '准备处理...');
 
         if (filename.endsWith('.tar.bz2')) {
@@ -495,7 +478,7 @@ class SettingsManager {
               });
           });
 
-          fs.rmdirSync(`${dir}.tmp`, { recursive: true });
+          fs.rmSync(`${dir}.tmp`, { recursive: true });
         } else if (filename.endsWith('.7z')) {
           await new Promise<null>((resolve, reject) => {
             node7z
@@ -512,7 +495,9 @@ class SettingsManager {
               });
           });
 
-          fs.rmdirSync(`${dir}.tmp`, { recursive: true });
+          fs.rmSync(`${dir}.tmp`, { recursive: true });
+        } else {
+          fs.renameSync(`${dir}.tmp`, `${dir}`);
         }
 
         notificationManager.progress(id, title, 100, '下载完成', true, 3);
@@ -528,8 +513,13 @@ class SettingsManager {
           'download fail',
         );
 
-        if (fs.existsSync(`${dir}.tmp`))
-          fs.rmdirSync(`${dir}.tmp`, { recursive: true });
+        // if (fs.existsSync(`${dir}.tmp`))
+        //   fs.rmSync(`${dir}.tmp`, {
+        //     recursive: true,
+        //     force: true,
+        //     maxRetries: 3,
+        //     retryDelay: 100,
+        //   });
       } finally {
         this.downloadingModels = this.downloadingModels.filter(
           (x) => x.id != model.id,

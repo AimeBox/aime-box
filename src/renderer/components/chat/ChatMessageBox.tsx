@@ -34,6 +34,7 @@ import {
   Divider,
   Input,
   Image,
+  Tag,
 } from 'antd';
 import React, { Fragment, createElement, useEffect, useState } from 'react';
 import { ChatMessage } from '../../../entity/Chat';
@@ -53,6 +54,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import JSONPretty from 'react-json-pretty';
 import { JSONTree } from 'react-json-tree';
 import './ChatMessageBox.css';
+import ChatAttachment from './ChatAttachment';
 // import 'katex/dist/katex.min.css';
 // import * as prod from 'react/jsx-runtime';
 // import { ProviderIcon } from '../common/ProviderIcon';
@@ -206,15 +208,29 @@ const ChatMessageBox = React.forwardRef(
                                   />
                                 </div>
                               )}
+
                               {x.type == 'file' && (
-                                <a href={x.file_url} key={x}>
-                                  {x.file_name}
-                                </a>
+                                <Tag>
+                                  <a href={x.path} key={x}>
+                                    {x.path}
+                                  </a>
+                                </Tag>
                               )}
                             </>
                           );
                         })}
                       </div>
+
+                      {value?.additional_kwargs?.files && (
+                        <div className="flex flex-wrap gap-2 p-1">
+                          {value?.additional_kwargs?.files.map((file) => {
+                            return (
+                              <ChatAttachment key={file.path} value={file} />
+                            );
+                          })}
+                        </div>
+                      )}
+
                       {/* <div className="p-1">
                         {value?.content
                           ?.filter((x) => x.type == 'text')

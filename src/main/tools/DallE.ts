@@ -27,6 +27,7 @@ import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
 
 export interface DallEParameters extends ToolParams {
+  apiBase: string;
   apiKey: string;
   model: 'dall-e-3' | 'dall-e-2';
 }
@@ -45,6 +46,11 @@ export class DallE extends BaseTool {
   });
 
   configSchema?: FormSchema[] = [
+    {
+      field: 'apiBase',
+      component: 'Input',
+      label: 'API Base URL',
+    },
     {
       field: 'apiKey',
       component: 'InputPassword',
@@ -77,6 +83,8 @@ export class DallE extends BaseTool {
 
   size?: '256x256' | '512x512' | '1024x1024' | '1792x1024' | '1024x1792';
 
+  apiBase: string;
+
   apiKey: string;
 
   client: OpenAIClient;
@@ -85,9 +93,11 @@ export class DallE extends BaseTool {
     super();
     this.model = params?.model || 'dall-e-3';
     this.apiKey = params?.apiKey;
+    this.apiBase = params?.apiBase || 'https://api.openai.com/v1';
     const clientConfig = {
       apiKey: this.apiKey,
       dangerouslyAllowBrowser: true,
+      baseURL: this.apiBase,
       httpAgent: settingsManager.getHttpAgent(),
     } as ClientOptions;
     this.client = new OpenAIClient(clientConfig);

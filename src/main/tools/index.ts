@@ -74,6 +74,7 @@ import {
 import { runCommand } from '../utils/exec';
 import { Translate } from './Translate';
 import { TavilySearchTool } from './TavilySearch';
+import { UnixTimestampConvert } from './UnixTimestamp';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -413,6 +414,14 @@ export class ToolsManager {
     ipcMain.handle('tools:getMcpList', (event, filter: string = undefined) =>
       this.getMcpList(filter),
     );
+    ipcMain.handle('tools:refreshMcp', async (event, id: string) => {
+      const ts = await this.mcpServerRepository.findOne({
+        where: { id },
+      });
+      if (ts) {
+        await this.refreshMcp(ts);
+      }
+    });
     ipcMain.handle(
       'tools:invoke',
       async (
@@ -501,6 +510,7 @@ export class ToolsManager {
     await this.registerTool(Calculator);
     await this.registerTool(DateTimeTool);
     await this.registerTool(Translate);
+    await this.registerTool(UnixTimestampConvert);
     // await this.registerTool(SearchApi, { apiKey: 'NULL' });
     // await this.registerTool(TavilySearchResults, {
     //   apiKey: 'NULL',

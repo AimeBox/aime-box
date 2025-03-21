@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa';
 export interface ChatAttachmentProps {
   value: ChatInputAttachment;
-  onDelete: () => void;
+  onDelete?: () => void;
 }
 
 export default function ChatAttachment({
@@ -20,7 +20,7 @@ export default function ChatAttachment({
   onDelete,
 }: ChatAttachmentProps) {
   return (
-    <div className="h-8 max-w-[15rem] min-w-[10rem] items-center justify-between cursor-pointer group flex flex-row border gap-1 border-gray-200 dark:border-none rounded-xl px-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300">
+    <div className="h-8 max-w-[15rem] min-w-[10rem] items-center justify-between cursor-pointer group flex flex-row border gap-1 border-gray-200 dark:border-none rounded-xl px-2 hover:bg-gray-200 bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300">
       <div className="flex flex-row flex-1 gap-1 items-center min-w-0">
         <div
           className="flex overflow-hidden flex-row flex-1 gap-1 items-center text-sm font-medium dark:text-gray-100"
@@ -42,13 +42,15 @@ export default function ChatAttachment({
         </div>
       </div>
 
-      <div className="w-4 h-4">
-        {/* <button className="border border-white" type="button"></button> */}
-        <FaTrashAlt
-          className="opacity-0 transition-all duration-300 group-hover:opacity-100"
-          onClick={() => onDelete()}
-        />
-      </div>
+      {onDelete && (
+        <div className="w-4 h-4">
+          {/* <button className="border border-white" type="button"></button> */}
+          <FaTrashAlt
+            className="opacity-0 transition-all duration-300 group-hover:opacity-100"
+            onClick={() => onDelete()}
+          />
+        </div>
+      )}
     </div>
   );
 }

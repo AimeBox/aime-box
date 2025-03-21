@@ -7,31 +7,60 @@ import {
   isToolMessage,
   ToolMessage,
 } from '@langchain/core/messages';
-import { CompiledStateGraph } from '@langchain/langgraph';
+import { CompiledStateGraph, StateGraph } from '@langchain/langgraph';
 import { v4 as uuidv4 } from 'uuid';
 import { notificationManager } from '../app/NotificationManager';
+import { isArray } from '../utils/is';
 
 export const runAgent = async (
   agent: any,
   messages: BaseMessage[],
-  signal?: AbortSignal,
-  configurable?: Record<string, any> | undefined,
-  modelName?: string,
-  providerType?: string,
-  callbacks?: {
-    handlerMessageCreated?: (message: BaseMessage) => Promise<void>;
-    handlerMessageStream?: (message: BaseMessage) => Promise<void>;
-    handlerMessageError?: (message: BaseMessage) => Promise<void>;
-    handlerMessageFinished?: (message: BaseMessage) => Promise<void>;
+  options: {
+    modelName?: string;
+    providerType?: string;
+    signal?: AbortSignal;
+    configurable?: Record<string, any> | undefined;
+    recursionLimit?: number;
+    callbacks?: {
+      handlerMessageCreated?: (message: BaseMessage) => Promise<void>;
+      handlerMessageStream?: (message: BaseMessage) => Promise<void>;
+      handlerMessageError?: (message: BaseMessage) => Promise<void>;
+      handlerMessageFinished?: (message: BaseMessage) => Promise<void>;
+    };
   },
 ) => {
   let lastMessage;
   // const toolCalls = [];
   // const messages = [];
   messages.forEach((x) => {
+    // filter file content
+    if (isArray(x.content) && x.content.find((x) => x.type == 'file')) {
+      const files: any[] = x.content.filter((x) => x.type == 'file');
+      if (x.content.find((x) => x.type == 'text')) {
+        (x.content.find((x) => x.type == 'text') as any).text +=
+          `\n\n${files.map((z) => `[${z.name}](${z.path})`).join('\n')}`;
+      } else {
+        x.content.push({
+          type: 'text',
+          text: files.map((z) => `[${z.name}](${z.path})`).join('\n'),
+        });
+      }
+      x.content = x.content.filter((x) => x.type != 'file');
+      x.additional_kwargs = {
+        ...x.additional_kwargs,
+        files: files,
+      };
+    }
+
     if (isHumanMessage(x)) {
       if (x.content.length == 1 && (x.content[0] as any)?.type == 'text') {
         x.content = (x.content[0] as any)?.text;
+      } else if (
+        x.content.length > 1 &&
+        (x.content as any[]).filter((x) => x.type == 'text').length ==
+          x.content.length
+      ) {
+        x.content = (x.content as any[]).map((x) => x.text).join('\n');
       }
     }
   });
@@ -41,8 +70,9 @@ export const runAgent = async (
       { messages, current_time: new Date().toISOString() },
       {
         version: 'v2',
-        signal,
-        configurable: { thread_id: uuidv4(), ...(configurable || {}) },
+        signal: options?.signal,
+        recursionLimit: options?.recursionLimit,
+        configurable: { thread_id: uuidv4(), ...(options?.configurable || {}) },
       },
     );
     let _toolCalls = [];
@@ -57,17 +87,17 @@ export const runAgent = async (
         _lastMessage =
           data.input.messages[0][data.input.messages[0].length - 1];
         if (isHumanMessage(_lastMessage)) {
-          await callbacks?.handlerMessageCreated?.(_lastMessage);
+          await options?.callbacks?.handlerMessageCreated?.(_lastMessage);
           _messages.push(_lastMessage);
           const aiMessage = new AIMessage({
             id: uuidv4(),
             content: '',
             additional_kwargs: {
-              model: modelName,
-              provider_type: providerType,
+              model: options?.modelName,
+              provider_type: options?.providerType,
             },
           });
-          await callbacks?.handlerMessageCreated?.(aiMessage);
+          await options?.callbacks?.handlerMessageCreated?.(aiMessage);
           _lastMessage = aiMessage;
           _messages.push(aiMessage);
         } else {
@@ -75,11 +105,11 @@ export const runAgent = async (
             id: uuidv4(),
             content: '',
             additional_kwargs: {
-              model: modelName,
-              provider_type: providerType,
+              model: options?.modelName,
+              provider_type: options?.providerType,
             },
           });
-          await callbacks?.handlerMessageCreated?.(aiMessage);
+          await options?.callbacks?.handlerMessageCreated?.(aiMessage);
           _lastMessage = aiMessage;
           _messages.push(aiMessage);
         }
@@ -89,7 +119,7 @@ export const runAgent = async (
         if (data.chunk.content && _lastMessage) {
           if (isAIMessage(_lastMessage)) {
             _lastMessage.content += data.chunk.content;
-            await callbacks?.handlerMessageStream?.(_lastMessage);
+            await options?.callbacks?.handlerMessageStream?.(_lastMessage);
           }
         }
       } else if (event == 'on_chat_model_end') {
@@ -103,7 +133,7 @@ export const runAgent = async (
             _toolStart = [];
           }
           _lastMessage.usage_metadata = data.output.usage_metadata;
-          await callbacks?.handlerMessageFinished?.(_lastMessage);
+          await options?.callbacks?.handlerMessageFinished?.(_lastMessage);
         }
       } else if (event == 'on_tool_start') {
         console.log('on_tool_start', data);
@@ -119,7 +149,7 @@ export const runAgent = async (
               model: toolCall.name,
             },
           });
-          await callbacks?.handlerMessageCreated?.(toolMessage);
+          await options?.callbacks?.handlerMessageCreated?.(toolMessage);
           _lastMessage = toolMessage;
           _messages.push(toolMessage);
           _toolStart.push(toolMessage);
@@ -144,7 +174,7 @@ export const runAgent = async (
             provider_type: undefined,
             model: data.output.name,
           };
-          await callbacks?.handlerMessageFinished?.(msg);
+          await options?.callbacks?.handlerMessageFinished?.(msg);
           _lastMessage = msg;
         } else {
           const _toolMessage =
@@ -162,7 +192,7 @@ export const runAgent = async (
               provider_type: undefined,
               model: msg.name,
             };
-            await callbacks?.handlerMessageFinished?.(msg);
+            await options?.callbacks?.handlerMessageFinished?.(msg);
             _lastMessage = msg;
           }
         }
@@ -181,7 +211,7 @@ export const runAgent = async (
           if (msg.status === undefined) {
             msg.content = data.output.messages[0].content;
             msg.status = data.output.messages[0].status;
-            await callbacks?.handlerMessageFinished?.(msg);
+            await options?.callbacks?.handlerMessageFinished?.(msg);
           }
         }
       } else {
@@ -194,7 +224,7 @@ export const runAgent = async (
         _lastMessage.status = ChatStatus.ERROR;
       }
       _lastMessage.additional_kwargs['error'] = err.message || err.name;
-      await callbacks?.handlerMessageError?.(_lastMessage);
+      await options?.callbacks?.handlerMessageError?.(_lastMessage);
     }
     throw err;
   }

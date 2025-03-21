@@ -123,6 +123,12 @@ export default function ChatContent() {
         return values.type === 'supervisor';
       },
     },
+    {
+      component: 'InputNumber',
+      field: 'recursionLimit',
+      defaultValue: 25,
+      label: t('agents.recursionLimit'),
+    },
   ] as FormSchema[];
   const onSave = async (values: any) => {
     try {

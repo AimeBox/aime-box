@@ -125,7 +125,7 @@ export class WebSearchTool extends BaseTool {
           apiKey: settings.webSearchEngine.tavily.apiKey,
           maxResults: this.limit,
         });
-        const res = await d.invoke(input.query);
+        const res = await d.invoke({ query: input.query });
         return res;
       } else if (
         this.provider == WebSearchEngine.Serpapi &&

@@ -27,7 +27,12 @@ import { BaseTool } from '../tools/BaseTool';
 import { toolsManager } from '../tools';
 import { getProviderModel } from '../utils/providerUtil';
 import { createSupervisor, OutputMode } from '@langchain/langgraph-supervisor';
-import { BaseStore, InMemoryStore, MemorySaver } from '@langchain/langgraph';
+import {
+  BaseStore,
+  InMemoryStore,
+  MemorySaver,
+  StateGraph,
+} from '@langchain/langgraph';
 
 export interface AgentInfo extends Agent {
   static: boolean;
@@ -324,6 +329,7 @@ export class AgentManager {
             where: { id: agentId },
           });
           const workflow = await this.buildAgent(_agent);
+
           agents.push(workflow);
         }
 

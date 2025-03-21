@@ -33,6 +33,7 @@ import { appManager } from './app/AppManager';
 import promptsManager from './prompts';
 import fs from 'fs';
 import { exec } from 'node:child_process';
+import { notificationManager } from './app/NotificationManager';
 
 dbManager
   .init()
@@ -55,10 +56,10 @@ dbManager
 
 process.on('uncaughtException', (error) => {
   console.error('未捕获的异常:', error);
-  dialog.showErrorBox(
-    '应用错误',
-    `发生了一个错误: ${error.message}\n ${error.stack}`,
-  );
+  // dialog.showErrorBox(
+  //   '应用错误',
+  //   `发生了一个错误: ${error.message}\n ${error.stack}`,
+  // );
   // 可以在这里记录错误日志或显示错误对话框
 });
 
@@ -179,7 +180,7 @@ const createWindow = async () => {
 
   mainWindow = new BrowserWindow({
     show: false,
-    width: 2048,
+    width: 1024,
     height: 728,
     minHeight: 728,
     icon: getAssetPath('icon.png'),
@@ -206,7 +207,13 @@ const createWindow = async () => {
       if (fs.statSync(filePath).isFile()) {
         shell.openPath(filePath);
       } else if (fs.statSync(filePath).isDirectory()) {
-        exec(`explorer ${filePath}`);
+        if (platform == 'win32') {
+          exec(`explorer ${filePath.replaceAll('/', '\\')}`);
+        } else {
+          exec(`open ${filePath}`);
+        }
+      } else {
+        notificationManager.sendNotification('path error', 'error');
       }
     }
   });

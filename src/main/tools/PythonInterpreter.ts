@@ -72,10 +72,10 @@ export class PythonInterpreterTool extends BaseTool {
   ): Promise<string> {
     let tempDir;
     try {
-      if (!this.pythonPath) {
+      if (!this.pythonPath || !fs.statSync(this.pythonPath).isFile()) {
         try {
           this.pythonPath = (
-            await runCommand(`python -c 'import sys;print(sys.executable)'`)
+            await runCommand(`python -c "import sys;print(sys.executable)"`)
           )
             .toString()
             .trim();
@@ -122,7 +122,8 @@ export class PythonInterpreterTool extends BaseTool {
             console.log(res);
             isSuccess = true;
             break;
-          } catch {
+          } catch (err) {
+            console.log(err);
             await new Promise((resolve) => {
               setTimeout(resolve, 2000);
             });
@@ -211,5 +212,6 @@ export class PythonInterpreterTool extends BaseTool {
 
   async createVenv(path: string) {
     const res = await runCommand(`python -m venv ${path}`).toString().trim();
+    console.log(res);
   }
 }

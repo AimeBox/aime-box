@@ -140,7 +140,8 @@
     "agents": "Agents",
     "supervisorOutputMode": "Output Mode",
     "supervisorOutputMode_full_history": "Full History",
-    "supervisorOutputMode_last_message": "Last Message"
+    "supervisorOutputMode_last_message": "Last Message",
+    "recursionLimit": "Recursion Limit"
   },
   "sidebar": {
     "settings": "Settings",

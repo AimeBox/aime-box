@@ -61,6 +61,7 @@ export class Ideogram extends BaseTool {
       .enum(['GENERAL', 'REALISTIC', 'DESIGN', 'RENDER_3D', 'ANIME'])
       .optional()
       .describe('The style type to generate with'),
+    save_path: z.string().optional().describe('The path to save the image to'),
     // resolution: z
     //   .enum([])
     //   .optional()
@@ -71,16 +72,17 @@ export class Ideogram extends BaseTool {
 
   configSchema: FormSchema[] = [
     {
-      label: 'Api Key',
-      field: 'apiKey',
-      component: 'InputPassword',
-    },
-    {
       label: 'Api Base',
       field: 'apiBase',
       defaultValue: 'https://api.ideogram.ai',
       component: 'Input',
     },
+    {
+      label: 'Api Key',
+      field: 'apiKey',
+      component: 'InputPassword',
+    },
+
     {
       label: t('common.model'),
       field: 'model',
@@ -147,9 +149,22 @@ export class Ideogram extends BaseTool {
     const url = `${this.apiBase.replace(/\/+$/, '')}/generate`;
     const res = await fetch(url, options);
     const resJson = await res.json();
-
-    return resJson.data.map(
-      (x) => `https://wsrv.nl/?url=${encodeURIComponent(x.url)}`,
-    );
+    if (input.save_path) {
+      const filePaths = [];
+      for (let index = 0; index < resJson.data.length; index++) {
+        const downloadUrl = `https://wsrv.nl/?url=${encodeURIComponent(resJson.data[index].url)}`;
+        const filePath = input.save_path;
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        const response = await fetch(downloadUrl);
+        const buffer = await response.arrayBuffer();
+        fs.writeFileSync(filePath, Buffer.from(buffer));
+        filePaths.push(filePath);
+      }
+      return filePaths.join('\n');
+    } else {
+      return resJson.data.map(
+        (x) => `https://wsrv.nl/?url=${encodeURIComponent(x.url)}`,
+      );
+    }
   }
 }
