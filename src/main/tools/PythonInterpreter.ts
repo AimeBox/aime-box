@@ -117,7 +117,7 @@ export class PythonInterpreterTool extends BaseTool {
         for (let i = 0; i < 5; i++) {
           try {
             const res = await runCommand(
-              `${this.pythonPath} -m pip install ${input.dependencies.join(' ')}`,
+              `"${this.pythonPath}" -m pip install ${input.dependencies.join(' ')}`,
             );
             console.log(res);
             isSuccess = true;
@@ -137,7 +137,7 @@ export class PythonInterpreterTool extends BaseTool {
       console.log('check python virtual environment');
       for (let i = 0; i < 5; i++) {
         try {
-          const res = await runCommand(`${this.pythonPath} -V`);
+          const res = await runCommand(`"${this.pythonPath}" -V`);
           console.log(res);
           isSuccess = true;
           break;
@@ -211,7 +211,7 @@ export class PythonInterpreterTool extends BaseTool {
   }
 
   async createVenv(path: string) {
-    const res = await runCommand(`python -m venv ${path}`).toString().trim();
+    const res = await runCommand(`python -m venv "${path}"`).toString().trim();
     console.log(res);
   }
 }

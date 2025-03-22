@@ -86,7 +86,8 @@
     "knowledgebase": "KnowledgeBase",
     "tool": "Tools",
     "fileChat": "File Chat",
-    "export_image": "Export Image"
+    "export_image": "Export Image",
+    "plannerChat": "Planner Chat"
   },
   "language": {
     "english": "English",

@@ -25,6 +25,7 @@ import Content from '@/renderer/components/layout/Content';
 import { ChatMode } from '@/types/chat';
 import { Chat } from '@/entity/Chat';
 import ChatFileContent from './ChatFileContent';
+import ChatPlannerContent from './ChatPlannerContent';
 
 export default function ChatPage() {
   const chatListRef = useRef<ChatListRef | null>(null);
@@ -67,6 +68,9 @@ export default function ChatPage() {
               <Route path="*" element={<ChatContent />} />
             )}
             {mode == 'file' && <Route path="*" element={<ChatFileContent />} />}
+            {mode == 'planner' && (
+              <Route path="*" element={<ChatPlannerContent />} />
+            )}
           </Routes>
         </div>
       </div>

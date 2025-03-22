@@ -9,4 +9,4 @@ export interface ChatInputExtend {
   attachments: ChatInputAttachment[];
 }
 
-export type ChatMode = 'default' | 'task' | 'agent' | 'file';
+export type ChatMode = 'default' | 'planner' | 'agent' | 'file';

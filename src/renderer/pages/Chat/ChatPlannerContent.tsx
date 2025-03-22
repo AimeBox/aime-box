@@ -25,7 +25,7 @@ import { isUrl } from '@/main/utils/is';
 import Link from 'antd/es/typography/Link';
 import { useLocation } from 'react-router-dom';
 
-export default function ChatManusContent() {
+export default function ChatPlannerContent() {
   const location = useLocation();
   const [currentChat, setCurrentChat] = useState<
     (Chat & { status: string }) | undefined

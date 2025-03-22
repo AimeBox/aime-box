@@ -15,7 +15,7 @@ import List from '../common/List';
 import { t } from 'i18next';
 import dayjs from 'dayjs';
 import { ListItem } from '../common/ListItem';
-import { FaRegMessage } from 'react-icons/fa6';
+import { FaRegMessage, FaRegRectangleList } from 'react-icons/fa6';
 
 // import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 export interface ChatListRef {
@@ -23,7 +23,7 @@ export interface ChatListRef {
 }
 
 export interface ChatListProps {
-  onNewChat?: (mode: 'default' | 'task' | 'file') => void;
+  onNewChat?: (mode: 'default' | 'planner' | 'file') => void;
 }
 // const ChatListComponent = function ({
 //   onNewChat,
@@ -117,6 +117,13 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
       );
     };
   }, []);
+
+  const renderChatIcon = (mode: string) => {
+    if (mode === 'file') return <FaFile />;
+    else if (mode === 'planner') return <FaRegRectangleList />;
+    else return <FaRegMessage />;
+  };
+
   return (
     <List
       onSearch={onSearch}
@@ -158,6 +165,19 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
                   {t('chat.fileChat')}
                 </Button>
               )}
+              {!isPackaged && (
+                <Button
+                  type="text"
+                  block
+                  icon={<FaRegMessage />}
+                  onClick={() => {
+                    setAddButtonOpen(false);
+                    onNewChat('planner');
+                  }}
+                >
+                  {t('chat.plannerChat')}
+                </Button>
+              )}
             </div>
           }
         >
@@ -170,7 +190,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
           return (
             <ListItem
               key={chat.id}
-              icon={chat.mode === 'file' ? <FaFile /> : undefined}
+              icon={renderChatIcon(chat.mode)}
               active={currentChatId === chat.id}
               title={chat.title}
               subTitle={

@@ -39,26 +39,25 @@ export class RapidOcrTool extends BaseTool {
   }
 
   async _call(
-    filePath: z.infer<typeof this.schema>,
+    input: z.infer<typeof this.schema>,
     runManager,
     config,
   ): Promise<string> {
-    if (!fs.existsSync(path.join(getModelsPath(), 'RapidOCR-json_v0.2.0'))) {
+    if (
+      !fs.existsSync(path.join(getModelsPath(), 'ocr', 'RapidOCR-json_v0.2.0'))
+    ) {
       return 'model not found';
     }
     try {
-      if (isString(filePath) || fs.statSync(filePath).isFile()) {
+      if (isString(input.filePath) || fs.statSync(input.filePath).isFile()) {
         const json_res = (await new Promise((resolve, reject) => {
           const process = spawn('RapidOCR-json.exe', {
-            cwd: path.join(getModelsPath(), 'RapidOCR-json_v0.2.0'),
+            cwd: path.join(getModelsPath(), 'ocr', 'RapidOCR-json_v0.2.0'),
           });
           let output = null;
-          // 向进程的标准输入写入 "run"
           process.stdin.write(
-            `{"image_path": "${filePath.replaceAll('\\', '/')}"}\n`,
-          ); // \n 模拟按下回车键
-
-          // 处理子进程的输出
+            `{"image_path": "${input.filePath.replaceAll('\\', '/')}"}\n`,
+          );
           process.stdout.on('data', (data) => {
             const text = data.toString();
 
@@ -87,27 +86,6 @@ export class RapidOcrTool extends BaseTool {
         } else {
           return json_res.data;
         }
-
-        // const out = execFileSync(
-        //   path.join(
-        //     getModelsPath(),
-        //     'RapidOCR-json_v0.2.0',
-        //     'RapidOCR-json.exe',
-        //   ),
-        //   [`--image="${path.resolve(filePath)}"`],
-        //   {
-        //     cwd: path.join(getModelsPath(), 'RapidOCR-json_v0.2.0'),
-        //     //encoding: 'utf8',
-        //   },
-        // );
-        // let res = out.toString();
-        // res = res.substring(res.indexOf('OCR init completed.\r\n') + 21);
-        // const json_res = JSON.parse(res) as any;
-        // if (json_res.code == 100) {
-        //   return json_res.data.map((x) => x.text).join('');
-        // } else {
-        //   return json_res.data;
-        // }
       } else {
         return 'Please provide a valid file path';
       }
