@@ -184,8 +184,8 @@ const createWindow = async () => {
     height: 728,
     minHeight: 728,
     icon: getAssetPath('icon.png'),
-    autoHideMenuBar: app.isPackaged,
-    transparent: process.platform === 'darwin',
+    autoHideMenuBar: process.platform === 'darwin' ? false : app.isPackaged,
+    //transparent: process.platform === 'darwin',
     webPreferences: {
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
@@ -208,7 +208,6 @@ const createWindow = async () => {
         if (!filePath.startsWith('/')) {
           filePath = `/${filePath}`;
         }
-
       }
       if (fs.statSync(filePath)?.isFile()) {
         shell.openPath(filePath);
