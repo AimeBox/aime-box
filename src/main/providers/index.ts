@@ -261,7 +261,7 @@ export class ProvidersManager {
       }
     } catch (e) {
       console.log(e);
-      notificationManager.sendNotification('获取模型列表失败', 'error', 3000);
+      notificationManager.sendNotification('获取模型列表失败', 'error');
     }
 
     return [];

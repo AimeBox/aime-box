@@ -561,11 +561,7 @@ export class ToolsManager {
       useJina: false,
     });
     await this.registerTool(RemoveBackground);
-    await this.registerTool(SpeechToText, {
-      ffmpegPath: '',
-      model: 'sense-voice@local',
-      apiKey: '',
-    });
+    await this.registerTool(SpeechToText);
     await this.registerTool(Ideogram, {
       apiKey: '',
       apiBase: 'https://api.ideogram.ai',

@@ -11,15 +11,13 @@ import { z } from 'zod';
 import iconv from 'iconv-lite';
 import { runCommand } from '../utils/exec';
 import { BaseTool } from './BaseTool';
+import { platform } from 'process';
 
 export interface CmdToolParameters extends ToolParams {
   ask_human_input: boolean;
 }
 
 export class CmdTool extends BaseTool {
-  static lc_name() {
-    return 'cmd';
-  }
 
   schema = z.object({
     commands: z.string(),
@@ -27,7 +25,7 @@ export class CmdTool extends BaseTool {
 
   name: string = 'cmd';
 
-  description: string = 'run powershell.exe commands on windows system.';
+  description: string = `run ${platform == 'win32' ? 'cmd.exe' : 'bash'} commands on ${platform} system.`;
 
   ask_human_input: boolean = false;
 

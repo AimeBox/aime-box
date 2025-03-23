@@ -204,9 +204,15 @@ const createWindow = async () => {
       event.preventDefault();
       let filePath = url.substring(8);
       filePath = decodeURI(filePath);
-      if (fs.statSync(filePath).isFile()) {
+      if (platform == 'darwin') {
+        if (!filePath.startsWith('/')) {
+          filePath = `/${filePath}`;
+        }
+
+      }
+      if (fs.statSync(filePath)?.isFile()) {
         shell.openPath(filePath);
-      } else if (fs.statSync(filePath).isDirectory()) {
+      } else if (fs.statSync(filePath)?.isDirectory()) {
         if (platform == 'win32') {
           exec(`explorer ${filePath.replaceAll('/', '\\')}`);
         } else {

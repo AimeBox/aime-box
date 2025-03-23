@@ -32,6 +32,8 @@ import node7z from 'node-7z';
 import axios from 'axios';
 import nodeFetch, { RequestInit, Response } from 'node-fetch';
 import { getModelsPath } from '../utils/path';
+import { platform } from 'process';
+import { exec } from 'child_process';
 
 export interface GlobalSettings {
   appName: string;
@@ -467,7 +469,20 @@ class SettingsManager {
 
         if (filename.endsWith('.tar.bz2')) {
           await new Promise<null>((resolve, reject) => {
-            fs.createReadStream(path.join(`${dir}.tmp`, filename))
+            if (platform == 'darwin' || platform == 'linux') {
+              exec(`tar -xvjf ${path.join(`${dir}.tmp`, filename)} -C ${path.join(`${dir}.tmp`, '..')}`, (error, stdout, stderr) => {
+                  if (error) {
+                      console.error(`执行出错: ${error}`);
+                      reject(error);
+                      return;
+                  }
+                  console.log(`stdout: ${stdout}`);
+                  console.log('解压完成');
+                  resolve(null);
+              });
+
+            } else if(platform == 'win32'){
+              fs.createReadStream(path.join(`${dir}.tmp`, filename))
               .pipe(bz2())
               .pipe(tar.x({ C: path.join(`${dir}.tmp`, '..') }))
               .on('error', (err) => {
@@ -476,6 +491,8 @@ class SettingsManager {
               .on('finish', () => {
                 resolve(null);
               });
+            }
+
           });
 
           fs.rmSync(`${dir}.tmp`, { recursive: true });

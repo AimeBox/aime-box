@@ -30,10 +30,10 @@ export const runCommand = async (
   return new Promise((resolve, reject) => {
     const commands = [];
     if (_file == 'cmd.exe') {
-      //commands.push('/c');
+      commands.push(_file);
+      commands.push('/c');
     }
-    const env = { ...process.env };
-    console.log(env.Path.split(';').join('\n'));
+
     commands.push(command);
     // const cmd = spawn(commands.join(' ')); // /c 执行后关闭窗口；/k 是保持窗口打开
 
@@ -52,7 +52,7 @@ export const runCommand = async (
     // });
     // return;
     const child2 = exec(
-      'cmd.exe /c ' + commands.join(' '),
+      commands.join(' '),
       {
         encoding: 'buffer',
       },

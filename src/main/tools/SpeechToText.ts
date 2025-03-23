@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
 
+
 export interface SpeechToTextParameters extends ToolParams {
   ffmpegPath: string;
   model: string;
@@ -40,6 +41,8 @@ export class SpeechToText extends BaseTool {
 
   sherpa_onnx: any;
 
+  apiKey: string;
+
   configSchema: FormSchema[] = [
     {
       field: 'model',
@@ -65,6 +68,7 @@ export class SpeechToText extends BaseTool {
       }
     }
     this.model = params?.model;
+
     this.apiKey = params?.apiKey;
 
     Function('return import("sherpa-onnx-node")')()
@@ -76,105 +80,6 @@ export class SpeechToText extends BaseTool {
         throw err;
       });
   }
-
-  // splitAudio = (fileOrUrl: string): Promise<Float64Array[]> => {
-  //   return new Promise((resolve, reject) => {
-  //     const buffer = Buffer.from(fs.readFileSync(fileOrUrl));
-
-  //     const wav = new WaveFile(buffer);
-
-  //     wav.toBitDepth('32f');
-  //     wav.toSampleRate(16000);
-  //     const { sampleRate, numChannels } = wav.fmt as {
-  //       sampleRate: any;
-  //       numChannels: number;
-  //     };
-  //     let audioData = wav.getSamples();
-
-  //     if (Array.isArray(audioData)) {
-  //       if (audioData.length > 1) {
-  //         const SCALING_FACTOR = Math.sqrt(2);
-
-  //         // Merge channels (into first channel to save memory)
-  //         for (let i = 0; i < audioData[0].length; i++) {
-  //           audioData[0][i] =
-  //             (SCALING_FACTOR * (audioData[0][i] + audioData[1][i])) / 2;
-  //         }
-  //       }
-
-  //       // Select first channel
-  //       audioData = audioData[0];
-  //     }
-  //     // const audioBuffer = Buffer.from(wav.getSamples(false, Int32Array));
-
-  //     const silenceArray: any[] = [];
-  //     const chucks: Float64Array[] = [];
-  //     const totalDuration = audioData.length / sampleRate;
-  //     console.log('totalDuration:', `${totalDuration.toFixed(4)}s`);
-  //     ffmpeg.setFfmpegPath('C:\\ffmpeg\\bin\\ffmpeg.exe');
-  //     ffmpeg(fileOrUrl)
-  //       .audioFilters([
-  //         'silencedetect=noise=-30dB:d=0.5', // 设置静音检测参数
-  //       ])
-  //       .noVideo() // 禁用视频流处理
-  //       .format('null') // 设置输出格式为null，等效于/dev/null
-  //       .on('end', () => {
-  //         let offset = 0;
-  //         if (silenceArray.length == 0) {
-  //           silenceArray.push([totalDuration, totalDuration]);
-  //         }
-  //         silenceArray.forEach((item) => {
-  //           const startTime = item[0];
-  //           const endTime = item[1];
-  //           const startSample = Math.floor(startTime * sampleRate);
-  //           const endSample = Math.floor(endTime * sampleRate);
-  //           const sliceLength = startSample - offset;
-  //           const slice = audioData.slice(offset, offset + sliceLength);
-  //           offset = endSample;
-  //           const total_duration = slice.length / sampleRate;
-  //           if (chucks.length > 0) {
-  //             const lastChuck = chucks[chucks.length - 1];
-  //             const last_duration = lastChuck.length / sampleRate;
-  //             if (last_duration + total_duration < 30) {
-  //               const mergedArray = new Float64Array(
-  //                 lastChuck.length + slice.length,
-  //               );
-  //               mergedArray.set(lastChuck, 0);
-  //               mergedArray.set(slice, lastChuck.length);
-  //               chucks[chucks.length - 1] = mergedArray;
-  //             } else {
-  //               chucks.push(slice);
-  //             }
-  //           } else {
-  //             chucks.push(slice);
-  //           }
-
-  //           //console.log('total_duration:', `${total_duration.toFixed(4)}s`);
-  //         });
-  //         resolve(chucks);
-  //       })
-  //       .on('error', (err) => {
-  //         reject(err);
-  //       })
-  //       .on('stderr', (line: string) => {
-  //         // 捕捉 stderr 输出中的静音信息
-  //         if (line.startsWith('[silencedetect ')) {
-  //           const value = line.split(':')[1].trim();
-  //           if (line.includes('silence_start')) {
-  //             silenceArray.push([parseFloat(value)]);
-  //           } else if (line.includes('silence_end')) {
-  //             silenceArray[silenceArray.length - 1].push(
-  //               parseFloat(value.split('|')[0].trim()),
-  //             );
-  //           }
-  //           //console.log('FFmpeg stderr:', line);
-  //         }
-  //         // console.log('FFmpeg stderr:', line);
-  //       })
-  //       .output('/dev/null') // 在非 Windows 系统上
-  //       .run();
-  //   });
-  // };
 
   createRecognizer(language) {
     // Please download test files from

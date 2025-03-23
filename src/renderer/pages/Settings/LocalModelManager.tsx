@@ -57,7 +57,7 @@ export default function LocalModelManager() {
           <div className="flex flex-col gap-2">
             <div className="font-semibold">{t('settings.localModelPath')}</div>
             <div className="flex flex-row gap-2 justify-between items-center">
-              <Link href={settings?.localModelPath}>
+              <Link href={`file:///${settings?.localModelPath}`}>
                 {settings?.localModelPath}
               </Link>
 
