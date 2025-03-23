@@ -38,7 +38,7 @@
   
 
 ### 📝 **Todo**
-- [ ] mac平台兼容
+- [x] mac平台兼容
 - [ ] 多语言支持
 - [ ] 文档对话功能类似于ChatDoc 支持docx、pdf、txt、url、mp4、音频文件等格式的对话
 - [ ] 浏览器browser-use

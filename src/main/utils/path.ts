@@ -3,23 +3,28 @@ import path from 'path';
 import fs from 'fs';
 
 const getDataPath = () => {
-  return app?.isPackaged
-    ? path.join(process.resourcesPath, '..', '.data')
-    : path.join(__dirname, '../../.data');
+  const userData = app.getPath('userData');
+  const dataPath = path.join(userData, '.data');
+  if (!fs.existsSync(dataPath)) {
+    fs.mkdirSync(dataPath, { recursive: true });
+  }
+  return dataPath;
 };
 
 const getTmpPath = () => {
-  return app?.isPackaged
-    ? path.join(process.resourcesPath, '..', '.data', 'tmp')
-    : path.join(__dirname, '../../.data', 'tmp');
+  const userData = app.getPath('userData');
+  return path.join(userData, 'tmp');
 };
 
 const rootPath = app.isPackaged ? app.getAppPath() : __dirname;
 
 const getModelsPath = () => {
-  return app?.isPackaged
-    ? path.join(process.resourcesPath, '..', 'models')
-    : path.join(__dirname, '../../models');
+  const userData = app.getPath('userData');
+  const modelPath = path.join(userData, 'models');
+  if (!fs.existsSync(modelPath)) {
+    fs.mkdirSync(modelPath, { recursive: true });
+  }
+  return modelPath;
 };
 
 export { getDataPath, getTmpPath, getModelsPath, rootPath };

@@ -60,6 +60,7 @@ export default function ipcListener(mainWindow: BrowserWindow) {
   ipcMain.on('app:info', (event) => {
     event.returnValue = {
       appPath: app.getAppPath(),
+      userData: app.getPath('userData'),
       version: app.getVersion(),
       platform: platform,
       resourcesPath: process.resourcesPath,

@@ -213,9 +213,9 @@ const createWindow = async () => {
         shell.openPath(filePath);
       } else if (fs.statSync(filePath)?.isDirectory()) {
         if (platform == 'win32') {
-          exec(`explorer ${filePath.replaceAll('/', '\\')}`);
+          exec(`explorer "${filePath.replaceAll('/', '\\')}"`);
         } else {
-          exec(`open ${filePath}`);
+          exec(`open "${filePath}"`);
         }
       } else {
         notificationManager.sendNotification('path error', 'error');
