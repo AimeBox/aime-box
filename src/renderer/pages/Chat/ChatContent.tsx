@@ -19,6 +19,8 @@ import {
 } from 'antd';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
+  FaAngleDown,
+  FaAngleUp,
   FaEdit,
   FaEllipsisH,
   FaFile,
@@ -327,7 +329,7 @@ export default function ChatContent() {
           <Splitter.Panel min={400}>
             <div className="flex flex-col w-full h-full">
               <div className="w-full border-b border-gray-200">
-                <div className="flex flex-row flex-1 justify-between items-center p-2 w-full text-lg font-semibold group">
+                <div className="flex flex-row flex-1 justify-between items-center p-2 w-full text-lg font-semibold">
                   <div className="flex flex-col flex-1">
                     <Input
                       value={currentChat.title}
@@ -342,9 +344,15 @@ export default function ChatContent() {
                       className="flex-1 w-full text-lg"
                       onBlur={handleChangedTitle}
                     />
-                    <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400 opacity-0 group-hover:opacity-100">
+                    <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400">
                       {currentChat.id}
                       <span>token: {currentChat.totalToken}</span>
+                      <span className="flex flex-row items-center">
+                        <FaAngleUp /> {currentChat.inputToken}
+                      </span>
+                      <span className="flex flex-row items-center">
+                        <FaAngleDown /> {currentChat.outputToken}
+                      </span>
                     </small>
                   </div>
 

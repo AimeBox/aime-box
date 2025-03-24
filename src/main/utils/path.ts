@@ -3,7 +3,13 @@ import path from 'path';
 import fs from 'fs';
 
 const getDataPath = () => {
-  const userData = app.getPath('userData');
+  let userData;
+  if (app.isPackaged) {
+    userData = app.getPath('userData');
+  } else {
+    userData = app.getAppPath();
+  }
+
   const dataPath = path.join(userData, '.data');
   if (!fs.existsSync(dataPath)) {
     fs.mkdirSync(dataPath, { recursive: true });
@@ -19,7 +25,12 @@ const getTmpPath = () => {
 const rootPath = app.isPackaged ? app.getAppPath() : __dirname;
 
 const getModelsPath = () => {
-  const userData = app.getPath('userData');
+  let userData;
+  if (app.isPackaged) {
+    userData = app.getPath('userData');
+  } else {
+    userData = app.getAppPath();
+  }
   const modelPath = path.join(userData, 'models');
   if (!fs.existsSync(modelPath)) {
     fs.mkdirSync(modelPath, { recursive: true });

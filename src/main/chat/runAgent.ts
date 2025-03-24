@@ -95,6 +95,7 @@ export const runAgent = async (
             additional_kwargs: {
               model: options?.modelName,
               provider_type: options?.providerType,
+              history: data.input.messages[0].map((x) => x.toJSON()),
             },
           });
           await options?.callbacks?.handlerMessageCreated?.(aiMessage);
@@ -107,6 +108,7 @@ export const runAgent = async (
             additional_kwargs: {
               model: options?.modelName,
               provider_type: options?.providerType,
+              history: data.input.messages[0].map((x) => x.toJSON()),
             },
           });
           await options?.callbacks?.handlerMessageCreated?.(aiMessage);

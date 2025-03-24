@@ -1,8 +1,10 @@
 import {
   FaAngleDown,
+  FaAngleUp,
   FaClipboard,
   FaClock,
   FaEdit,
+  FaHistory,
   FaLightbulb,
   FaMedapps,
   FaPlay,
@@ -35,6 +37,7 @@ import {
   Input,
   Image,
   Tag,
+  Popover,
 } from 'antd';
 import React, { Fragment, createElement, useEffect, useState } from 'react';
 import { ChatMessage } from '../../../entity/Chat';
@@ -149,6 +152,10 @@ const ChatMessageBox = React.forwardRef(
         ?.filter((x) => x.type == 'tool_call')
         .map((x) => x.text)
         .join('\n');
+    };
+
+    const onHistory = () => {
+      console.log(value?.additional_kwargs?.history);
     };
 
     return (
@@ -304,8 +311,7 @@ const ChatMessageBox = React.forwardRef(
                       <div className="mb-2 text-sm font-medium">工具调用</div>
                       <div className="flex flex-row flex-wrap gap-2">
                         <Collapse
-                          ghost
-                          className="min-w-0"
+                          className="w-full"
                           items={value.tool_calls.map((toolCall, index) => {
                             return {
                               key: toolCall.id,
@@ -371,7 +377,39 @@ const ChatMessageBox = React.forwardRef(
                             }}
                           ></Button>
                         </Tooltip>
-
+                        {value?.additional_kwargs?.history && (
+                          <Popover
+                            content={
+                              <div className="flex flex-col gap-2 max-w-[400px] max-h-[300px] overflow-y-auto">
+                                {value?.additional_kwargs?.history.map((x) => {
+                                  return (
+                                    <div
+                                      key={x['kwargs'].id}
+                                      className="flex flex-col gap-1"
+                                    >
+                                      <div>
+                                        <Tag>{x['id'][x['id'].length - 1]}</Tag>
+                                      </div>
+                                      {JSON.stringify(
+                                        x['kwargs']['tool_calls'],
+                                      )}
+                                      <small className="">
+                                        {JSON.stringify(x['kwargs'].content)}
+                                      </small>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            }
+                            title="Input Message History"
+                            trigger="click"
+                          >
+                            <Button
+                              type="text"
+                              icon={<FaHistory></FaHistory>}
+                            ></Button>
+                          </Popover>
+                        )}
                         <Button
                           type="text"
                           icon={<FaTrashAlt></FaTrashAlt>}
@@ -381,7 +419,17 @@ const ChatMessageBox = React.forwardRef(
 
                       {value.role == 'assistant' && (
                         <div className="flex flex-row gap-2 items-center text-xs font-medium text-gray-400">
-                          <span>tokens: {value.total_tokens} </span>
+                          <span className="flex flex-row gap-1 whitespace-nowrap">
+                            tokens: {value.total_tokens}{' '}
+                            <div className="flex flex-row items-center">
+                              <FaAngleUp />
+                              {value.input_tokens}
+                            </div>{' '}
+                            <div className="flex flex-row items-center">
+                              <FaAngleDown />
+                              {value.output_tokens}
+                            </div>
+                          </span>
                           {value.time_cost && (
                             <div className="flex flex-row gap-1 items-center">
                               <FaClock />

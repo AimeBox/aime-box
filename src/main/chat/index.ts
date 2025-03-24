@@ -82,6 +82,8 @@ import { isArray, isString } from '../utils/is';
 
 export interface ChatInfo extends Chat {
   totalToken?: number;
+  inputToken?: number;
+  outputToken?: number;
   status: string;
 }
 
@@ -363,6 +365,12 @@ export class ChatManager {
       status: this.runningTasks.has(chatId) ? 'running' : 'idle',
       totalToken: res.chatMessages
         .map((x) => x.total_tokens)
+        .reduce((acc, curr) => acc + curr, 0),
+      inputToken: res.chatMessages
+        .map((x) => x.input_tokens)
+        .reduce((acc, curr) => acc + curr, 0),
+      outputToken: res.chatMessages
+        .map((x) => x.output_tokens)
         .reduce((acc, curr) => acc + curr, 0),
     };
     return output;
