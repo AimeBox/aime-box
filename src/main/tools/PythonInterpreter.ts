@@ -179,7 +179,7 @@ export class PythonInterpreterTool extends BaseTool {
       await new Promise((resolve) => setTimeout(resolve, 5000));
       if (isFile) {
         const res = await runCommand(
-          `${this.pythonPath} ${pythonScriptFilePath}`,
+          `"${this.pythonPath}" "${pythonScriptFilePath}"`,
         );
         if (res.toString().trim() == '') {
           return 'you should use print() in script!';
@@ -205,6 +205,7 @@ export class PythonInterpreterTool extends BaseTool {
     } finally {
       if (!this.keepVenv && tempDir && fs.existsSync(tempDir)) {
         fs.rmSync(tempDir, { recursive: true });
+        console.log(`remove temp dir: ${tempDir}`);
       }
     }
     return null;

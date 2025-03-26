@@ -31,7 +31,7 @@ export default function AboutPage() {
                 children: (
                   <pre>
                     {Object.keys(appInfo).map((key) => (
-                      <div key={key}>
+                      <div key={key} className="whitespace-pre-wrap break-all">
                         <strong>{key}</strong>: {appInfo[key]?.toString()}
                       </div>
                     ))}

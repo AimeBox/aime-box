@@ -166,6 +166,7 @@ export default function Connections() {
     });
     const models = await window.electron.providers.getModels(data.id);
     setModels(models);
+    console.log(models);
     setCurrentData(data);
     formModels.resetFields();
     formModels.setFieldsValue({ models: models });
@@ -174,6 +175,7 @@ export default function Connections() {
   };
   const onSubmitModels = async (data: Providers) => {
     const models = formModels.getFieldValue('models');
+    console.log(models);
     data.models = models;
     await window.electron.providers.createOrUpdate(data);
     setOpenModels(false);
@@ -408,22 +410,20 @@ export default function Connections() {
                 {(fields, { add, remove }, { errors }) => (
                   <>
                     {fields.map((field, index) => (
-                      <div
-                        className="flex flex-row justify-between mb-2"
-                        key={field.key}
-                      >
-                        <Form.Item
-                          noStyle
-                          name={[field.name, 'name']}
-                          shouldUpdate
-                        >
+                      <div className="flex flex-col  mb-2" key={field.key}>
+                        <div className="flex flex-row justify-between">
+                          <Form.Item
+                            noStyle
+                            name={[field.name, 'name']}
+                            shouldUpdate
+                          >
                           <div>
                             {
                               formModels.getFieldValue('models')[field.name]
                                 .name
                             }
                           </div>
-                        </Form.Item>
+                          </Form.Item>
 
                         <Form.Item
                           noStyle
@@ -432,6 +432,35 @@ export default function Connections() {
                         >
                           <Switch />
                         </Form.Item>
+                        </div>
+                        <div className="w-full">
+                          <Form.Item
+                                  noStyle
+                                  name={[field.name, 'input_token']}
+
+                                >
+                                  <Input
+                                    placeholder="Input Token"
+                                    size="small"
+                                    addonAfter="/1M token"
+                                    className="w-[200px]"
+                                  />
+                                </Form.Item>
+
+
+                                <Form.Item
+                                  noStyle
+                                  name={[field.name, 'output_token']}
+
+                                >
+                                <Input
+                                  placeholder="Ouput Token"
+                                  size="small"
+                                  addonAfter="/1M token"
+                                  className="w-[200px]"
+                                />
+                                </Form.Item>
+                        </div>
                       </div>
                     ))}
                   </>
