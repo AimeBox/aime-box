@@ -32,9 +32,11 @@ export const runCommand = async (
     if (_file == 'cmd.exe') {
       commands.push(_file);
       commands.push('/c');
+      commands.push(`"${command}"`);
+    } else {
+      commands.push(command);
     }
 
-    commands.push(command);
     // const cmd = spawn(commands.join(' ')); // /c 执行后关闭窗口；/k 是保持窗口打开
 
     // cmd.stdout.on('data', (data) => {

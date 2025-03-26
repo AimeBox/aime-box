@@ -178,6 +178,7 @@ export class PythonInterpreterTool extends BaseTool {
 
       await new Promise((resolve) => setTimeout(resolve, 5000));
       if (isFile) {
+        console.log(`"${this.pythonPath}" "${pythonScriptFilePath}"`);
         const res = await runCommand(
           `"${this.pythonPath}" "${pythonScriptFilePath}"`,
         );
