@@ -56,6 +56,16 @@ export default function DefaultModelSettings() {
           />
         </div>
         <div className="flex flex-col gap-2">
+          <div className="font-semibold">{t('settings.defaultVision')}</div>
+          <ProviderSelect
+            type="llm"
+            value={settings?.defaultVision}
+            allowClear
+            style={{ width: 200 }}
+            onChange={(v) => onChangeDefaultModel('defaultVision', v)}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
           <div className="font-semibold">{t('settings.defaultEmbedding')}</div>
           <ProviderSelect
             type="embedding"

@@ -154,5 +154,8 @@
     "tools": "Tools",
     "agent": "Agent",
     "home": "Home"
+  },
+  "settings": {
+    "defaultVision": "Default Vision"
   }
 }

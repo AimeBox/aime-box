@@ -14,6 +14,7 @@ import {
   Space,
   Button,
   Divider,
+  InputNumber,
 } from 'antd';
 import { useEffect, useState } from 'react';
 import {
@@ -22,6 +23,10 @@ import {
   FaTrashAlt,
   FaServer,
   FaDatabase,
+  FaMoneyBill,
+  FaMoneyCheck,
+  FaAngleUp,
+  FaAngleDown,
 } from 'react-icons/fa';
 import { LineChartOutlined, LoadingOutlined } from '@ant-design/icons';
 
@@ -45,6 +50,7 @@ export default function Connections() {
   const [messageApi, contextHolder] = message.useMessage();
   const [form] = Form.useForm();
   const [formModels] = Form.useForm();
+  const formModelsValue = Form.useWatch('models', formModels);
 
   const getData = async () => {
     try {
@@ -410,56 +416,59 @@ export default function Connections() {
                 {(fields, { add, remove }, { errors }) => (
                   <>
                     {fields.map((field, index) => (
-                      <div className="flex flex-col  mb-2" key={field.key}>
-                        <div className="flex flex-row justify-between">
+                      <div className="flex flex-col mb-2" key={field.key}>
+                        <div className="flex flex-row justify-between group">
                           <Form.Item
                             noStyle
-                            name={[field.name, 'name']}
+                            //name={[field.name, 'name']}
                             shouldUpdate
                           >
-                          <div>
-                            {
-                              formModels.getFieldValue('models')[field.name]
-                                .name
-                            }
-                          </div>
-                          </Form.Item>
-
-                        <Form.Item
-                          noStyle
-                          name={[field.name, 'enable']}
-                          valuePropName="checked"
-                        >
-                          <Switch />
-                        </Form.Item>
-                        </div>
-                        <div className="w-full">
-                          <Form.Item
+                            <div>
+                              <div className="font-bold">
+                                {
+                                  formModels.getFieldValue('models')[field.name]
+                                    .name
+                                }
+                              </div>
+                              <div className="flex flex-row gap-2 w-full">
+                                <Form.Item
                                   noStyle
                                   name={[field.name, 'input_token']}
-
                                 >
-                                  <Input
+                                  <InputNumber
+                                    controls={false}
+                                    prefix={<FaAngleUp />}
                                     placeholder="Input Token"
                                     size="small"
-                                    addonAfter="/1M token"
-                                    className="w-[200px]"
+                                    suffix="/ 1M token"
+                                    className="w-full text-gray-400"
                                   />
                                 </Form.Item>
-
 
                                 <Form.Item
                                   noStyle
                                   name={[field.name, 'output_token']}
-
                                 >
-                                <Input
-                                  placeholder="Ouput Token"
-                                  size="small"
-                                  addonAfter="/1M token"
-                                  className="w-[200px]"
-                                />
+                                  <InputNumber
+                                    controls={false}
+                                    prefix={<FaAngleDown />}
+                                    placeholder="Ouput Token"
+                                    size="small"
+                                    suffix="/ 1M token"
+                                    className="w-full text-gray-400"
+                                  />
                                 </Form.Item>
+                              </div>
+                            </div>
+                          </Form.Item>
+
+                          <Form.Item
+                            noStyle
+                            name={[field.name, 'enable']}
+                            valuePropName="checked"
+                          >
+                            <Switch />
+                          </Form.Item>
                         </div>
                       </div>
                     ))}

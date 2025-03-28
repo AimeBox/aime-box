@@ -126,7 +126,8 @@
     },
     "settings": "设置",
     "localModelPath": "本地模型存放目录",
-    "huggingfaceUrl": "HuggingfaceUrl"
+    "huggingfaceUrl": "HuggingfaceUrl",
+    "defaultVision": "默认视觉模型"
   },
   "knowledgebase": {
     "create_knowledgebase": "创建知识库",

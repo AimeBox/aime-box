@@ -96,6 +96,11 @@ export class ProvidersManager {
             name: x.name,
             enable:
               connection.models.find((z) => z.name == x.name)?.enable || false,
+            input_token:
+              connection.models.find((z) => z.name == x.name)?.input_token || 0,
+            output_token:
+              connection.models.find((z) => z.name == x.name)?.output_token ||
+              0,
           };
         });
       } else if (connection.type === ProviderType.OPENAI) {
@@ -214,6 +219,8 @@ export class ProvidersManager {
               name: x.id,
               enable:
                 connection.models?.find((z) => z.name == x.id)?.enable || false,
+              input_token: ((x.pricing?.prompt ?? 0) * 1000000).toFixed(2),
+              output_token: ((x.pricing?.completion ?? 0) * 1000000).toFixed(2),
             };
           })
           .sort((a, b) => a.name.localeCompare(b.name));
@@ -257,6 +264,11 @@ export class ProvidersManager {
               name: x.id,
               enable:
                 connection.models?.find((z) => z.name == x.id)?.enable || false,
+              input_token:
+                connection.models.find((z) => z.name == x.id)?.input_token || 0,
+              output_token:
+                connection.models.find((z) => z.name == x.id)?.output_token ||
+                0,
             };
           })
           .sort((a, b) => a.name.localeCompare(b.name));

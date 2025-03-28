@@ -49,6 +49,7 @@ export interface GlobalSettings {
   defaultTTS: string | null;
   defaultSTT: string | null;
   defaultReranker: string | null;
+  defaultVision: string | null;
   defaultWebSearchEngine: string | null;
   webSearchEngine: {
     zhipu: {
@@ -90,6 +91,7 @@ class SettingsManager {
     defaultSTT: null,
     defaultReranker: null,
     defaultWebSearchEngine: null,
+    defaultVision: null,
     webSearchEngine: {
       zhipu: { apiKey: null },
       searxng: { apiBase: null },
@@ -470,29 +472,30 @@ class SettingsManager {
         if (filename.endsWith('.tar.bz2')) {
           await new Promise<null>((resolve, reject) => {
             if (platform == 'darwin' || platform == 'linux') {
-              exec(`tar -xvjf ${path.join(`${dir}.tmp`, filename)} -C ${path.join(`${dir}.tmp`, '..')}`, (error, stdout, stderr) => {
+              exec(
+                `tar -xvjf ${path.join(`${dir}.tmp`, filename)} -C ${path.join(`${dir}.tmp`, '..')}`,
+                (error, stdout, stderr) => {
                   if (error) {
-                      console.error(`执行出错: ${error}`);
-                      reject(error);
-                      return;
+                    console.error(`执行出错: ${error}`);
+                    reject(error);
+                    return;
                   }
                   console.log(`stdout: ${stdout}`);
                   console.log('解压完成');
                   resolve(null);
-              });
-
-            } else if(platform == 'win32'){
+                },
+              );
+            } else if (platform == 'win32') {
               fs.createReadStream(path.join(`${dir}.tmp`, filename))
-              .pipe(bz2())
-              .pipe(tar.x({ C: path.join(`${dir}.tmp`, '..') }))
-              .on('error', (err) => {
-                reject(err);
-              })
-              .on('finish', () => {
-                resolve(null);
-              });
+                .pipe(bz2())
+                .pipe(tar.x({ C: path.join(`${dir}.tmp`, '..') }))
+                .on('error', (err) => {
+                  reject(err);
+                })
+                .on('finish', () => {
+                  resolve(null);
+                });
             }
-
           });
 
           fs.rmSync(`${dir}.tmp`, { recursive: true });

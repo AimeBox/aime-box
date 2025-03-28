@@ -11,6 +11,7 @@ import {
   Popover,
   Select,
   Space,
+  Splitter,
   Tag,
 } from 'antd';
 import {
@@ -198,7 +199,6 @@ export default function Tools() {
           value.value,
           'markdown',
         );
-
         console.log(res);
         if (isString(res)) {
           output = res;
@@ -557,157 +557,162 @@ export default function Tools() {
             </div>
           )}
         </List>
-        <div className="flex flex-row flex-1 p-4 w-full min-w-0 h-full">
-          {selectedFilterTag == 'built-in' && (
-            <ScrollArea className="flex-1">
-              {currentTool && (
-                <div className="flex flex-col flex-1 w-full">
-                  <div className="flex justify-between items-start py-4 border-b border-gray-200">
-                    <div className="ml-3 grow">
-                      <div className="space-x-1 h-6 text-xl font-semibold">
-                        {currentTool?.name}
-                      </div>
-                      <div className="mt-2 text-sm font-normal text-gray-500 whitespace-pre-wrap">
-                        {currentTool?.description}
-                      </div>
-                      {currentTool?.officialLink && (
-                        <div className="text-sm">
-                          <a href={currentTool?.officialLink}>
-                            {currentTool?.officialLink}
-                          </a>
+        <Splitter className="flex flex-row h-full">
+          <Splitter.Panel min={360}>
+            <div className="flex flex-row flex-1 p-4 w-full min-w-0 h-full">
+              {selectedFilterTag == 'built-in' && (
+                <ScrollArea className="flex-1">
+                  {currentTool && (
+                    <div className="flex flex-col flex-1 w-full">
+                      <div className="flex justify-between items-start py-4 border-b border-gray-200">
+                        <div className="ml-3 grow">
+                          <div className="space-x-1 h-6 text-xl font-semibold">
+                            {currentTool?.name}
+                          </div>
+                          <div className="mt-2 text-sm font-normal text-gray-500 whitespace-pre-wrap">
+                            {currentTool?.description}
+                          </div>
+                          {currentTool?.officialLink && (
+                            <div className="text-sm">
+                              <a href={currentTool?.officialLink}>
+                                {currentTool?.officialLink}
+                              </a>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col p-4">
-                    <BasicForm
-                      loading={invoking}
-                      ref={toolTestFormRef}
-                      schemas={toolInvokeSchemas}
-                      layout="vertical"
-                      onFinish={async (value) => {
-                        invoke(value);
-                      }}
-                    />
+                      </div>
+                      <div className="flex flex-col p-4">
+                        <BasicForm
+                          loading={invoking}
+                          ref={toolTestFormRef}
+                          schemas={toolInvokeSchemas}
+                          layout="vertical"
+                          onFinish={async (value) => {
+                            invoke(value);
+                          }}
+                        />
 
-                    {/* <Form
+                        {/* <Form
                   schema={toolInvokeSchemas}
                   validator={validator}
                   onSubmit={onOk}
                   className="dark:text-gray-200"
                   // style={{ color: 'rgb(229 231 235 / var(--tw-text-opacity))' }}
                 /> */}
-                    {/* <Button onClick={invoke}>invoke</Button> */}
-                  </div>
-                </div>
-              )}
-            </ScrollArea>
-          )}
-          {selectedFilterTag == 'mcp' && (
-            <ScrollArea className="flex-1">
-              {currentMcp && (
-                <div className="flex flex-col flex-1 w-full">
-                  <div className="flex justify-between items-start py-4 border-b border-gray-200">
-                    <div className="ml-3 grow">
-                      <div className="flex flex-row justify-between space-x-1 h-6 text-xl font-semibold">
-                        {currentMcp?.name}
-
-                        <div className="flex flex-row flex-1 gap-2 justify-end mr-4">
-                          <Button
-                            type="text"
-                            icon={<FaArrowRotateLeft />}
-                            onClick={() => {
-                              onRefreshMcp(currentMcp);
-                            }}
-                          ></Button>
-                          <Button
-                            type="text"
-                            icon={<FaEdit />}
-                            onClick={() => {
-                              onOpenAddMcp(currentMcp);
-                            }}
-                          ></Button>
-                          <Popconfirm
-                            title="Are you sure to delete this tool?"
-                            onConfirm={() => {
-                              onDeleteMcp(currentMcp);
-                            }}
-                          >
-                            <Button
-                              type="text"
-                              icon={<FaTrash />}
-                              danger
-                            ></Button>
-                          </Popconfirm>
-                        </div>
-                      </div>
-                      <div className="mt-2 text-sm font-normal text-gray-500 whitespace-pre-wrap">
-                        {currentMcp?.command}
+                        {/* <Button onClick={invoke}>invoke</Button> */}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-2 p-4">
-                    {currentMcp.tools.length > 0 && (
-                      <Collapse
-                        items={currentMcp.tools.map((item, index) => {
-                          return {
-                            key: item.name,
-                            label: (
-                              <div className="flex flex-col">
-                                <strong>{item.name}</strong>
-                                <small>{item.description}</small>
-                              </div>
-                            ),
-
-                            children: (
-                              <BasicForm
-                                //loading={invoking}
-                                ref={toolTestFormRef[item.name]}
-                                schemas={converFormSchemas(item)}
-                                layout="vertical"
-                                onFinish={async (value) => {
-                                  invoke({
-                                    mcpToolName: item.name,
-                                    value: {
-                                      ...value,
-                                    },
-                                  });
-                                }}
-                              />
-                            ),
-                          };
-                        })}
-                      ></Collapse>
-                    )}
-                  </div>
-                </div>
+                  )}
+                </ScrollArea>
               )}
-            </ScrollArea>
-          )}
+              {selectedFilterTag == 'mcp' && (
+                <ScrollArea className="flex-1">
+                  {currentMcp && (
+                    <div className="flex flex-col flex-1 w-full">
+                      <div className="flex justify-between items-start py-4 border-b border-gray-200">
+                        <div className="ml-3 grow">
+                          <div className="flex flex-row justify-between space-x-1 h-6 text-xl font-semibold">
+                            {currentMcp?.name}
 
-          <ScrollArea
-            className="w-[400px] ml-2 border border-gray-200 rounded-2xl"
-            dir="ltr"
-          >
-            <div className="flex flex-col h-full">
-              <div className="px-4 mt-4 w-full">
-                {isArray(invokeOutput) && (
-                  <div>
-                    {invokeOutput.map((item, index) => {
-                      return <ResponseCard key={index} value={item} />;
-                    })}
-                  </div>
-                )}
-                {isString(invokeOutput) && (
-                  <>
-                    {/* <pre>{invokeOutput}</pre> */}
-                    <ResponseCard value={invokeOutput} />
-                  </>
-                )}
-              </div>
+                            <div className="flex flex-row flex-1 gap-2 justify-end mr-4">
+                              <Button
+                                type="text"
+                                icon={<FaArrowRotateLeft />}
+                                onClick={() => {
+                                  onRefreshMcp(currentMcp);
+                                }}
+                              ></Button>
+                              <Button
+                                type="text"
+                                icon={<FaEdit />}
+                                onClick={() => {
+                                  onOpenAddMcp(currentMcp);
+                                }}
+                              ></Button>
+                              <Popconfirm
+                                title="Are you sure to delete this tool?"
+                                onConfirm={() => {
+                                  onDeleteMcp(currentMcp);
+                                }}
+                              >
+                                <Button
+                                  type="text"
+                                  icon={<FaTrash />}
+                                  danger
+                                ></Button>
+                              </Popconfirm>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-sm font-normal text-gray-500 whitespace-pre-wrap">
+                            {currentMcp?.command}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 p-4">
+                        {currentMcp.tools.length > 0 && (
+                          <Collapse
+                            items={currentMcp.tools.map((item, index) => {
+                              return {
+                                key: item.name,
+                                label: (
+                                  <div className="flex flex-col">
+                                    <strong>{item.name}</strong>
+                                    <small>{item.description}</small>
+                                  </div>
+                                ),
+
+                                children: (
+                                  <BasicForm
+                                    loading={invoking}
+                                    ref={toolTestFormRef[item.name]}
+                                    schemas={converFormSchemas(item)}
+                                    layout="vertical"
+                                    onFinish={async (value) => {
+                                      invoke({
+                                        mcpToolName: item.name,
+                                        value: {
+                                          ...value,
+                                        },
+                                      });
+                                    }}
+                                  />
+                                ),
+                              };
+                            })}
+                          ></Collapse>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </ScrollArea>
+              )}
             </div>
-          </ScrollArea>
-        </div>
+          </Splitter.Panel>
+          <Splitter.Panel min={360}>
+            <ScrollArea className="w-full h-full" dir="ltr">
+              <div
+                className="flex flex-col h-full"
+                style={{ wordBreak: 'break-all' }}
+              >
+                <div className="px-4 mt-4 w-full">
+                  {isArray(invokeOutput) && (
+                    <div>
+                      {invokeOutput.map((item, index) => {
+                        return <ResponseCard key={index} value={item} />;
+                      })}
+                    </div>
+                  )}
+                  {isString(invokeOutput) && (
+                    <>
+                      {/* <pre>{invokeOutput}</pre> */}
+                      <ResponseCard value={invokeOutput} />
+                    </>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+          </Splitter.Panel>
+        </Splitter>
       </div>
     </Content>
   );
