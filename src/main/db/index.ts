@@ -5,7 +5,7 @@ import { DataSource } from 'typeorm';
 import path from 'path';
 import Settings from '../../entity/Settings';
 import { Providers } from '../../entity/Providers';
-import { Chat, ChatFile, ChatMessage } from '../../entity/Chat';
+import { Chat, ChatFile, ChatMessage, ChatPlanner } from '../../entity/Chat';
 import { KnowledgeBase, KnowledgeBaseItem } from '../../entity/KnowledgeBase';
 import { TypeormSaver } from './TypeormSaver';
 import {
@@ -35,9 +35,11 @@ export class DBManager {
       entities: [
         Settings,
         Providers,
-        Chat,
+
         ChatMessage,
         ChatFile,
+        ChatPlanner,
+        Chat,
         KnowledgeBase,
         KnowledgeBaseItem,
         LanggraphCheckPoints,

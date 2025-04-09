@@ -295,6 +295,7 @@ export default function ChatContent() {
         image: dataUrl,
       });
     } catch (err) {
+      message.error('Export image failed');
       console.error(err);
     }
   };

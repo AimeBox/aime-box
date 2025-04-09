@@ -11,6 +11,7 @@ import { CompiledStateGraph, StateGraph } from '@langchain/langgraph';
 import { v4 as uuidv4 } from 'uuid';
 import { notificationManager } from '../app/NotificationManager';
 import { isArray } from '../utils/is';
+import { EventEmitter } from 'events';
 
 export const runAgent = async (
   agent: any,
@@ -26,6 +27,7 @@ export const runAgent = async (
       handlerMessageStream?: (message: BaseMessage) => Promise<void>;
       handlerMessageError?: (message: BaseMessage) => Promise<void>;
       handlerMessageFinished?: (message: BaseMessage) => Promise<void>;
+      handlerCustomMessage?: (message?: any) => Promise<void>;
     };
   },
 ) => {
@@ -66,13 +68,18 @@ export const runAgent = async (
   });
   let _lastMessage;
   try {
+    const configurable = {
+      thread_id: uuidv4(),
+      ...(options?.configurable || {}),
+    };
     const eventStream = await agent.streamEvents(
       { messages, current_time: new Date().toISOString() },
       {
         version: 'v2',
         signal: options?.signal,
         recursionLimit: options?.recursionLimit,
-        configurable: { thread_id: uuidv4(), ...(options?.configurable || {}) },
+        configurable,
+        subgraphs: true,
       },
     );
     let _toolCalls = [];
@@ -80,6 +87,7 @@ export const runAgent = async (
     const _messages = [];
     for await (const { event, tags, data } of eventStream) {
       if (tags.includes('ignore')) {
+        // console.log(event, tags, data);
         continue;
       }
       if (event == 'on_chat_model_start') {
@@ -216,9 +224,11 @@ export const runAgent = async (
             await options?.callbacks?.handlerMessageFinished?.(msg);
           }
         }
+      } else if (event == 'on_custom_event') {
+        console.log('on_custom_event', data);
       } else {
+        console.log(event, tags, data);
       }
-      console.log(event, tags, data);
     }
   } catch (err) {
     if (_lastMessage) {

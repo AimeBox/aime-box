@@ -135,7 +135,7 @@ export class PythonInterpreterTool extends BaseTool {
       }
       let isSuccess = false;
       console.log('check python virtual environment');
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 10; i++) {
         try {
           const res = await runCommand(`"${this.pythonPath}" -V`);
           console.log(res);

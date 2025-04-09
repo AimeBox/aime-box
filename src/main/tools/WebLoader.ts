@@ -22,13 +22,9 @@ export interface WebLoaderParameters extends ToolParams {
 }
 
 export class WebLoader extends Tool {
-  static lc_name() {
-    return 'WebLoader';
-  }
+  name: string = 'web_loader';
 
-  name: string;
-
-  description: string;
+  description: string = 'view web page';
 
   headless: boolean;
 
@@ -36,18 +32,6 @@ export class WebLoader extends Tool {
 
   constructor(params?: WebLoaderParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'web_loader',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'view web page',
-    });
     Object.defineProperty(this, 'headless', {
       enumerable: true,
       configurable: true,

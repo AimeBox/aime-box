@@ -14,7 +14,7 @@ import {
   GoogleRoutesAPI,
   GoogleRoutesAPIParams,
 } from '@langchain/community/tools/google_routes';
-import { CmdTool } from './CmdTool';
+import { TerminateTool } from './TerminateTool';
 import { DateTimeTool } from './DateTimeTool';
 import 'reflect-metadata';
 import settingsManager from '../settings';
@@ -47,7 +47,14 @@ import { PythonInterpreterTool } from './PythonInterpreter';
 import { DallE } from './DallE';
 import { AskHuman } from './AskHuman';
 import { Ideogram } from './Ideogram';
-import { FileRead, FileWrite, ListDirectory } from './FileSystemTool';
+import {
+  CreateDirectory,
+  FileRead,
+  FileWrite,
+  ListDirectory,
+  MoveFile,
+  SearchFiles,
+} from './FileSystemTool';
 import { Midjourney } from './Midjourney';
 import { TextToSpeech } from './TextToSpeech';
 import { ComfyuiTool } from './ComfyuiTool';
@@ -75,6 +82,8 @@ import { runCommand } from '../utils/exec';
 import { Translate } from './Translate';
 import { TavilySearchTool } from './TavilySearch';
 import { UnixTimestampConvert } from './UnixTimestamp';
+import { BrowserUseTool } from './BrowserUse';
+import { Vision } from './Vision';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -505,12 +514,14 @@ export class ToolsManager {
     this.tools = [];
 
     // await this.registerTool(new CmdTool());
+    await this.registerTool(BrowserUseTool);
     await this.registerTool(ChartjsTool);
-    await this.registerTool(CmdTool);
+    await this.registerTool(TerminateTool);
     await this.registerTool(Calculator);
     await this.registerTool(DateTimeTool);
     await this.registerTool(Translate);
     await this.registerTool(UnixTimestampConvert);
+    await this.registerTool(Vision);
     // await this.registerTool(SearchApi, { apiKey: 'NULL' });
     // await this.registerTool(TavilySearchResults, {
     //   apiKey: 'NULL',
@@ -580,6 +591,10 @@ export class ToolsManager {
     await this.registerTool(FileWrite);
     await this.registerTool(FileRead);
     await this.registerTool(ListDirectory);
+    await this.registerTool(CreateDirectory);
+    await this.registerTool(SearchFiles);
+    await this.registerTool(MoveFile);
+
     await this.registerTool(TextToSpeech, {
       model: 'matcha-icefall-zh-baker@local',
     });
@@ -735,26 +750,26 @@ export class ToolsManager {
       try {
         const { tools } = await mcpClient.listTools();
         ts.id = serverName;
-        const _tools = await this.toolRepository.find({
-          where: { mcp_id: serverName },
-        });
-        if (_tools.length > 0) {
-          await this.toolRepository.delete(_tools.map((x) => x.name));
-        }
-        let toolList = [];
-        for (const tool of tools) {
-          let t = new Tools(
-            `${tool.name}@${ts.id}`,
-            tool.description,
-            'mcp',
-            {},
-          );
-          t.enabled = true;
-          t.mcp_id = ts.id;
-          t.toolkit_name = data.name;
-          toolList.push(t);
-        }
-        await this.toolRepository.save(toolList);
+        // const _tools = await this.toolRepository.find({
+        //   where: { mcp_id: serverName },
+        // });
+        // if (_tools.length > 0) {
+        //   await this.toolRepository.delete(_tools.map((x) => x.name));
+        // }
+        // let toolList = [];
+        // for (const tool of tools) {
+        //   let t = new Tools(
+        //     `${tool.name}@${ts.id}`,
+        //     tool.description,
+        //     'mcp',
+        //     {},
+        //   );
+        //   t.enabled = true;
+        //   t.mcp_id = ts.id;
+        //   t.toolkit_name = data.name;
+        //   toolList.push(t);
+        // }
+        // await this.toolRepository.save(toolList);
         await mcpClient.close();
         ts.enabled = true;
       } catch (err) {
@@ -826,10 +841,22 @@ export class ToolsManager {
   };
 
   public refreshMcp = async (mcpServer: McpServers): Promise<McpServerInfo> => {
-    this.mcpServerInfos = this.mcpServerInfos.filter(
-      (x) => x.id != mcpServer.id,
+    let mcpServerInfo = this.mcpServerInfos.find((x) => x.id == mcpServer.id);
+    if (mcpServerInfo) {
+      this.mcpServerInfos = this.mcpServerInfos.filter(
+        (x) => x.id != mcpServer.id,
+      );
+    }
+
+    const mcpClient = this.mcpClients.find(
+      (x) => x.getServerVersion().name == mcpServer.id,
     );
-    let mcpServerInfo;
+    if (mcpClient) {
+      await mcpClient.close();
+      this.mcpClients = this.mcpClients.filter(
+        (x) => x.getServerVersion().name != mcpServer.id,
+      );
+    }
     if (!mcpServer.enabled) {
       mcpServerInfo = {
         ...mcpServer,
@@ -850,29 +877,49 @@ export class ToolsManager {
         const _tools = await this.toolRepository.find({
           where: { mcp_id: mcpServer.id, type: 'mcp' },
         });
-
-        for (const tool of _tools) {
-          const mcpTool = _mcpTools.find(
-            (x) => x.name == tool.name.split('@')[0],
+        if (_tools.length > 0) {
+          await this.toolRepository.delete(_tools.map((x) => x.name));
+        }
+        const toolList = [];
+        for (const mcpTool of _mcpTools) {
+          const t = new Tools(
+            `${mcpTool.name}@${mcpServer.id}`,
+            mcpTool.description,
+            'mcp',
+            {},
           );
-          const toolInfo = { ...tool } as ToolInfo;
-          toolInfo.id = tool.name;
-          toolInfo.name = mcpTool.name;
-          toolInfo.description = mcpTool.description;
+          t.enabled = true;
+          t.mcp_id = mcpServer.id;
+          t.toolkit_name = mcpServer.name;
+          toolList.push(t);
+          const toolInfo = { ...t } as ToolInfo;
           toolInfo.schema = mcpTool.inputSchema;
           toolInfos.push(toolInfo);
         }
+        await this.toolRepository.save(toolList);
+
+        // for (const tool of _tools) {
+        //   const mcpTool = _mcpTools.find(
+        //     (x) => x.name == tool.name.split('@')[0],
+        //   );
+        //   const toolInfo = { ...tool } as ToolInfo;
+        //   toolInfo.id = tool.name;
+        //   toolInfo.name = mcpTool.name;
+        //   toolInfo.description = mcpTool.description;
+        //   toolInfo.schema = mcpTool.inputSchema;
+        //   toolInfos.push(toolInfo);
+        // }
         this.mcpClients = this.mcpClients.filter(
           (x) => x.getServerVersion().name != mcpServer.id,
         );
         this.mcpClients.push(client);
         mcpServer.version = client.getServerVersion().version;
         await this.mcpServerRepository.save(mcpServer);
-        console.log('loaded success ' + mcpServer.id);
+        console.log(`loaded success ${mcpServer.id}`);
       } catch (err) {
         mcpServer.enabled = false;
         await this.mcpServerRepository.save(mcpServer);
-        console.error('loaded failed ' + mcpServer.id, err);
+        console.error(`loaded failed ${mcpServer.id}`, err);
       }
 
       mcpServerInfo = { ...mcpServer, tools: toolInfos };

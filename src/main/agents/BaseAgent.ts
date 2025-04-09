@@ -5,6 +5,8 @@ import { z, ZodObject } from 'zod';
 import { dbManager } from '../db';
 import { Agent } from '@/entity/Agent';
 import { removeEmptyValues } from '../utils/common';
+import { BaseStore } from '@langchain/langgraph';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 export abstract class BaseAgent extends Tool {
   abstract name: string;
@@ -68,7 +70,7 @@ export abstract class BaseAgent extends Tool {
     return { ...(this.config || {}), ...config };
   }
 
-  abstract createAgent(): Promise<any>;
+  abstract createAgent(store?: BaseStore, model?: BaseChatModel): Promise<any>;
 
   // abstract invoke(input: z.infer<typeof this.schema> | string): Promise<any>;
 }

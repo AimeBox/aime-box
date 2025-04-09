@@ -38,6 +38,7 @@ import { FaArrowRotateLeft, FaRegMessage } from 'react-icons/fa6';
 import { t } from 'i18next';
 import { ListItem } from '../components/common/ListItem';
 import { cat } from '@huggingface/transformers';
+import { MultiServerMCPClient } from '@langchain/mcp-adapters';
 
 export default function Tools() {
   const [open, setOpen] = useState(false);
@@ -195,7 +196,7 @@ export default function Tools() {
       if (currentMcp) {
         isInvoking(true);
         const res = await window.electron.tools.invoke(
-          `${value.mcpToolName}@${currentMcp.id}`,
+          `${value.mcpToolName}`,
           value.value,
           'markdown',
         );
@@ -417,9 +418,15 @@ export default function Tools() {
     }
   };
 
-  const onDeleteMcp = (item: McpServerInfo) => {
-    window.electron.tools.deleteMcp(item.id);
-    getMcps();
+  const onDeleteMcp = async (item: McpServerInfo) => {
+    try {
+      await window.electron.tools.deleteMcp(item.id);
+      await getMcps();
+      setCurrentMcp(undefined);
+      message.success('Delete MCP server success');
+    } catch (err) {
+      message.error(err.message);
+    }
   };
 
   return (
@@ -656,7 +663,7 @@ export default function Tools() {
                                 key: item.name,
                                 label: (
                                   <div className="flex flex-col">
-                                    <strong>{item.name}</strong>
+                                    <strong>{item.name.split('@')[0]}</strong>
                                     <small>{item.description}</small>
                                   </div>
                                 ),

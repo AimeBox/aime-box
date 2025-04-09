@@ -7,6 +7,8 @@ import {
   ManyToOne,
   RelationOptions,
   JoinColumn,
+  OneToOne,
+  OneOrMore,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { ChatInputAttachment, ChatMode } from '@/types/chat';
@@ -37,6 +39,30 @@ export class ChatOptions {
   streaming?: boolean = true;
 
   format?: string;
+}
+
+export interface IChatPlannerPlanStep {
+  agent: string;
+  id: number;
+  description: string;
+  status: string;
+  note: string;
+}
+
+export interface IChatPlannerPlan {
+  title: string;
+  steps: IChatPlannerPlanStep[];
+  thought: string;
+}
+
+export interface IChatPlanner {
+  id: string;
+
+  chatId: string;
+
+  task?: string;
+
+  plans?: IChatPlannerPlan[];
 }
 
 export enum ChatStatus {
@@ -88,6 +114,9 @@ export class Chat {
   @OneToMany((type) => ChatFile, (chatFile) => chatFile.chat) // note: we will create author property in the Photo class below
   chatFiles?: ChatFile[];
 
+  @OneToOne((type) => ChatPlanner, (chatPlanner) => chatPlanner.chat) // note: we will create author property in the Photo class below
+  chatPlanner?: IChatPlanner;
+
   @Column('json', { nullable: true })
   options?: any;
 
@@ -138,7 +167,7 @@ export class ChatMessage {
   @Column({ nullable: false })
   chatId!: string;
 
-  @ManyToOne((type) => Chat, (chat) => chat.chatMessages, {
+  @ManyToOne(() => Chat, (chat: any) => chat.chatMessages, {
     nullable: false,
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
@@ -229,7 +258,7 @@ export class ChatFile {
   @Column({ nullable: false })
   chatId!: string;
 
-  @ManyToOne((type) => Chat, (chat) => chat.chatFiles, {
+  @ManyToOne(() => Chat, (chat: any) => chat.chatFiles, {
     nullable: false,
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
@@ -245,4 +274,32 @@ export class ChatFile {
 
   @Column('json', { nullable: true })
   additional_kwargs?: any;
+}
+
+@Entity('chat_planner')
+export class ChatPlanner implements IChatPlanner {
+  constructor(id?: string, chatId?: string) {
+    this.id = id || uuidv4();
+    this.chatId = chatId;
+  }
+
+  @PrimaryColumn()
+  id!: string;
+
+  @Column({ nullable: false })
+  chatId!: string;
+
+  @OneToOne(() => Chat, (chat) => chat.chatPlanner, {
+    nullable: false,
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  } as RelationOptions)
+  @JoinColumn()
+  chat!: Chat;
+
+  @Column({ nullable: true, type: 'json' })
+  plans?: any;
+
+  @Column({ nullable: true })
+  task?: string;
 }

@@ -34,6 +34,7 @@ import {
   ChatFile,
   ChatMessage,
   ChatOptions,
+  ChatPlanner,
   ChatStatus,
 } from '../../entity/Chat';
 import { Providers } from '../../entity/Providers';
@@ -76,7 +77,15 @@ import { Agent } from '@/entity/Agent';
 import { AgentExecutor } from 'langchain/agents';
 import { writeFile } from 'node:fs/promises';
 import { runAgent } from './runAgent';
-import { InMemoryStore } from '@langchain/langgraph';
+import {
+  CompiledStateGraph,
+  InMemoryStore,
+  MessagesAnnotation,
+  Pregel,
+  StateDefinition,
+  StateGraph,
+  StateType,
+} from '@langchain/langgraph';
 import { isArray, isString } from '../utils/is';
 // const repository = dbManager.dataSource.getRepository(Chat);
 
@@ -94,6 +103,8 @@ export class ChatManager {
 
   chatFileRepository: Repository<ChatFile>;
 
+  chatPlannerRepository: Repository<ChatPlanner>;
+
   chatMessageRepository: Repository<ChatMessage>;
 
   providersRepository: Repository<Providers>;
@@ -103,6 +114,8 @@ export class ChatManager {
   constructor() {
     this.chatRepository = dbManager.dataSource.getRepository(Chat);
     this.chatFileRepository = dbManager.dataSource.getRepository(ChatFile);
+    this.chatPlannerRepository =
+      dbManager.dataSource.getRepository(ChatPlanner);
     this.chatMessageRepository =
       dbManager.dataSource.getRepository(ChatMessage);
     this.providersRepository = dbManager.dataSource.getRepository(Providers);
@@ -278,7 +291,11 @@ export class ChatManager {
   }
 
   public async createChat(model: string, mode: ChatMode, agentName?: string) {
-    const data = new Chat(uuidv4(), 'New Chat', model, mode, agentName);
+    let _agentName = agentName;
+    if (mode == 'planner') {
+      _agentName = 'aime-manus';
+    }
+    const data = new Chat(uuidv4(), 'New Chat', model, mode, _agentName);
     const res = await this.chatRepository.save(data);
     return res;
   }
@@ -357,7 +374,7 @@ export class ChatManager {
   public async getChat(chatId: string): Promise<ChatInfo> {
     const res = await this.chatRepository.findOne({
       where: { id: chatId },
-      relations: { chatMessages: true, chatFiles: true },
+      relations: { chatMessages: true, chatFiles: true, chatPlanner: true },
     });
 
     const output = {
@@ -530,6 +547,7 @@ export class ChatManager {
     event(`chat:message-changed:${chatId}`, insertData);
     event(`chat:start`, chat);
     const controller = new AbortController();
+
     this.runningTasks.set(chatId, controller);
 
     const callbacks = {
@@ -613,8 +631,9 @@ export class ChatManager {
           | undefined;
         msg.time_cost = new Date().getTime() - msg.timestamp;
         msg.timestamp = new Date().getTime();
-
-        msg.setUsage(message.usage_metadata);
+        if (isAIMessage(message)) {
+          msg.setUsage(message.usage_metadata);
+        }
         await this.chatMessageRepository.manager.save(msg);
         event(`chat:message-finish:${chatId}`, msg);
         lastMesssageId = msg.id;
@@ -668,6 +687,18 @@ export class ChatManager {
             controller.signal,
           );
         }
+      } else if (chat.mode == 'planner' && chat.agent) {
+        const agent = await agentManager.getAgent(chat.agent);
+        await this.chatPlanner(agent, messages, {
+          providerModel: chat.model,
+          options: chat.options,
+          callbacks,
+          signal: controller.signal,
+          configurable: {
+            chatRootPath: this.getChatPath(chatId),
+            thread_id: chatId,
+          },
+        });
       } else {
         // 普通chat模式
         await this.chat(
@@ -971,7 +1002,11 @@ export class ChatManager {
     const { provider, modelName } = getProviderModel(agent.model);
     const providerInfo = await providersManager.getProviders();
     const providerType = providerInfo.find((x) => x.name == provider)?.type;
-    const _agent = await agentManager.buildAgent(agent);
+    const _agent = await agentManager.buildAgent({
+      agent,
+      store: new InMemoryStore(),
+      model: agent.model,
+    });
     const handlerMessageCreated = callbacks?.['handleMessageCreated'];
     //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
     const handlerMessageFinished = callbacks?.['handleMessageFinished'];
@@ -1009,7 +1044,11 @@ export class ChatManager {
     const providerType = providerInfo.find((x) => x.name == provider)?.type;
 
     const model = await getChatModel(provider, modelName, config?.options);
-    const workflow = await agentManager.buildAgent(agent, new InMemoryStore());
+    const workflow = await agentManager.buildAgent({
+      agent,
+      store: new InMemoryStore(),
+      model: config?.providerModel,
+    });
     const handlerMessageCreated = config?.callbacks?.['handleMessageCreated'];
     //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
     const handlerMessageFinished = config?.callbacks?.['handleMessageFinished'];
@@ -1056,10 +1095,11 @@ export class ChatManager {
     const tools = await toolsManager.buildTools(agent?.tools);
 
     const model = await getChatModel(provider, modelName, config?.options);
-    const reactAgent = await agentManager.buildAgent(
+    const reactAgent = await agentManager.buildAgent({
       agent,
-      new InMemoryStore(),
-    );
+      store: new InMemoryStore(),
+      model: config?.providerModel,
+    });
 
     await runAgent(reactAgent, messages, {
       signal: config?.signal,
@@ -1074,28 +1114,69 @@ export class ChatManager {
         handlerMessageError,
       },
     });
-    // try {
-    //   const eventStream = await reactAgent.streamEvents(
-    //     { messages },
-    //     {
-    //       version: 'v2',
-    //       signal,
-    //       callbacks: chatCallbacks(
-    //         modelName,
-    //         providerType,
-    //         handlerMessageCreated,
-    //         handlerMessageStream,
-    //         handlerMessageError,
-    //         handlerMessageFinished,
-    //       ),
-    //     },
-    //   );
-    //   for await (const { event, tags, data } of eventStream) {
-    //     console.log(event, tags, data);
-    //   }
-    // } catch (err) {
-    //   console.error(err);
-    // }
+  }
+
+  public async chatPlanner(
+    agent: Agent,
+    messages: BaseMessage[],
+    config: {
+      providerModel: string;
+      options?: ChatOptions | undefined;
+      callbacks?: any | undefined;
+      signal?: AbortSignal | undefined;
+      configurable?: Record<string, any> | undefined;
+    },
+  ) {
+    const handlerMessageCreated = config?.callbacks?.['handleMessageCreated'];
+    //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
+    const handlerMessageFinished = config?.callbacks?.['handleMessageFinished'];
+    const handlerMessageStream = config?.callbacks?.['handleMessageStream'];
+    const handlerMessageError = config?.callbacks?.['handleMessageError'];
+    const handlerCustomMessage = async (message?: any) => {};
+
+    const { provider, modelName } = getProviderModel(
+      config?.providerModel || agent.model,
+    );
+    const providerInfo = await providersManager.getProviders();
+    const providerType = providerInfo.find((x) => x.name == provider)?.type;
+    const tools = await toolsManager.buildTools(agent?.tools);
+
+    const model = await getChatModel(provider, modelName, config?.options);
+    const reactAgent = await agentManager.buildAgent({
+      agent,
+      store: new InMemoryStore(),
+      model: config?.providerModel,
+    });
+
+    await runAgent(reactAgent, messages, {
+      signal: config?.signal,
+      configurable: config?.configurable,
+      modelName,
+      providerType,
+      recursionLimit: agent.recursionLimit,
+      callbacks: {
+        handlerMessageCreated,
+        handlerMessageFinished,
+        handlerMessageStream,
+        handlerMessageError,
+        handlerCustomMessage,
+      },
+    });
+    const state = await reactAgent.getState({
+      configurable: config?.configurable,
+    });
+
+    let chatPlanner = await this.chatPlannerRepository.findOne({
+      where: { chatId: config?.configurable.thread_id },
+    });
+
+    if (!chatPlanner) {
+      chatPlanner = new ChatPlanner(uuidv4(), config?.configurable.thread_id);
+    }
+    chatPlanner.task = state.values.task;
+    chatPlanner.plans = state.values.plans;
+    await this.chatPlannerRepository.save(chatPlanner);
+    console.log(state);
   }
 
   public async cancelChat(chatId: string) {

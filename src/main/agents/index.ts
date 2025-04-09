@@ -14,6 +14,7 @@ import { BaseAgent } from './BaseAgent';
 import { dbManager } from '../db';
 import { Agent } from '@/entity/Agent';
 import { Tool } from '@langchain/core/tools';
+import { RunnableWithMessageHistory } from '@langchain/core/runnables';
 import { ScriptAssistant } from './script_assistant/ScriptAssistant';
 import { FormSchema } from '@/types/form';
 import { TranslateAgent } from './translate/TranslateAgent';
@@ -33,6 +34,7 @@ import {
   MemorySaver,
   StateGraph,
 } from '@langchain/langgraph';
+import { ManusAgent } from './manus/ManusAgent';
 
 export interface AgentInfo extends Agent {
   static: boolean;
@@ -51,6 +53,8 @@ export class AgentManager {
     this.registerAgent(ScriptAssistant);
     //this.registerAgent(TranslateAgent);
     this.registerAgent(PlannerAgent);
+
+    this.registerAgent(ManusAgent);
     if (!ipcMain) return;
     ipcMain.on('agent:getList', async (event, filter?: string) => {
       event.returnValue = await this.getList(filter);
@@ -221,6 +225,7 @@ export class AgentManager {
           [],
           [],
           '',
+          25,
           {},
         );
 
@@ -229,7 +234,7 @@ export class AgentManager {
       this.agents = this.agents.filter((x) => x.info.name != agent.name);
       //agent.config = ts.config;
       const config = await agent.getConfig();
-      console.log(agent.name, config);
+
       this.agents.push({
         info: {
           id: ts.id,
@@ -284,6 +289,9 @@ export class AgentManager {
       throw new Error('agent id is required');
     }
     const agentInfo = await this.getAgent(agent.id);
+    if (agentInfo.config.model) {
+      agent.model = agentInfo.config.model;
+    }
     if (agentInfo.type == 'react' || agentInfo.type == 'supervisor') {
       const workflow = await this.buildAgent(agent);
       if (workflow) {
@@ -305,10 +313,17 @@ export class AgentManager {
     await this.agentRepository.delete(id);
   }
 
-  public async buildAgent(agent: Agent, store?: BaseStore) {
+  public async buildAgent(config: {
+    agent: Agent;
+    store?: BaseStore;
+    model?: string;
+  }) {
+    const { agent, store, model: providerModel } = config;
+    const { provider, modelName } = getProviderModel(
+      providerModel || agent.model,
+    );
+    const model = await getChatModel(provider, modelName, agent.config);
     if (agent.type == 'react' || agent.type == 'supervisor') {
-      const { provider, modelName } = getProviderModel(agent.model);
-      const model = await getChatModel(provider, modelName, agent.config);
       const tools = await toolsManager.buildTools(agent?.tools);
       if (agent.type == 'react') {
         const reactAgent = createReactAgent({
@@ -321,6 +336,7 @@ export class AgentManager {
             agent.prompt ||
             'You are a ai agent, you can use the tools to help you answer the question.',
         });
+
         return reactAgent;
       } else if (agent.type == 'supervisor') {
         const agents = [];
@@ -352,7 +368,7 @@ export class AgentManager {
       }
     } else if (agent.type == 'built-in') {
       const _agent = this.agents.find((x) => x.info.name == agent.name);
-      return await _agent.agent.createAgent();
+      return await _agent.agent.createAgent(store, model);
     }
     return null;
   }

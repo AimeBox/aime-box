@@ -7,7 +7,7 @@ import {
   OpenDialogOptions,
   SaveDialogOptions,
 } from 'electron';
-import { Chat, ChatOptions } from '../entity/Chat';
+import { Chat } from '../entity/Chat';
 import { Providers } from '../entity/Providers';
 import { McpServerInfo, ToolInfo } from './tools';
 import {
@@ -19,6 +19,7 @@ import {
 import { GlobalSettings } from './settings';
 import { ChatInputAttachment, ChatInputExtend, ChatMode } from '@/types/chat';
 import { Prompt, PromptGroup } from '@/entity/Prompt';
+import { ChatInfo } from './chat';
 
 const electronHandler = {
   ipcRenderer: {
@@ -153,7 +154,7 @@ const electronHandler = {
       const res = await ipcRenderer.invoke('chat:export', type, chatId, input);
       return res;
     },
-    getChat: (chatId: string) =>
+    getChat: (chatId: string): Promise<ChatInfo> =>
       ipcRenderer.invoke('chat:get-chat', { chatId }),
     chatResquest(input: {
       chatId: string;

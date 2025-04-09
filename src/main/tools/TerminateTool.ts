@@ -13,23 +13,22 @@ import { runCommand } from '../utils/exec';
 import { BaseTool } from './BaseTool';
 import { platform } from 'process';
 
-export interface CmdToolParameters extends ToolParams {
+export interface TerminateToolParameters extends ToolParams {
   ask_human_input: boolean;
 }
 
-export class CmdTool extends BaseTool {
-
+export class TerminateTool extends BaseTool {
   schema = z.object({
     commands: z.string(),
   });
 
-  name: string = 'cmd';
+  name: string = 'terminate';
 
   description: string = `run ${platform == 'win32' ? 'cmd.exe' : 'bash'} commands on ${platform} system.`;
 
   ask_human_input: boolean = false;
 
-  constructor(params?: CmdToolParameters) {
+  constructor(params?: TerminateToolParameters) {
     super();
     const { ask_human_input } = params ?? {};
     this.ask_human_input = ask_human_input ?? false;
@@ -57,6 +56,6 @@ export class CmdTool extends BaseTool {
       return res;
     }
 
-    return null;
+    //return null;
   }
 }
