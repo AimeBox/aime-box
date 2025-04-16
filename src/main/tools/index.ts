@@ -247,10 +247,16 @@ export class ToolsManager {
             }
           }
           try {
-            const res = await mcpClient.callTool({
-              name: _tool.name,
-              arguments: result,
-            });
+            const res = await mcpClient.callTool(
+              {
+                name: _tool.name,
+                arguments: result,
+              },
+              undefined,
+              {
+                timeout: 1000 * 60 * 60,
+              },
+            );
             if (res.content instanceof String) {
               return res.content.toString();
             } else if (res.content instanceof Array) {
@@ -982,6 +988,11 @@ export class ToolsManager {
       } else if (type == 'sse') {
         transport = new SSEClientTransport(
           createSmitheryUrl(`${command}`, config),
+          {
+            requestInit: {
+              keepalive: true,
+            },
+          },
         );
       } else if (type == 'ws') {
         transport = new WebSocketClientTransport(
@@ -993,7 +1004,7 @@ export class ToolsManager {
       //     (x) => x.getServerVersion().name != mcpName,
       //   );
       // };
-      await client.connect(transport);
+      await client.connect(transport, { timeout: 1000 * 60 * 60 });
     }
 
     return client;

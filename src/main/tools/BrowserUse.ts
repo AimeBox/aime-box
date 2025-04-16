@@ -18,6 +18,7 @@ import { Agent, Browser, BrowserConfig } from 'browser-use-js';
 import { getChatModel } from '../llm';
 import { getProviderModel } from '../utils/providerUtil';
 import fs from 'fs';
+import { dialog } from 'electron';
 
 export interface BrowserUseParameters extends ToolParams {
   model: string;

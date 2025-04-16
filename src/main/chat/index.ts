@@ -679,13 +679,13 @@ export class ChatManager {
             configurable: { chatRootPath: this.getChatPath(chatId) },
           });
         } else if (agent.type == 'built-in') {
-          await this.chatBuiltIn(
-            agent,
-            messages,
-            chat.options,
+          await this.chatBuiltIn(agent, messages, {
+            providerModel: chat.model,
+            options: chat.options,
             callbacks,
-            controller.signal,
-          );
+            signal: controller.signal,
+            configurable: { chatRootPath: this.getChatPath(chatId) },
+          });
         }
       } else if (chat.mode == 'planner' && chat.agent) {
         const agent = await agentManager.getAgent(chat.agent);
@@ -994,27 +994,32 @@ export class ChatManager {
   public async chatBuiltIn(
     agent: Agent,
     messages: BaseMessage[],
-    options?: ChatOptions | undefined,
-    callbacks?: any | undefined,
-    signal?: AbortSignal | undefined,
-    configurable?: Record<string, any> | undefined,
+    config: {
+      providerModel: string;
+      options?: ChatOptions | undefined;
+      callbacks?: any | undefined;
+      signal?: AbortSignal | undefined;
+      configurable?: Record<string, any> | undefined;
+    },
   ) {
-    const { provider, modelName } = getProviderModel(agent.model);
+    const { provider, modelName } = getProviderModel(
+      config?.providerModel || agent.model,
+    );
     const providerInfo = await providersManager.getProviders();
     const providerType = providerInfo.find((x) => x.name == provider)?.type;
     const _agent = await agentManager.buildAgent({
       agent,
       store: new InMemoryStore(),
-      model: agent.model,
+      model: config?.providerModel || agent.model,
     });
-    const handlerMessageCreated = callbacks?.['handleMessageCreated'];
+    const handlerMessageCreated = config.callbacks?.['handleMessageCreated'];
     //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
-    const handlerMessageFinished = callbacks?.['handleMessageFinished'];
-    const handlerMessageStream = callbacks?.['handleMessageStream'];
-    const handlerMessageError = callbacks?.['handleMessageError'];
+    const handlerMessageFinished = config.callbacks?.['handleMessageFinished'];
+    const handlerMessageStream = config.callbacks?.['handleMessageStream'];
+    const handlerMessageError = config.callbacks?.['handleMessageError'];
     await runAgent(_agent, messages, {
-      signal,
-      configurable,
+      signal: config.signal,
+      configurable: config.configurable,
       modelName,
       providerType,
       callbacks: {
