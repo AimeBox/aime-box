@@ -17,6 +17,7 @@ import {
   cos_sim,
 } from '@huggingface/transformers';
 import { borderColor } from 'tailwindcss/defaultTheme';
+import settingsManager from '../settings';
 
 export interface TransformersParams {
   task: string;

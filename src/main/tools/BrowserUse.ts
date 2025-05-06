@@ -46,13 +46,13 @@ export class BrowserUseTool extends BaseTool {
       },
     },
     {
-      label: t('useVision'),
+      label: t('tools.useVision'),
       field: 'useVision',
       component: 'Switch',
       defaultValue: false,
     },
     {
-      label: t('common.plannerModel'),
+      label: t('tools.plannerModel'),
       field: 'plannerModel',
       component: 'ProviderSelect',
       componentProps: {
@@ -61,7 +61,7 @@ export class BrowserUseTool extends BaseTool {
       },
     },
     {
-      label: t('chromeInstancePath'),
+      label: t('tools.chromeInstancePath'),
       field: 'chromeInstancePath',
       component: 'Input',
     },

@@ -600,7 +600,7 @@ export class ExtractTool extends BaseTool {
 }
 
 export class ExtractAgent extends BaseAgent {
-  name: string = 'Extract';
+  name: string = 'extract';
 
   description: string = '对输入的文字或文件文件夹路径进行提取用户需要的信息';
 
@@ -782,5 +782,28 @@ export class ExtractAgent extends BaseAgent {
     // Finally, we compile it into a LangChain Runnable.
     const app = workflow.compile();
     return app;
+  }
+
+  async stream(
+    input: z.infer<typeof this.schema> | string,
+    options?: RunnableConfig,
+  ): Promise<IterableReadableStream<any>> {
+    const that = this;
+    async function* generateStream() {}
+    const stream = IterableReadableStream.fromAsyncGenerator(generateStream());
+    return stream;
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema> | string,
+    runManager?: CallbackManagerForToolRun,
+    config?: RunnableConfig,
+  ): Promise<string> {
+    const stream = await this.stream(input, config);
+    let output = '';
+    for await (const chunk of stream) {
+      output += chunk;
+    }
+    return output;
   }
 }

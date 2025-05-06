@@ -41,18 +41,29 @@ export const runAgent = async (
       const files: any[] = x.content.filter((x) => x.type == 'file');
       if (x.content.find((x) => x.type == 'text')) {
         (x.content.find((x) => x.type == 'text') as any).text +=
-          `\n\n${files.map((z) => `[${z.name}](${z.path})`).join('\n')}`;
+          `\n${files.map((z) => `<file>[${z.name}](${z.path})</file>`).join('\n')}`;
       } else {
         x.content.push({
           type: 'text',
-          text: files.map((z) => `[${z.name}](${z.path})`).join('\n'),
+          text: files
+            .map((z) => `<file>[${z.name}](${z.path})</file>`)
+            .join('\n'),
         });
       }
       x.content = x.content.filter((x) => x.type != 'file');
-      x.additional_kwargs = {
-        ...x.additional_kwargs,
-        files: files,
-      };
+      const folders: any[] = x.content.filter((x) => x.type == 'folder');
+      if (x.content.find((x) => x.type == 'text')) {
+        (x.content.find((x) => x.type == 'text') as any).text +=
+          `\n${folders.map((z) => `<folder>[${z.name}](${z.path})</folder>`).join('\n')}`;
+      } else {
+        x.content.push({
+          type: 'text',
+          text: folders
+            .map((z) => `<folder>[${z.name}](${z.path})</folder>`)
+            .join('\n'),
+        });
+      }
+      x.content = x.content.filter((x) => x.type != 'folder');
     }
 
     if (isHumanMessage(x)) {
@@ -78,7 +89,7 @@ export const runAgent = async (
       {
         version: 'v2',
         signal: options?.signal,
-        recursionLimit: options?.recursionLimit,
+        recursionLimit: options?.recursionLimit || 25,
         configurable,
         subgraphs: true,
       },

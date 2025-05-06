@@ -454,7 +454,7 @@ export class ChatManager {
             type: 'video_path',
             video_path: attachment.path,
           });
-        } else if (attachment.type == 'file') {
+        } else if (attachment.type == 'file' || attachment.type == 'folder') {
           res.content.push(attachment);
         }
       }
@@ -672,14 +672,26 @@ export class ChatManager {
           where: { id: message.id },
           relations: { chat: true },
         });
-        msg.content = [
-          {
-            type: 'text',
-            text: message.content,
-          },
-        ];
-
         msg.error_msg = message.additional_kwargs['error'] as string;
+        if (isToolMessage(message)) {
+          msg.content = [
+            {
+              type: 'tool_call',
+              text: msg.error_msg,
+              tool_call_id: message.tool_call_id,
+              tool_call_name: message.name,
+              status: message.status,
+            },
+          ];
+        } else if (isAIMessage(message)) {
+          msg.content = [
+            {
+              type: 'text',
+              text: message.content,
+            },
+          ];
+        }
+
         msg.status = ChatStatus.ERROR;
         await this.chatMessageRepository.manager.save(msg);
         event(`chat:message-changed:${chatId}`, msg);
@@ -1068,6 +1080,7 @@ export class ChatManager {
           });
         },
       },
+      signal: config.signal,
     });
     await runAgent(_agent, messages, {
       signal: config.signal,

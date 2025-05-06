@@ -18,6 +18,7 @@ import {
   FaCheck,
   FaEdit,
   FaPlus,
+  FaSpinner,
   FaToggleOff,
   FaToggleOn,
   FaTrash,
@@ -240,16 +241,16 @@ export default function Tools() {
   useEffect(() => {
     getTools();
     window.electron.ipcRenderer.on('tools:invokeAsync', toolInvokeHandle);
+    window.electron.ipcRenderer.on('tools:mcp-updated', (data) => {
+      getMcps();
+    });
     return () => {
+      window.electron.ipcRenderer.removeAllListeners('tools:mcp-updated');
       window.electron.ipcRenderer.removeListener(
         'tools:invokeAsync',
         toolInvokeHandle,
       );
     };
-    // toolTestFormRef.current?.updateSchema({
-    //   field: 'filed',
-    //   componentProps: { disabled: true },
-    // });
   }, []);
 
   useEffect(() => {
@@ -339,6 +340,14 @@ export default function Tools() {
             defaultValue: tool.schema.properties[x].default,
             componentProps: {},
           } as FormSchema);
+        } else if (tool.schema.properties[x].type == 'object') {
+          c.push({
+            field: x,
+            label: x,
+            required: required.includes(x),
+            subLabel: tool.schema.properties[x].description,
+            component: 'JsonEditor',
+          } as FormSchema);
         }
       }
 
@@ -413,9 +422,11 @@ export default function Tools() {
   };
   const onRefreshMcp = async (item: McpServerInfo) => {
     try {
-      await window.electron.tools.refreshMcp(currentMcp?.id);
-      await getMcps();
-      message.success('Refresh MCP server success');
+      const res = await window.electron.tools.refreshMcp(currentMcp?.id);
+      if (res.status == 'activated') {
+        await getMcps();
+        message.success('Refresh MCP server success');
+      }
     } catch (err) {
       message.error(err.message);
     }
@@ -532,48 +543,28 @@ export default function Tools() {
             <div className="flex flex-col gap-1">
               {tools.map((item, index) => {
                 return (
-                  <div className="relative pr-4" key={item.name}>
-                    <Link
-                      className={`flex flex-row justify-between px-3 py-2 transition rounded-xl dark:hover:bg-gray-900 hover:bg-gray-200   whitespace-nowrap text-ellipsis ${
-                        currentTool && currentTool.name === item.name
-                          ? 'dark:bg-gray-900 bg-blue-100 text-blue-600'
-                          : ''
-                      }`}
-                      to={`/tools?id=${item.name}`}
-                    >
-                      <div className="flex flex-1 justify-between self-center w-full">
-                        <div
-                          className={`overflow-hidden self-center text-left`}
-                        >
-                          <div className="flex flex-col">
-                            <div className="font-bold whitespace-normal line-clamp-1">
-                              {item.name}
-                            </div>
-                            <small className="text-gray-400 whitespace-normal line-clamp-1">
-                              {item.description}
-                            </small>
-                          </div>
-                        </div>
-                        {(item.parameters ||
-                          item?.configSchema?.length > 0) && (
-                          <div className="">
-                            <div className="flex self-center space-x-1.5">
-                              <button
-                                className="self-center transition dark:hover:text-white"
-                                type="button"
-                                onClick={(e) => {
-                                  navigate(`/tools?id=${item.name}`);
-                                  onShowToolSetting(item);
-                                }}
-                              >
-                                <FaEdit className="w-4 h-4" />{' '}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                  </div>
+                  <ListItem
+                    active={currentTool?.name == item.name}
+                    key={item.name}
+                    title={item.name}
+                    subTitle={<small>{item.description}</small>}
+                    href={`/tools?id=${item.name}`}
+                    // onClick={() => {
+                    //   navigate(`/tools?id=${item.name}`);
+                    // }}
+                    button={
+                      (item.parameters || item?.configSchema?.length > 0) && (
+                        <Button
+                          type="text"
+                          icon={<FaEdit />}
+                          onClick={() => {
+                            navigate(`/tools?id=${item.name}`);
+                            onShowToolSetting(item);
+                          }}
+                        />
+                      )
+                    }
+                  ></ListItem>
                 );
               })}
             </div>
@@ -590,7 +581,15 @@ export default function Tools() {
                     onClick={() => {
                       setCurrentMcp(item);
                     }}
-                    icon={item.enabled ? <FaToggleOn /> : <FaToggleOff />}
+                    icon={
+                      <>
+                        {item.status == 'activated' && <FaToggleOn />}
+                        {item.status == 'deactivated' && <FaToggleOff />}
+                        {item.status == 'pending' && (
+                          <FaSpinner className="animate-spin" />
+                        )}
+                      </>
+                    }
                   ></ListItem>
                 );
               })}
@@ -715,7 +714,7 @@ export default function Tools() {
                   {isArray(invokeOutput) && (
                     <div>
                       {invokeOutput.map((item, index) => {
-                        return <ResponseCard key={index} value={item} />;
+                        return <ResponseCard key={item} value={item} />;
                       })}
                     </div>
                   )}

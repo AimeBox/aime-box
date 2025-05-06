@@ -14,7 +14,12 @@ import { AgentMessageEvent, BaseAgent } from './BaseAgent';
 import { dbManager } from '../db';
 import { Agent } from '@/entity/Agent';
 import { Tool } from '@langchain/core/tools';
-import { RunnableWithMessageHistory } from '@langchain/core/runnables';
+import {
+  Runnable,
+  RunnablePassthrough,
+  RunnableSequence,
+  RunnableWithMessageHistory,
+} from '@langchain/core/runnables';
 import { ScriptAssistant } from './script_assistant/ScriptAssistant';
 import { FormSchema } from '@/types/form';
 import { TranslateAgent } from './translate/TranslateAgent';
@@ -35,6 +40,7 @@ import {
   StateGraph,
 } from '@langchain/langgraph';
 import { ManusAgent } from './manus/ManusAgent';
+import { notificationManager } from '../app/NotificationManager';
 
 export interface AgentInfo extends Agent {
   static: boolean;
@@ -266,6 +272,22 @@ export class AgentManager {
       data.config,
     );
     if (/^[a-zA-Z0-9_-]+$/.test(agent.name)) {
+      if (
+        data.type == 'react' ||
+        data.type == 'supervisor' ||
+        data.type == 'built-in'
+      ) {
+        const workflow = await this.buildAgent({ agent });
+        if (workflow) {
+          try {
+            const graph = await workflow.getGraphAsync();
+            const mermaid = await graph.drawMermaid();
+            agent.mermaid = mermaid;
+          } catch (err) {
+            console.error(`build agent '${agent.name}' fail, ${err.message}`);
+          }
+        }
+      }
       await this.agentRepository.save(agent);
     } else {
       throw new Error('名称只能包含字母、数字、下划线和破折号');
@@ -292,18 +314,35 @@ export class AgentManager {
     if (agentInfo.config.model) {
       agent.model = agentInfo.config.model;
     }
-    if (agentInfo.type == 'react' || agentInfo.type == 'supervisor') {
-      const workflow = await this.buildAgent(agent);
-      if (workflow) {
-        const graph = await workflow.getGraphAsync();
-        const mermaid = await graph.drawMermaid();
-        agent.mermaid = mermaid;
-      }
-    }
     if (/^[a-zA-Z0-9_-]+$/.test(agent.name)) {
       await this.agentRepository.save(agent);
     } else {
       throw new Error('名称只能包含字母、数字、下划线和破折号');
+    }
+    if (
+      agentInfo.type == 'react' ||
+      agentInfo.type == 'supervisor' ||
+      agentInfo.type == 'built-in'
+    ) {
+      try {
+        const workflow = await this.buildAgent({ agent });
+        if (workflow) {
+          try {
+            const graph = await workflow.getGraphAsync();
+            const mermaid = await graph.drawMermaid();
+            agent.mermaid = mermaid;
+            await this.agentRepository.save(agent);
+          } catch (err) {
+            console.error(`build agent '${agent.name}' fail, ${err.message}`);
+          }
+        }
+      } catch (err) {
+        notificationManager.sendNotification(
+          `build agent "${agent.name}" fail, ${err.message}`,
+          'error',
+        );
+        throw new Error(`build agent ${agent.name} fail`);
+      }
     }
 
     //this.agents.find((x) => x.info.name == data.name).info.config = data.config;
@@ -319,6 +358,7 @@ export class AgentManager {
     model?: string;
     messageEvent?: AgentMessageEvent;
     chatOptions?: ChatOptions;
+    signal?: AbortSignal;
   }) {
     const {
       agent,
@@ -326,11 +366,16 @@ export class AgentManager {
       model: providerModel,
       messageEvent,
       chatOptions,
+      signal,
     } = config;
-    const { provider, modelName } = getProviderModel(
-      providerModel || agent.model,
-    );
-    const model = await getChatModel(provider, modelName, agent.config);
+    let model;
+    if (providerModel || agent.model) {
+      const { provider, modelName } = getProviderModel(
+        providerModel || agent.model,
+      );
+      model = await getChatModel(provider, modelName, agent.config);
+    }
+
     if (agent.type == 'react' || agent.type == 'supervisor') {
       const tools = await toolsManager.buildTools(agent?.tools);
       if (agent.type == 'react') {
@@ -352,7 +397,13 @@ export class AgentManager {
           const _agent = await this.agentRepository.findOne({
             where: { id: agentId },
           });
-          const workflow = await this.buildAgent(_agent);
+          const workflow = await this.buildAgent({
+            agent: _agent,
+            store,
+            model: providerModel,
+            messageEvent,
+            chatOptions,
+          });
 
           agents.push(workflow);
         }
@@ -362,7 +413,6 @@ export class AgentManager {
           agents: agents,
           llm: model,
           tools: tools,
-
           prompt: agent.prompt,
           outputMode: (agent.supervisorOutputMode ||
             'last_message') as OutputMode,
@@ -381,6 +431,7 @@ export class AgentManager {
         model,
         messageEvent,
         chatOptions,
+        signal,
       );
     }
     return null;

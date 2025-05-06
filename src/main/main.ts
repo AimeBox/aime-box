@@ -79,7 +79,7 @@ class AppUpdater {
     // autoUpdater.setFeedURL({
     //   provider: 'generic',
     //   url: `https://xxxxx.com/aimebox/download/${process.platform}`,
-    //   updaterCacheDirName: 'aimebox-ai-updater',
+    //   updaterCacheDirName: 'aime-box-updater',
     // });
 
     autoUpdater.on('error', (err, msg) => {

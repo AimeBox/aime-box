@@ -21,6 +21,7 @@ import { t } from 'i18next';
 import FileSelect from './FileSelect';
 import AgentSelect from '../agents/AgentSelect';
 import ToolSelect from '../tools/ToolSelect';
+import JsonEditor from './JsonEditor';
 
 export interface FormItemProps {
   schema: FormSchema;
@@ -133,6 +134,9 @@ const FormModal = forwardRef((props: FormItemProps, ref) => {
         )}
         {props.schema.component === 'ToolSelect' && (
           <ToolSelect {...props.schema.componentProps}></ToolSelect>
+        )}
+        {props.schema.component === 'JsonEditor' && (
+          <JsonEditor {...props.schema.componentProps}></JsonEditor>
         )}
       </Form.Item>
     )

@@ -1,0 +1,24 @@
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* 移除pointer-events: none，因为它会阻止拖放事件 */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.5s ease, visibility 0.2s ease;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+}
+
+.overlay.visible {
+  opacity: 0.8;
+  visibility: visible;
+
+}

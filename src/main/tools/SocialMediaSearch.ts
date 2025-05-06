@@ -20,6 +20,8 @@ import * as cheerio from 'cheerio';
 import * as vm from 'vm';
 import { getDataPath } from '../utils/path';
 import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
+import { t } from 'i18next';
 
 // const getUserDataPath = (...paths: string[]): string => {
 //   return path.join(
@@ -29,6 +31,10 @@ import { BaseTool } from './BaseTool';
 //     ...paths,
 //   );
 // };
+
+export interface SocialMediaSearchParameters extends ToolParams {
+  chromeInstancePath: string;
+}
 
 interface XHSNoteItem {
   id: string;
@@ -71,16 +77,12 @@ export class SocialMediaSearch extends BaseTool {
       .describe(
         'xhs: 小红书 ,bilibili: 哔哩哔哩,douyin: 抖音, kuaishou: 快搜, tiktok: Tiktok, twitter: 推特',
       ),
-    keyword: z.optional(z.string()).describe('搜索关键字'),
+    keyword: z.optional(z.string()),
     url: z.optional(z.string()).describe('网址连接'),
     //count: z.number().default(10),
   });
 
-  static lc_name() {
-    return 'social-media-search';
-  }
-
-  name: string = 'social-media-search';
+  name: string = 'social_media_search';
 
   description: string = 'search social media post';
 
@@ -90,9 +92,21 @@ export class SocialMediaSearch extends BaseTool {
 
   outputFormat: 'json' | 'markdown' = 'json';
 
-  constructor() {
+  configSchema?: FormSchema[] = [
+    {
+      label: t('tools.chromeInstancePath'),
+      field: 'chromeInstancePath',
+      component: 'Input',
+    },
+  ];
+
+  chromeInstancePath?: string;
+
+  constructor(params: SocialMediaSearchParameters) {
     super();
+    const { chromeInstancePath } = params ?? {};
     this.userDataDir = path.join(getDataPath(), 'User Data');
+    this.chromeInstancePath = chromeInstancePath;
   }
 
   async getBrowserContext(): Promise<BrowserContext> {
@@ -110,6 +124,8 @@ export class SocialMediaSearch extends BaseTool {
     //     args: ['--disable-blink-features=AutomationControlled'],
     //   },
     // ); // Or 'firefox' or 'webkit'.
+
+    // chromium.launchPersistentContext()
     const msbrowser = await chromium.connectOverCDP('http://localhost:9222');
     const defaultContext = msbrowser.contexts()[0];
     return defaultContext;

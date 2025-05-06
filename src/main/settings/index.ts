@@ -31,7 +31,7 @@ import tar from 'tar';
 import node7z from 'node-7z';
 import axios from 'axios';
 import nodeFetch, { RequestInit, Response } from 'node-fetch';
-import { getModelsPath } from '../utils/path';
+import { getDefaultModelsPath, getModelsPath } from '../utils/path';
 import { platform } from 'process';
 import { exec } from 'child_process';
 import serverManager from '../server/serverManager';
@@ -101,7 +101,7 @@ class SettingsManager {
       tavily: { apiKey: null },
       serpapi: { apiKey: null },
     },
-    localModelPath: getModelsPath(),
+    localModelPath: getDefaultModelsPath(),
     huggingfaceUrl: 'https://huggingface.co',
     serverEnable: false,
     serverPort: 4560,

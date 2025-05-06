@@ -18,6 +18,9 @@ import * as prod from 'react/jsx-runtime';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeCodeTitles from 'rehype-code-titles';
 import 'katex/dist/katex.min.css';
+import { ChatInputAttachment } from '@/types/chat';
+import ChatAttachment from '../chat/ChatAttachment';
+import { marked } from 'marked';
 
 export interface MarkdownProps {
   value?: string;
@@ -32,12 +35,70 @@ const production = {
 export function Markdown(props: MarkdownProps) {
   const [renderedContent, setRenderedContent] = useState<string | null>(null);
   const [thinkContent, setThinkContent] = useState<string | undefined>();
+  const [files, setFiles] = useState<ChatInputAttachment[]>([]);
+  function splitContextAndFiles(input: string): {
+    context: string;
+    attachments: ChatInputAttachment[];
+  } {
+    const attachments: ChatInputAttachment[] = [];
+    const fileRegex = /<file>([\s\S]*?)<\/file>/g;
+    let match: RegExpExecArray | null;
+
+    // 提取所有 <file>xxx</file> 内容
+    while ((match = fileRegex.exec(input)) !== null) {
+      const attachment = parseMarkdownFileLink(match[1], 'file');
+      if (attachment) {
+        attachments.push(attachment);
+      }
+    }
+
+    // 去掉所有 <file>...</file> 后，剩下的就是 context
+    let context = input.replace(fileRegex, '').trim();
+
+    const folderRegex = /<folder>([\s\S]*?)<\/folder>/g;
+    while ((match = folderRegex.exec(input)) !== null) {
+      const attachment = parseMarkdownFileLink(match[1], 'folder');
+      if (attachment) {
+        attachments.push(attachment);
+      }
+    }
+    context = context.replace(folderRegex, '').trim();
+
+    return { context, attachments: attachments };
+  }
+  function parseMarkdownFileLink(
+    md: string,
+    type: 'file' | 'folder',
+  ): ChatInputAttachment | undefined {
+    const match = md.match(/\[([^\]]+?)\]\((.+?)\)$/);
+    const tokens = marked.lexer(md);
+    if (tokens.length == 1) {
+      const linkToken = tokens
+        .at(0)
+        ?.tokens.find((token) => token.type === 'link');
+      if (linkToken) {
+        console.log(linkToken);
+        const name = linkToken.text;
+        const path = linkToken.href;
+        const ext = `.${name.split('.').pop()}`;
+        return {
+          name,
+          path,
+          type: 'file',
+          ext: ext,
+        };
+      }
+    }
+
+    return undefined;
+  }
 
   useEffect(() => {
     const { thinkContent, restContent } = splitThinkTag(props?.value);
-
+    const { context, attachments } = splitContextAndFiles(restContent);
+    setFiles(attachments);
     setThinkContent(thinkContent);
-    setRenderedContent(restContent);
+    setRenderedContent(context);
 
     unified()
       .use(remarkParse, { fragment: true })
@@ -63,7 +124,7 @@ export function Markdown(props: MarkdownProps) {
 
       //.use(rehypeSanitize)
 
-      .process(restContent)
+      .process(context)
       .then((res) => {
         const content = res.toString();
         setRenderedContent(content);
@@ -99,6 +160,11 @@ export function Markdown(props: MarkdownProps) {
         dangerouslySetInnerHTML={{ __html: renderedContent }}
         key={renderedContent}
       />
+      <div className="flex flex-wrap gap-2 p-1">
+        {files.map((file) => {
+          return <ChatAttachment value={file} key={file.path}></ChatAttachment>;
+        })}
+      </div>
     </>
   ) : null;
 }

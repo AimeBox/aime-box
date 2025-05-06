@@ -20,7 +20,7 @@ const ChatQuickInput = React.forwardRef(
     const { prompts } = useContext(GlobalContext);
 
     return (
-      <div className={cn(className, 'flex flex-row gap-2')}>
+      <div className={cn(className, 'flex flex-row gap-2 items-center')}>
         {messages.map((message, index) => {
           return (
             <Button

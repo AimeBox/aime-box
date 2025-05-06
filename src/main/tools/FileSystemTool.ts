@@ -19,7 +19,7 @@ export class FileWrite extends BaseTool {
 
   //output = und;
 
-  name = 'file-write';
+  name = 'file_write';
 
   description: string = 'create file and write';
 
@@ -40,7 +40,7 @@ export class FileWrite extends BaseTool {
 export class FileRead extends BaseTool {
   toolKitName?: string = 'file-system';
 
-  name: string = 'file-read';
+  name: string = 'file_read';
 
   description: string = 'read file';
 
@@ -220,5 +220,32 @@ export class MoveFile extends BaseTool {
   ): Promise<string> {
     fs.renameSync(input.source, input.destination);
     return 'File moved successfully';
+  }
+}
+
+export class DeleteFile extends BaseTool {
+  toolKitName?: string = 'file-system';
+
+  schema = z.object({
+    path: z.string(),
+  });
+
+  //output = und;
+
+  name = 'delete_file';
+
+  description: string = 'Removes a file. absolute paths.';
+
+  constructor(params?: FileWriteParameters) {
+    super(params);
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<string> {
+    await fs.promises.rm(input.path);
+    return 'file has been deleted.';
   }
 }

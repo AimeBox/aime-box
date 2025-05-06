@@ -4,16 +4,19 @@ import { ScrollArea } from '../components/ui/scroll-area';
 import Content from '../components/layout/Content';
 import { Editor } from '../components/common/Editor';
 import { Document, Page, pdfjs } from 'react-pdf';
+import FileDropZone from '../components/common/FileDropZone';
 
 interface Props {}
 
 function Home(props: Props): React.ReactElement {
   return (
     <Content>
-      <ScrollArea className="p-4 w-full h-full">
-        <h1>Welcome to the Home Page</h1>
+      <ScrollArea className="relative p-4 w-full h-full">
         {/* <Editor></Editor> */}
         {/* <ShowcaseLayout /> */}
+        <FileDropZone>
+          <h1>Welcome to the Home Page</h1>
+        </FileDropZone>
       </ScrollArea>
     </Content>
   );

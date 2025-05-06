@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import settingsManager from '../settings';
 
 const getDataPath = () => {
   let userData;
@@ -31,11 +32,34 @@ const getModelsPath = () => {
   } else {
     userData = app.getAppPath();
   }
-  const modelPath = path.join(userData, 'models');
+  const { localModelPath } = settingsManager.getSettings();
+  const modelPath = localModelPath;
+
   if (!fs.existsSync(modelPath)) {
     fs.mkdirSync(modelPath, { recursive: true });
   }
   return modelPath;
 };
 
-export { getDataPath, getTmpPath, getModelsPath, rootPath };
+const getDefaultModelsPath = () => {
+  let userData;
+  if (app.isPackaged) {
+    userData = app.getPath('userData');
+  } else {
+    userData = app.getAppPath();
+  }
+  const modelPath = path.join(userData, 'models');
+
+  if (!fs.existsSync(modelPath)) {
+    fs.mkdirSync(modelPath, { recursive: true });
+  }
+  return modelPath;
+};
+
+export {
+  getDataPath,
+  getTmpPath,
+  getModelsPath,
+  getDefaultModelsPath,
+  rootPath,
+};

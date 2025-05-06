@@ -123,4 +123,5 @@ export type ComponentType =
   | 'MarkDown'
   | 'ProviderSelect'
   | 'AgentSelect'
-  | 'ToolSelect';
+  | 'ToolSelect'
+  | 'JsonEditor';

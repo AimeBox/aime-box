@@ -14,9 +14,7 @@
   "DefaultEmbedding": "Default Embedding",
   "DefaultLLM": "Default LLM",
   "PluginsManage": "Plugins Manage",
-
   "theme": "Theme",
-
   "chat.delete": "Delete",
   "chat.editTitle": "Edit Title",
   "kb.rerank_score": "rerank score",
@@ -31,7 +29,6 @@
   "tool.add_tool": "Add Tool",
   "tools.show_all": "All",
   "chat.chat_options.clear": "clear",
-
   "delete": "Delete",
   "chat.chat_options.agents": "Agents",
   "selectFile": "Select File",
@@ -93,7 +90,10 @@
   "tools": {
     "addMcp": "Add Mcp",
     "tool_config": "Tool Config",
-    "mcp": "Mcp"
+    "mcp": "Mcp",
+    "chromeInstancePath": "Browser Instance Path",
+    "useVision": "Use Vision",
+    "plannerModel": "Planner Model"
   },
   "common": {
     "edit": "Edit",
@@ -102,7 +102,9 @@
     "all": "All",
     "prompt": "Prompt",
     "model": "Model",
-    "mode": "Mode"
+    "mode": "Mode",
+    "agents": "Agents",
+    "parameters": "Parameters"
   },
   "agents": {
     "name": "Name",
@@ -130,7 +132,6 @@
     "agent": "Agent",
     "home": "Home"
   },
-
   "settings": {
     "serverEnable": "Remote Server Port",
     "serverPort": {

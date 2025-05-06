@@ -10,6 +10,7 @@ export interface ListItemProps {
   href?: string;
   active?: boolean;
   menu?: ReactNode;
+  button?: ReactNode;
   onClick?: () => void;
   icon?: ReactNode;
   // openMenu?: boolean;
@@ -24,6 +25,7 @@ export const ListItem = forwardRef((props: ListItemProps) => {
     subTitle,
     active = false,
     menu,
+    button,
     onClick,
     icon,
     // openMenu,
@@ -52,13 +54,19 @@ export const ListItem = forwardRef((props: ListItemProps) => {
                   {title}
                 </div>
               </div>
-              <small className="text-gray-500 whitespace-normal line-clamp-1">
+              <small
+                className="text-gray-500 whitespace-normal line-clamp-1"
+                style={{
+                  wordBreak: 'break-all',
+                }}
+              >
                 {subTitle}
               </small>
               {children}
             </div>
           </div>
         </div>
+        {button && <div className="flex-1 w-14">{button}</div>}
         {menu && (
           <div className="flex-1 w-14">
             <Popover

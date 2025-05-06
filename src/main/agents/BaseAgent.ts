@@ -24,25 +24,8 @@ export abstract class BaseAgent extends Tool {
   abstract tags: string[];
 
   declare schema;
-  // declare schema: z.ZodEffects<
-  //   z.ZodObject<
-  //     {
-  //       input: z.ZodOptional<z.ZodString>;
-  //     },
-  //     'strip',
-  //     z.ZodTypeAny,
-  //     {
-  //       input?: string | undefined;
-  //     },
-  //     {
-  //       input?: string | undefined;
-  //     }
-  //   >,
-  //   string | undefined,
-  //   {
-  //     input?: string | undefined;
-  //   }
-  // >;
+
+  declare opener?: string;
 
   agentOptions?: {
     provider: string;
@@ -83,6 +66,7 @@ export abstract class BaseAgent extends Tool {
     model?: BaseChatModel,
     messageEvent?: AgentMessageEvent,
     chatOptions?: ChatOptions,
+    signal?: AbortSignal,
   ): Promise<any>;
 
   // abstract invoke(input: z.infer<typeof this.schema> | string): Promise<any>;

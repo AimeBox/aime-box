@@ -2,7 +2,7 @@ import { RunnableConfig } from '@langchain/core/runnables';
 
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import { ChatOptions } from '@/entity/Chat';
-import { BaseAgent } from '../BaseAgent';
+import { AgentMessageEvent, BaseAgent } from '../BaseAgent';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Embeddings } from '@langchain/core/embeddings';
 import { FormSchema } from '@/types/form';
@@ -25,7 +25,7 @@ import {
   MessagesPlaceholder,
   PromptTemplate,
 } from '@langchain/core/prompts';
-import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { createReactAgent, ToolNode } from '@langchain/langgraph/prebuilt';
 import { MessagesAnnotation } from '@langchain/langgraph/dist/graph/messages_annotation';
 import {
   Annotation,
@@ -69,6 +69,8 @@ export class ManusAgent extends BaseAgent {
 
   model: BaseChatModel;
 
+  systemPrompt: string;
+
   configSchema: FormSchema[] = [
     {
       label: t('common.model'),
@@ -77,6 +79,11 @@ export class ManusAgent extends BaseAgent {
       componentProps: {
         type: 'llm',
       },
+    },
+    {
+      label: t('agents.prompt'),
+      field: 'systemPrompt',
+      component: 'InputTextArea',
     },
   ];
 
@@ -179,19 +186,56 @@ export class ManusAgent extends BaseAgent {
     });
   };
 
-  async createAgent(store?: BaseStore, model?: BaseChatModel) {
+  async createAgent(
+    store?: BaseStore,
+    model?: BaseChatModel,
+    messageEvent?: AgentMessageEvent,
+    chatOptions?: ChatOptions,
+    signal?: AbortSignal,
+  ) {
     const StateAnnotation = Annotation.Root({
       task: Annotation<string>,
+      todo: Annotation<string>,
+
       plans: Annotation<Plans[]>,
       current_step: Annotation<PlanStep>,
       memory: Annotation<string>,
       messages: Annotation<BaseMessage[]>,
     });
+    const editTodo = tool(
+      (input) => {
+        if (['sf', 'san francisco'].includes(input.location.toLowerCase())) {
+          return "It's 60 degrees and foggy.";
+        } else {
+          return "It's 90 degrees and sunny.";
+        }
+      },
+      {
+        name: 'edit_todo',
+        description: 'create or update a todo list in todo.md',
+        schema: z.object({
+          location: z.string().describe('Location to get the weather for.'),
+        }),
+      },
+    );
+
+    const readTodo = tool(
+      (input) => {
+        return 'todo.md';
+      },
+      {
+        name: 'read_todo',
+        description: 'read the todo list in todo.md',
+        schema: z.object({}),
+      },
+    );
+    const todoNode = new ToolNode([editTodo, readTodo]);
 
     const config = await this.getConfig();
     const { provider, modelName } = getProviderModel(config.model);
     this.model =
       model || (await getChatModel(provider, modelName, { temperature: 0 }));
+    this.systemPrompt = config.systemPrompt;
     const that = this;
     const agentMap = {
       browser: {
@@ -485,24 +529,19 @@ export class ManusAgent extends BaseAgent {
     };
 
     const workflow = new StateGraph(StateAnnotation)
-      .addNode('agent', agentNode, {
-        ends: ['__end__', 'execute'],
+      .addNode('manus', agentNode, {
+        ends: ['__end__'],
       })
-      .addNode('execute', executeNode, {
-        ends: ['__end__', 'agent'],
+      .addNode('ask', agentNode, {
+        ends: ['__end__'],
       })
-      .addNode('planner', plannerNode, {
-        ends: ['__end__', 'execute'],
-      })
-      .addNode('receptionist', receptionistNode, {
-        ends: ['planner', 'execute', '__end__'],
-      })
-      .addEdge('__start__', 'receptionist');
+      .addEdge('__start__', 'manus');
 
     // Finally, we compile it into a LangChain Runnable.
     const app = workflow.compile({
       store: store,
       checkpointer: dbManager.langgraphSaver,
+      // interruptAfter: ['ask'],
     });
 
     return app;

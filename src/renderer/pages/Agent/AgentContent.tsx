@@ -35,6 +35,9 @@ export default function ChatContent() {
   };
 
   const onAgentChange = async (agent: AgentInfo) => {
+    setAgentConfigDrawerOpen(false);
+    setCurrentAgent(undefined);
+    message.success('success');
     const agents = await window.electron.agents.getList();
     setAgents(agents);
   };
@@ -140,6 +143,7 @@ export default function ChatContent() {
       } else {
         await window.electron.agents.create(values);
       }
+      message.success('success');
       modalRef.current.openModal(false);
       setAgents(await window.electron.agents.getList());
     } catch (error) {
@@ -180,12 +184,22 @@ export default function ChatContent() {
       </Modal>
       <ScrollArea className="p-4">
         <div className="flex flex-col gap-4">
-          <Card
+          <div className="mb-6">
+            <div className="flex justify-between items-center">
+              <div className="self-center text-2xl font-semibold">
+                {t('common.agents')}
+              </div>
+              <Button onClick={() => onCreate()} shape="round">
+                {t('common.create')}
+              </Button>
+            </div>
+          </div>
+          {/* <Card
             className="flex justify-center items-center p-2 w-64 transition-all duration-300 cursor-pointer hover:bg-gray-100"
             onClick={() => onCreate()}
           >
             <strong className="text-lg">+ {t('common.create')}</strong>
-          </Card>
+          </Card> */}
 
           {agents.map((agent) => (
             <Card key={agent.name} styles={{ body: { padding: 16 } }}>
@@ -198,7 +212,7 @@ export default function ChatContent() {
                     type="text"
                     onClick={() => onNewChat('agent', agent.id)}
                   ></Button>
-                  {!agent.static && (
+                  {agent.mermaid && (
                     <Button
                       icon={<FaInfo />}
                       type="text"

@@ -9,6 +9,7 @@ import {
   DrawerProps,
   Form,
   Input,
+  message,
   Slider,
   Switch,
   Tabs,
@@ -30,7 +31,7 @@ export interface AgentConfigDrawerProps extends DrawerProps {
 }
 
 export default function AgentConfigDrawer(props: AgentConfigDrawerProps) {
-  const { value, ...rest } = props;
+  const { value, onChange } = props;
   const [currentTab, setCurrentTab] = useState<string>('base');
 
   const [insideValue, setInsideValue] = useState<AgentInfo>(value);
@@ -45,22 +46,22 @@ export default function AgentConfigDrawer(props: AgentConfigDrawerProps) {
     [],
   );
 
-  const onChange = (value: Record<string, any>) => {
-    //console.log(value);
-    props?.onChange?.(value);
-  };
+  // const onChange = (value: Record<string, any>) => {
+  //   //console.log(value);
+  //   props?.onChange?.(value);
+  // };
 
   const onFinish = async (config: Record<string, any>) => {
     const data = { ...value, config: config };
     await window.electron.agents.update(data);
-    props?.onChange?.(value);
+    onChange?.(value);
   };
 
   useEffect(() => {}, []);
 
   useEffect(() => {
     setInsideValue(value);
-  }, [props?.value]);
+  }, [value]);
   return (
     <ConfigProvider
       drawer={{

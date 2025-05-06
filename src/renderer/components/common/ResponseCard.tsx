@@ -11,7 +11,6 @@ export function ResponseCard({ value, className }: ResponseCardProps) {
   function convertToMarkdown(obj: any, parentKey: string = ''): string {
     let markdown = '';
     if (!obj) return '';
-
     if (typeof obj == 'object') {
       for (const [key, value] of Object.entries(obj)) {
         const fullKey = parentKey ? `${parentKey}.${key}` : key;

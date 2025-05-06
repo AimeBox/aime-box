@@ -64,13 +64,17 @@ const electronHandler = {
     info: () => ipcRenderer.sendSync('app:info'),
     setTheme: (theme: 'system' | 'light' | 'dark') =>
       ipcRenderer.sendSync('app:setTheme', theme),
-    clipboard: (text: string) => ipcRenderer.sendSync('app:clipboard', text),
+    clipboard: (text: string) => ipcRenderer.invoke('app:clipboard', text),
     tts: (text: string) => ipcRenderer.send('app:tts', text),
     resetTTS: () => ipcRenderer.invoke('app:resetTTS'),
     openPath: (path: string) => ipcRenderer.invoke('app:openPath', path),
     showItemInFolder: (path: string) =>
       ipcRenderer.invoke('app:showItemInFolder', path),
     trashItem: (path: string) => ipcRenderer.invoke('app:trashItem', path),
+    startDrag: (filePath: string) =>
+      ipcRenderer.send('app:startDrag', filePath),
+    getPathInfo: (paths: string[]): Promise<ChatInputAttachment[]> =>
+      ipcRenderer.invoke('app:getPathInfo', paths),
   },
   db: {
     insert(tableName: string, data: any) {

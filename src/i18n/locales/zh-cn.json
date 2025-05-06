@@ -149,7 +149,10 @@
   "tools": {
     "addMcp": "添加MCP",
     "tool_config": "工具配置",
-    "mcp": "Mcp"
+    "mcp": "Mcp",
+    "useVision": "使用视觉模型",
+    "plannerModel": "计划模型",
+    "chromeInstancePath": "浏览器实例路径"
   },
   "common": {
     "edit": "编辑",
@@ -158,7 +161,9 @@
     "all": "全部",
     "prompt": "提示词",
     "model": "模型",
-    "mode": "模式"
+    "mode": "模式",
+    "agents": "AI助手",
+    "parameters": "参数"
   },
   "agents": {
     "name": "名称",

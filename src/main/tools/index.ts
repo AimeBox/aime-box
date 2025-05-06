@@ -43,6 +43,7 @@ import { AskHuman } from './AskHuman';
 import { Ideogram } from './Ideogram';
 import {
   CreateDirectory,
+  DeleteFile,
   FileRead,
   FileWrite,
   ListDirectory,
@@ -80,6 +81,7 @@ import { BrowserUseTool } from './BrowserUse';
 import { Vision } from './Vision';
 import { MultiServerMCPClient } from '@langchain/mcp-adapters';
 import { SleepTool } from './Sleep';
+import { appManager } from '../app/AppManager';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -92,6 +94,7 @@ export interface ToolInfo extends Tools {
 
 export interface McpServerInfo extends McpServers {
   tools: ToolInfo[];
+  status: 'activated' | 'deactivated' | 'pending';
 }
 
 export class ToolsManager {
@@ -213,76 +216,81 @@ export class ToolsManager {
   };
 
   public buildTool = async (tool: Tools, config: any): Promise<BaseTool> => {
-    if (tool.type == 'mcp') {
-      let mcpClient = this.mcpClients.find(
-        (x) => x.getServerVersion().name == tool.mcp_id,
-      );
-      if (!mcpClient || mcpClient.transport === undefined) {
-        const mcpServer = await this.mcpServerRepository.findOne({
-          where: { id: tool.mcp_id },
-        });
-        await this.refreshMcp(mcpServer);
-        mcpClient = this.mcpClients.find(
+    try {
+      if (tool.type == 'mcp') {
+        let mcpClient = this.mcpClients.find(
           (x) => x.getServerVersion().name == tool.mcp_id,
         );
-      }
-      const _tool = (await mcpClient.listTools()).tools.find(
-        (x) => x.name == tool.name.split('@')[0],
-      );
-      console.log(_tool.inputSchema);
-      const schema = this.jsonSchemaToZod(_tool.inputSchema);
-      return LangchainTool(
-        async (input): Promise<string> => {
-          const result = {};
+        if (!mcpClient || mcpClient.transport === undefined) {
+          const mcpServer = await this.mcpServerRepository.findOne({
+            where: { id: tool.mcp_id },
+          });
+          await this.refreshMcp(mcpServer);
+          mcpClient = this.mcpClients.find(
+            (x) => x.getServerVersion().name == tool.mcp_id,
+          );
+        }
+        const _tool = (await mcpClient.listTools()).tools.find(
+          (x) => x.name == tool.name.split('@')[0],
+        );
+        console.log(_tool.inputSchema);
+        const schema = this.jsonSchemaToZod(_tool.inputSchema);
+        return LangchainTool(
+          async (input): Promise<string> => {
+            const result = {};
 
-          // 遍历输入对象的所有属性
-          for (const key in input) {
-            if (Object.prototype.hasOwnProperty.call(input, key)) {
-              // 如果值是空字符串，则设置为undefined
-              result[key] = input[key] === '' ? undefined : input[key];
-            }
-          }
-          try {
-            const res = await mcpClient.callTool(
-              {
-                name: _tool.name,
-                arguments: result,
-              },
-              undefined,
-              {
-                timeout: 1000 * 60 * 60,
-              },
-            );
-            if (res.content instanceof String) {
-              return res.content.toString();
-            } else if (res.content instanceof Array) {
-              const item = res.content.find((x) => x.type == 'text');
-              if (item) {
-                return item.text;
-              } else {
-                return null;
+            // 遍历输入对象的所有属性
+            for (const key in input) {
+              if (Object.prototype.hasOwnProperty.call(input, key)) {
+                // 如果值是空字符串，则设置为undefined
+                result[key] = input[key] === '' ? undefined : input[key];
               }
             }
-          } catch (err) {
-            console.error(err);
-            throw new Error(err.message);
-          }
-          return '';
-        },
-        {
-          name: _tool.name,
-          description: _tool.description,
-          schema: schema,
-        },
-      );
-    } else if (tool.type == 'built-in') {
-      const baseTool = Reflect.construct(
-        this.builtInToolsClassType.find((x) => x.name == tool.name).classType,
-        tool.config ? [tool.config] : [],
-      ) as BaseTool;
+            try {
+              const res = await mcpClient.callTool(
+                {
+                  name: _tool.name,
+                  arguments: result,
+                },
+                undefined,
+                {
+                  timeout: 1000 * 60 * 60,
+                },
+              );
+              if (res.content instanceof String) {
+                return res.content.toString();
+              } else if (res.content instanceof Array) {
+                const item = res.content.find((x) => x.type == 'text');
+                if (item) {
+                  return item.text;
+                } else {
+                  return null;
+                }
+              }
+            } catch (err) {
+              console.error(err);
+              throw new Error(err.message);
+            }
+            return '';
+          },
+          {
+            name: _tool.name,
+            description: _tool.description,
+            schema: schema,
+          },
+        );
+      } else if (tool.type == 'built-in') {
+        const baseTool = Reflect.construct(
+          this.builtInToolsClassType.find((x) => x.name == tool.name).classType,
+          tool.config ? [tool.config] : [],
+        ) as BaseTool;
 
-      return baseTool;
+        return baseTool;
+      }
+    } catch (err) {
+      console.error('buildTool error', err);
     }
+
     return null;
   };
 
@@ -426,14 +434,18 @@ export class ToolsManager {
     ipcMain.handle('tools:getMcpList', (event, filter: string = undefined) =>
       this.getMcpList(filter),
     );
-    ipcMain.handle('tools:refreshMcp', async (event, id: string) => {
-      const ts = await this.mcpServerRepository.findOne({
-        where: { id },
-      });
-      if (ts) {
-        await this.refreshMcp(ts);
-      }
-    });
+    ipcMain.handle(
+      'tools:refreshMcp',
+      async (event, id: string): Promise<McpServerInfo> => {
+        const ts = await this.mcpServerRepository.findOne({
+          where: { id },
+        });
+        if (ts) {
+          return await this.refreshMcp(ts);
+        }
+        return null;
+      },
+    );
     ipcMain.handle(
       'tools:invoke',
       async (
@@ -519,29 +531,20 @@ export class ToolsManager {
     // await this.registerTool(new CmdTool());
     if (!app.isPackaged) {
       await this.registerTool(SleepTool);
+      await this.registerTool(ChartjsTool);
+      await this.registerTool(NodejsVM, { sensitive: true });
     }
     await this.registerTool(BrowserUseTool);
-    await this.registerTool(ChartjsTool);
     await this.registerTool(TerminalTool);
     await this.registerTool(Calculator);
     await this.registerTool(DateTimeTool);
     await this.registerTool(Translate);
     await this.registerTool(UnixTimestampConvert);
     await this.registerTool(Vision);
-    // await this.registerTool(SearchApi, { apiKey: 'NULL' });
-    // await this.registerTool(TavilySearchResults, {
-    //   apiKey: 'NULL',
-    //   maxResults: 3,
-    //   kwargs: {},
-    // } as TavilySearchAPIRetrieverFields);
     await this.registerTool(DuckDuckGoSearchTool, {
       maxResults: 3,
     } as DuckDuckGoSearchParameters);
     await this.registerTool(SearxngSearchTool, { apiBase: 'NULL' });
-    // await this.registerTool(VideoToText, {
-    //   ffmpegPath: 'NULL',
-    // } as VideoToTextParameters);
-
     await this.registerTool(DallE, {
       n: 1, // Default
       modelName: 'dall-e-3', // Default
@@ -567,7 +570,7 @@ export class ToolsManager {
 
     await this.registerTool(SocialMediaSearch);
     await this.registerTool(FileToText);
-    await this.registerTool(NodejsVM, { sensitive: true });
+
     await this.registerTool(Vectorizer, {
       apiKeyName: '',
       apiKey: '',
@@ -592,7 +595,7 @@ export class ToolsManager {
     await this.registerTool(ComfyuiTool, {
       defaultApiBase: 'http://127.0.0.1:8188',
     });
-    await this.registerTool(AskHuman);
+    // await this.registerTool(AskHuman);
 
     await this.registerTool(FileWrite);
     await this.registerTool(FileRead);
@@ -600,6 +603,7 @@ export class ToolsManager {
     await this.registerTool(CreateDirectory);
     await this.registerTool(SearchFiles);
     await this.registerTool(MoveFile);
+    await this.registerTool(DeleteFile);
 
     await this.registerTool(TextToSpeech, {
       model: 'matcha-icefall-zh-baker@local',
@@ -700,7 +704,13 @@ export class ToolsManager {
       entries.forEach((item) => {
         const key = item[0];
         const value = item[1];
-        text += `**${key}**:\n${value}\n`;
+        if (isObject(value)) {
+          text += `**${key}**:\n${JSON.stringify(value, null, 2)}\n`;
+        } else if (isArray(value)) {
+          text += `**${key}**:\n${JSON.stringify(value, null, 2)}\n`;
+        } else {
+          text += `**${key}**:\n${value.toString()}\n`;
+        }
       });
       return text;
     }
@@ -844,14 +854,37 @@ export class ToolsManager {
     }
   };
 
+  private updateMcpServerInfo = (mcpServerInfo: McpServerInfo) => {
+    const _mcpServerInfo = this.mcpServerInfos.find(
+      (x) => x.id == mcpServerInfo.id,
+    );
+    if (_mcpServerInfo) {
+      this.mcpServerInfos = this.mcpServerInfos.filter(
+        (x) => x.id != mcpServerInfo.id,
+      );
+    }
+    this.mcpServerInfos.push(mcpServerInfo);
+    appManager.sendEvent('tools:mcp-updated', mcpServerInfo);
+  };
+
   public refreshMcp = async (mcpServer: McpServers): Promise<McpServerInfo> => {
-    let mcpServerInfo = this.mcpServerInfos.find((x) => x.id == mcpServer.id);
+    let mcpServerInfo: McpServerInfo = this.mcpServerInfos.find(
+      (x) => x.id == mcpServer.id,
+    );
     if (mcpServerInfo) {
+      if (mcpServerInfo.status == 'pending') {
+        return mcpServerInfo;
+      }
       this.mcpServerInfos = this.mcpServerInfos.filter(
         (x) => x.id != mcpServer.id,
       );
     }
-
+    mcpServerInfo = {
+      ...mcpServer,
+      tools: [],
+      status: 'pending',
+    } as McpServerInfo;
+    this.updateMcpServerInfo(mcpServerInfo);
     const mcpClient = this.mcpClients.find(
       (x) => x.getServerVersion().name == mcpServer.id,
     );
@@ -867,9 +900,12 @@ export class ToolsManager {
       mcpServerInfo = {
         ...mcpServer,
         tools: [],
+        status: 'deactivated',
       } as McpServerInfo;
+      this.updateMcpServerInfo(mcpServerInfo);
     } else {
       const toolInfos: ToolInfo[] = [];
+
       try {
         const client = await this.getMcpClient(
           mcpServer.id,
@@ -904,18 +940,6 @@ export class ToolsManager {
           toolInfos.push(toolInfo);
         }
         await this.toolRepository.save(toolList);
-
-        // for (const tool of _tools) {
-        //   const mcpTool = _mcpTools.find(
-        //     (x) => x.name == tool.name.split('@')[0],
-        //   );
-        //   const toolInfo = { ...tool } as ToolInfo;
-        //   toolInfo.id = tool.name;
-        //   toolInfo.name = mcpTool.name;
-        //   toolInfo.description = mcpTool.description;
-        //   toolInfo.schema = mcpTool.inputSchema;
-        //   toolInfos.push(toolInfo);
-        // }
         this.mcpClients = this.mcpClients.filter(
           (x) => x.getServerVersion().name != mcpServer.id,
         );
@@ -924,16 +948,24 @@ export class ToolsManager {
         mcpServer.description = client.getServerVersion().description;
         await this.mcpServerRepository.save(mcpServer);
         console.log(`loaded success ${mcpServer.id}`);
+        mcpServerInfo = {
+          ...mcpServer,
+          tools: toolInfos,
+          status: 'activated',
+        } as McpServerInfo;
       } catch (err) {
         mcpServer.enabled = false;
         await this.mcpServerRepository.save(mcpServer);
+        mcpServerInfo = {
+          ...mcpServer,
+          tools: toolInfos,
+          status: 'deactivated',
+        } as McpServerInfo;
         console.error(`loaded failed ${mcpServer.id}`, err);
       }
 
-      mcpServerInfo = { ...mcpServer, tools: toolInfos };
+      this.updateMcpServerInfo(mcpServerInfo);
     }
-
-    this.mcpServerInfos.push(mcpServerInfo);
     return mcpServerInfo;
   };
 

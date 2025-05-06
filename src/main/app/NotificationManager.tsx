@@ -9,6 +9,7 @@ export class NotificationManager {
 
   public getMainWindow() {
     const windows = BrowserWindow.getAllWindows();
+
     const mainWindow = windows.length > 0 ? windows[0] : null;
     return mainWindow;
   }

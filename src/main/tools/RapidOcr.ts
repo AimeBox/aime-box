@@ -15,14 +15,6 @@ import fs from 'fs';
 import { getModelsPath } from '../utils/path';
 import { BaseTool } from './BaseTool';
 
-// const getModelsPath = (...paths: string[]): string => {
-//   return path.join(
-//     app.isPackaged
-//       ? path.join(process.resourcesPath, 'models')
-//       : path.join(__dirname, '../../../models'),
-//     ...paths,
-//   );
-// };
 export interface RapidOcrToolParameters extends ToolParams {}
 
 export class RapidOcrTool extends BaseTool {

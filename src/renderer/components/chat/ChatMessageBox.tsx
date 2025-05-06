@@ -24,6 +24,8 @@ import rehypeGfm from 'remark-gfm';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/atom-one-dark.css';
 import { LoadingOutlined } from '@ant-design/icons';
+import ReactJsonView from '@microlink/react-json-view';
+
 // import MarkdownIt from 'markdown-it';
 import {
   message,
@@ -38,6 +40,7 @@ import {
   Image,
   Tag,
   Popover,
+  Radio,
 } from 'antd';
 import React, { Fragment, createElement, useEffect, useState } from 'react';
 import { ChatMessage } from '../../../entity/Chat';
@@ -88,6 +91,9 @@ const ChatMessageBox = React.forwardRef(
   ) => {
     const [edit, setEdit] = useState(false);
     const [height, setHeight] = useState('auto');
+    const [toolCallInputView, setToolCallInputView] = useState<'json' | 'text'>(
+      'json',
+    );
 
     const [content, setContent] = useState<[{ type: string; text: string }]>(
       value.content || [],
@@ -254,7 +260,7 @@ const ChatMessageBox = React.forwardRef(
                         })}
                       </div>
 
-                      {value?.additional_kwargs?.files && (
+                      {/* {value?.additional_kwargs?.files && (
                         <div className="flex flex-wrap gap-2 p-1">
                           {value?.additional_kwargs?.files.map((file) => {
                             return (
@@ -262,7 +268,7 @@ const ChatMessageBox = React.forwardRef(
                             );
                           })}
                         </div>
-                      )}
+                      )} */}
 
                       {/* <div className="p-1">
                         {value?.content
@@ -334,9 +340,9 @@ const ChatMessageBox = React.forwardRef(
                   )}
                   {value.tool_calls && value.tool_calls.length > 0 && (
                     <>
-                      <div className="mb-2 text-sm font-medium">
+                      {/* <div className="mb-2 text-sm font-medium">
                         {t('tool_calls')}
-                      </div>
+                      </div> */}
                       <div className="flex flex-row flex-wrap gap-2">
                         <Collapse
                           className="w-full"
@@ -391,11 +397,33 @@ const ChatMessageBox = React.forwardRef(
                               ),
                               children: (
                                 <>
-                                  <div>input</div>
-                                  <ResponseCard value={toolCall.args} />
+                                  <div className="mb-2">
+                                    {t('common.parameters')} :{' '}
+                                    <Radio.Group
+                                      size="small"
+                                      value={toolCallInputView}
+                                      onChange={(e) =>
+                                        setToolCallInputView(e.target.value)
+                                      }
+                                    >
+                                      <Radio.Button value="json">
+                                        JSON
+                                      </Radio.Button>
+                                      <Radio.Button value="text">
+                                        Text
+                                      </Radio.Button>
+                                    </Radio.Group>
+                                  </div>
+                                  {toolCallInputView == 'text' && (
+                                    <ResponseCard value={toolCall.args} />
+                                  )}
+                                  {toolCallInputView == 'json' && (
+                                    <ReactJsonView src={toolCall.args} />
+                                  )}
+
                                   {toolMessageContent && (
                                     <>
-                                      <div>output</div>
+                                      <div className="mb-2">Output :</div>
                                       {renderToolContent(toolMessage)}
                                     </>
                                   )}

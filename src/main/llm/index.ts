@@ -14,7 +14,6 @@ import { Tool, ToolParams } from '@langchain/core/tools';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { RunnableLambda } from '@langchain/core/runnables';
 import { ChatGroqInput, ChatGroq } from '@langchain/groq';
-import { toolsManager } from '../tools';
 import settingsManager from '../settings';
 import providersManager from '../providers';
 import { ProviderType, Providers } from '../../entity/Providers';
@@ -36,10 +35,10 @@ export async function getChatModel(
   const model = provider?.models.find((x) => x.name === modelName);
 
   if (!model) {
-    throw new Error('Model not found');
+    throw new Error(`model "${modelName}" not found`);
   }
   if (!model.enable) {
-    throw new Error('Model not enable');
+    throw new Error(`model "${modelName}" not enable`);
   }
 
   let llm;
