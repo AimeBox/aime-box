@@ -14,34 +14,9 @@
   "DefaultEmbedding": "Default Embedding",
   "DefaultLLM": "Default LLM",
   "PluginsManage": "Plugins Manage",
-  "Settings": "Settings",
-  "settings.general_settings": "General Settings",
+
   "theme": "Theme",
-  "settings.defaultRanker": "Default Ranker",
-  "settings.defaultReranker": "Default Reranker",
-  "settings.defaultTTS": "Default TTS",
-  "settings.defaultEmbedding": "Default Embedding",
-  "settings.defaultTitleLLM": "Default Title LLM",
-  "settings.defaultLLM": "Default LLM",
-  "settings.settings": "Settings",
-  "settings.defaultSTT": "Default STT",
-  "settings.about": "About",
-  "settings.theme": "Theme",
-  "settings.language": "Language",
-  "settings.proxy": "Proxy",
-  "settings.proxy.system": "System",
-  "settings.proxy.custom": "Custom",
-  "settings.proxy.none": "None",
-  "settings.theme.light": "☀️Light",
-  "settings.theme.dark": "🌑Dark",
-  "settings.theme.system": "System",
-  "settings.zhipuWebSearchProApiKey": "ZhiPu Web Search Pro ApiKey",
-  "settings.serpapiApiKey": "Serpapi Api Key",
-  "settings.tavilyApiKey": "Tavily Api Key",
-  "settings.duckduckgo": "Duck Duck Go",
-  "settings.defaultWebSearchEngine": "Default Web Search Engine",
-  "settings.localModelManager": "Local Model Manager",
-  "settings.defaultModel": "Default Model",
+
   "chat.delete": "Delete",
   "chat.editTitle": "Edit Title",
   "kb.rerank_score": "rerank score",
@@ -56,7 +31,7 @@
   "tool.add_tool": "Add Tool",
   "tools.show_all": "All",
   "chat.chat_options.clear": "clear",
-  "settings.serverEnable": "Server Port",
+
   "delete": "Delete",
   "chat.chat_options.agents": "Agents",
   "selectFile": "Select File",
@@ -155,7 +130,46 @@
     "agent": "Agent",
     "home": "Home"
   },
+
   "settings": {
-    "defaultVision": "Default Vision"
+    "serverEnable": "Remote Server Port",
+    "serverPort": {
+      "description": "Internal Tools methods can be called from the outside via the API"
+    },
+    "settings": "Settings",
+    "defaultReranker": "Default Reranker",
+    "defaultTTS": "Default TTS",
+    "defaultEmbedding": "Default Embedding",
+    "defaultTitleLLM": "Default Title LLM",
+    "defaultLLM": "Default LLM",
+    "websearch_settings": "Websearch Settings",
+    "general_settings": "General Settings",
+    "defaultSTT": "Default STT",
+    "about": "About",
+    "theme": {
+      "theme": "Theme",
+      "light": "☀️Light",
+      "dark": "🌑Dark",
+      "system": "System"
+    },
+    "language": "Language",
+    "proxy": {
+      "proxy": "Proxy",
+      "system": "System",
+      "custom": "Custom",
+      "none": "None"
+    },
+    "localModelPath": "Local Model Path",
+    "huggingfaceUrl": "HuggingfaceUrl",
+    "defaultVision": "Default Vision",
+    "zhipuWebSearchProApiKey": "ZhiPu Web Search Pro ApiKey",
+    "searxngApiBase": "Searxng Api Base",
+    "serpapiApiKey": "Serpapi Api Key",
+    "tavilyApiKey": "Tavily Api Key",
+    "duckduckgo": "Duck Duck Go",
+    "defaultWebSearchEngine": "Default Web Search Engine",
+    "localModelManager": "Local Model Manager",
+    "defaultModel": "Default Model",
+    "showMcpWindows": "Show Mcp Windows"
   }
 }

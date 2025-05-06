@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import settingsManager from '../settings';
 import { toolsManager } from '../tools';
 import { TextToSpeech } from '../tools/TextToSpeech';
@@ -63,6 +63,18 @@ export class AppManager {
     if (audio.sampleRate) {
       await this.textToSpeech.play(audio);
     }
+  }
+
+  public async sendAllWindowsEvent(event: string, data: any) {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach((window) => {
+      window.webContents.send(event, data);
+    });
+  }
+
+  public async sendEvent(event: string, data: any) {
+    const windows = BrowserWindow.getAllWindows();
+    windows[0].webContents.send(event, data);
   }
 }
 

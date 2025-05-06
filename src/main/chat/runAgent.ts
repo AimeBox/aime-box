@@ -24,6 +24,7 @@ export const runAgent = async (
     recursionLimit?: number;
     callbacks?: {
       handlerMessageCreated?: (message: BaseMessage) => Promise<void>;
+      handlerMessageUpdate?: (message: BaseMessage) => Promise<void>;
       handlerMessageStream?: (message: BaseMessage) => Promise<void>;
       handlerMessageError?: (message: BaseMessage) => Promise<void>;
       handlerMessageFinished?: (message: BaseMessage) => Promise<void>;

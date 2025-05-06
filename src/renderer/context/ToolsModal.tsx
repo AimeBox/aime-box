@@ -1,5 +1,7 @@
 import {
   Button,
+  Card,
+  Collapse,
   Divider,
   Input,
   Menu,
@@ -33,7 +35,16 @@ export const ToolsModal = React.forwardRef(
       setSelectedTools = (tools: ToolInfo[]) => {},
       onChange = (tools: ToolInfo[]) => {},
     } = props;
-    console.log(tools);
+
+    const grouped = tools.reduce((acc, obj) => {
+      const key = obj.toolkit_name;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(obj);
+      return acc;
+    }, {});
+    console.log(grouped);
     const [selectedKey, setSelectedKey] = useState<string>('built-in');
     const onSearch = (v) => {};
 
@@ -44,6 +55,7 @@ export const ToolsModal = React.forwardRef(
       } else {
         _selectedTools = [...selectedTools, tool];
       }
+
       setSelectedTools(_selectedTools);
       onChange(_selectedTools);
     };
@@ -80,9 +92,12 @@ export const ToolsModal = React.forwardRef(
             </div>
             <ScrollArea className="flex-1 pl-2 my-1 w-full">
               <div className="flex flex-col gap-1">
-                {tools
-                  .filter((x) => x.type == selectedKey)
-                  .map((tool) => {
+                {Object.keys(grouped).map((key) => {
+                  if (grouped[key].length == 1) {
+                    const tool = grouped[key][0];
+                    if (tool.type != selectedKey) {
+                      return null;
+                    }
                     return (
                       <Button
                         key={tool.id}
@@ -104,7 +119,106 @@ export const ToolsModal = React.forwardRef(
                         />
                       </Button>
                     );
-                  })}
+                  } else {
+                    return (
+                      <>
+                        {grouped[key].filter((x) => x.type == selectedKey)
+                          .length > 0 && (
+                          <Card
+                            className="w-full"
+                            key={key}
+                            title={key.toLocaleUpperCase()}
+                            classNames={{ body: '!p-2' }}
+                          >
+                            <div className="flex flex-col gap-1">
+                              {grouped[key].map((tool, index) => {
+                                return (
+                                  <Button
+                                    key={tool.id}
+                                    type="text"
+                                    className="flex flex-row justify-between items-center h-16"
+                                    onClick={() => {
+                                      onSelect(tool);
+                                    }}
+                                  >
+                                    <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
+                                      <strong>{tool.name.split('@')[0]}</strong>
+
+                                      <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
+                                        {tool.description}
+                                      </small>
+                                    </div>
+                                    <FaCheck
+                                      color="green"
+                                      className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
+                                    />
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                          </Card>
+                          // <strong className="text-lg text-gray-500">
+                          //   {key.toLocaleUpperCase()}
+                          // </strong>
+                        )}
+
+                        {/* {grouped[key].map((tool) => {
+                          if (tool.type != selectedKey) {
+                            return null;
+                          }
+                          return (
+                            <Button
+                              key={tool.id}
+                              type="text"
+                              className="flex flex-row justify-between items-center h-16"
+                              onClick={() => {
+                                onSelect(tool);
+                              }}
+                            >
+                              <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
+                                <strong>{tool.name.split('@')[0]}</strong>
+
+                                <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
+                                  {tool.description}
+                                </small>
+                              </div>
+                              <FaCheck
+                                color="green"
+                                className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
+                              />
+                            </Button>
+                          );
+                        })} */}
+                      </>
+                    );
+                  }
+                })}
+                {/* {tools
+                  .filter((x) => x.type == selectedKey)
+                  .map((tool) => {
+                    return (
+                      <Button
+                        key={tool.name}
+                        type="text"
+                        className="flex flex-row justify-between items-center h-16"
+                        onClick={() => {
+                          onSelect(tool);
+                        }}
+                      >
+                        <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
+                          <strong>{tool.name}</strong>
+                          {tool.id}
+                          <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
+                            {tool.description}
+                          </small>
+                        </div>
+                        <FaCheck
+                          color="green"
+                          className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
+                        />
+                      </Button>
+                    );
+                  })} */}
               </div>
             </ScrollArea>
           </div>

@@ -5,11 +5,14 @@ import settingsManager from '../settings';
 import { toolsManager } from '../tools';
 import { agentManager } from '../agents';
 import { isObject } from '../utils/is';
+import { appManager } from '../app/AppManager';
+import { notificationManager } from '../app/NotificationManager';
+
 class ServerManager {
   server: Application;
 
   private httpServer?: ReturnType<Application['listen']>;
-
+  private isRunning = false;
   constructor() {
     this.server = express();
 
@@ -63,19 +66,29 @@ class ServerManager {
   }
 
   public start() {
+    if (this.isRunning) return;
     if (
       settingsManager.getSettings().serverEnable &&
       settingsManager.getSettings().serverPort
     ) {
-      this.httpServer = this.server.listen(
-        settingsManager.getSettings().serverPort,
-        '127.0.0.1',
-        () => {
-          console.log(
-            `AIME HTTP Server running on port ${settingsManager.getSettings().serverPort}`,
-          );
-        },
-      );
+      try {
+        this.httpServer = this.server.listen(
+          settingsManager.getSettings().serverPort,
+          '127.0.0.1',
+          () => {
+            this.isRunning = true;
+            console.log(
+              `AIME HTTP Server running on port ${settingsManager.getSettings().serverPort}`,
+            );
+          },
+        );
+      } catch {
+        this.isRunning = false;
+        notificationManager.sendNotification(
+          'AIME HTTP Server start failed',
+          'error',
+        );
+      }
     } else {
       console.log('AIME HTTP Server is disabled');
     }
@@ -87,7 +100,10 @@ class ServerManager {
   }
 
   public close() {
-    this.httpServer?.close();
+    if (this.isRunning) {
+      this.httpServer?.close();
+      this.isRunning = false;
+    }
   }
 }
 const serverManager = new ServerManager();

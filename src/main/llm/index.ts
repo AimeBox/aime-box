@@ -56,7 +56,9 @@ export async function getChatModel(
   } else if (
     provider?.type === ProviderType.OPENAI ||
     provider?.type === ProviderType.OPENROUTER ||
-    provider?.type === ProviderType.SILICONFLOW
+    provider?.type === ProviderType.SILICONFLOW ||
+    provider?.type === ProviderType.BAIDU ||
+    provider?.type === ProviderType.LMSTUDIO
   ) {
     llm = new ChatOpenAI({
       apiKey: provider.api_key,

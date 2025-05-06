@@ -161,6 +161,16 @@ export default function Connections() {
           api_base: 'https://api.together.xyz/v1',
           api_key: 'NULL',
         });
+      } else if (changedFields[0].value === 'baidu') {
+        form.setFieldsValue({
+          api_base: 'https://qianfan.baidubce.com/v2',
+          api_key: 'NULL',
+        });
+      } else if (changedFields[0].value === 'lmstudio') {
+        form.setFieldsValue({
+          api_base: 'http://localhost:1234/v1',
+          api_key: 'NULL',
+        });
       }
     }
   };
@@ -170,14 +180,19 @@ export default function Connections() {
       content: 'loading...',
       duration: 0,
     });
-    const models = await window.electron.providers.getModels(data.id);
-    setModels(models);
-    console.log(models);
-    setCurrentData(data);
-    formModels.resetFields();
-    formModels.setFieldsValue({ models: models });
-    setOpenModels(true);
-    messageApi.destroy();
+    try {
+      const models = await window.electron.providers.getModels(data.id);
+      setModels(models);
+      console.log(models);
+      setCurrentData(data);
+      if (models.length > 0) {
+        formModels.resetFields();
+        formModels.setFieldsValue({ models: models });
+        setOpenModels(true);
+      }
+    } finally {
+      messageApi.destroy();
+    }
   };
   const onSubmitModels = async (data: Providers) => {
     const models = formModels.getFieldValue('models');
@@ -429,35 +444,6 @@ export default function Connections() {
                                   formModels.getFieldValue('models')[field.name]
                                     .name
                                 }
-                              </div>
-                              <div className="flex flex-row gap-2 w-full">
-                                <Form.Item
-                                  noStyle
-                                  name={[field.name, 'input_token']}
-                                >
-                                  <InputNumber
-                                    controls={false}
-                                    prefix={<FaAngleUp />}
-                                    placeholder="Input Token"
-                                    size="small"
-                                    suffix="/ 1M token"
-                                    className="w-full text-gray-400"
-                                  />
-                                </Form.Item>
-
-                                <Form.Item
-                                  noStyle
-                                  name={[field.name, 'output_token']}
-                                >
-                                  <InputNumber
-                                    controls={false}
-                                    prefix={<FaAngleDown />}
-                                    placeholder="Ouput Token"
-                                    size="small"
-                                    suffix="/ 1M token"
-                                    className="w-full text-gray-400"
-                                  />
-                                </Form.Item>
                               </div>
                             </div>
                           </Form.Item>

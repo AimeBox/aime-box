@@ -13,8 +13,9 @@ export const getLoaderFromExt = (ext: string, value: string) => {
     case '.pdf':
       return new PDFLoader(value);
     case '.docx':
+      return new DocxLoader(value, { type: 'docx' });
     case '.doc':
-      return new DocxLoader(value);
+      return new DocxLoader(value, { type: 'doc' });
     case '.png':
     case '.jpg':
     case '.jpeg':

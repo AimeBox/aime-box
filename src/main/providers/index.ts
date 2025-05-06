@@ -25,6 +25,8 @@ import { ChatDeepSeek } from '@langchain/deepseek';
 import { getProviderModel } from '../utils/providerUtil';
 import { Transformers } from '../utils/transformers';
 import { notificationManager } from '../app/NotificationManager';
+import { ChatBaiduQianfan } from '@langchain/baidu-qianfan';
+import { ChatCompletion } from '@baiducloud/qianfan';
 
 export class ProvidersManager {
   repository: Repository<Providers>;
@@ -103,7 +105,10 @@ export class ProvidersManager {
               0,
           };
         });
-      } else if (connection.type === ProviderType.OPENAI) {
+      } else if (
+        connection.type === ProviderType.OPENAI ||
+        connection.type === ProviderType.LMSTUDIO
+      ) {
         const openai = new OpenAI({
           baseURL: connection.api_base,
           apiKey: connection.api_key,
@@ -119,15 +124,19 @@ export class ProvidersManager {
             };
           })
           .sort((a, b) => a.name.localeCompare(b.name));
-      } else if (connection.type === ProviderType.TONGYI) {
+      } else if (connection.type === ProviderType.BAIDU) {
         const models = [
-          'qwen-turbo',
-          'qwen-plus',
-          'qwen-max',
-          'qwen-max-0428',
-          'qwen-max-longcontext',
-          'qwen-vl-plus',
-          'qwen-vl-max',
+          'ernie-4.5-turbo-128k',
+          'ernie-4.5-turbo-32k',
+          'ernie-4.0-8k',
+          'ernie-4.0-8k-latest',
+          'ernie-4.0-turbo-128k',
+          'ernie-4.0-turbo-8k',
+          'ernie-speed-128k',
+          'ernie-speed-8k',
+          'ernie-speed-pro-128k',
+          'ernie-lite-8k',
+          'ernie-lite-pro-128k',
         ];
         return models.map((x) => {
           return {
@@ -136,6 +145,48 @@ export class ProvidersManager {
               connection.models?.find((z) => z.name == x)?.enable || false,
           };
         });
+
+        const options = {
+          method: 'POST',
+          agent: httpProxy,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${connection.api_key}`,
+          },
+          body: JSON.stringify({}),
+        };
+        const url = `https://qianfan.baidubce.com/v2/model?Action=DescribeCustomModelSets`;
+        const res = await fetch(url, options);
+        const data = await res.json();
+        return data.models.map((x) => {
+          return {
+            name: x.id,
+            enable:
+              connection.models?.find((z) => z.name == x.id)?.enable || false,
+          };
+        });
+      } else if (connection.type === ProviderType.TONGYI) {
+        const options = {
+          method: 'GET',
+          agent: httpProxy,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${connection.api_key}`,
+          },
+          // body: JSON.stringify({}),
+        };
+        const url = `https://dashscope.aliyuncs.com/compatible-mode/v1/models`;
+        const res = await fetch(url, options);
+        const data = await res.json();
+        return data.data
+          .map((x) => {
+            return {
+              name: x.id,
+              enable:
+                connection.models?.find((z) => z.name == x.id)?.enable || false,
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection.type === ProviderType.GROQ) {
         const groq = new Groq({
           baseURL: connection.api_base,
@@ -143,13 +194,15 @@ export class ProvidersManager {
           httpAgent: httpProxy,
         });
         const list = await groq.models.list();
-        return list.data.map((x) => {
-          return {
-            name: x.id,
-            enable:
-              connection.models.find((z) => z.name == x.id)?.enable || false,
-          };
-        });
+        return list.data
+          .map((x) => {
+            return {
+              name: x.id,
+              enable:
+                connection.models.find((z) => z.name == x.id)?.enable || false,
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection.type === ProviderType.ANTHROPIC) {
         const anthropic = new Anthropic({
           apiKey: connection.api_key,
@@ -193,14 +246,16 @@ export class ProvidersManager {
         const url = `${connection.api_base}/v1beta/models?key=${connection.api_key}`;
         const res = await fetch(url, options);
         const data = await res.json();
-        return data.models.map((x) => {
-          return {
-            name: x.name.split('/')[1],
-            enable:
-              connection.models?.find((z) => z.name == x.name.split('/')[1])
-                ?.enable || false,
-          };
-        });
+        return data.models
+          .map((x) => {
+            return {
+              name: x.name.split('/')[1],
+              enable:
+                connection.models?.find((z) => z.name == x.name.split('/')[1])
+                  ?.enable || false,
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection.type === ProviderType.OPENROUTER) {
         const options = {
           method: 'GET',
@@ -468,6 +523,28 @@ export class ProvidersManager {
             models: [],
           });
         }
+      } else if (connection?.type === ProviderType.LMSTUDIO) {
+        const options = {
+          method: 'GET',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            Authorization: `Bearer ${connection.api_key}`,
+          },
+        };
+        const url = `${connection.api_base}/models`;
+        try {
+          const res = await fetch(url, options);
+          const models = await res.json();
+
+          emb_list.push({
+            name: connection.name,
+            models:
+              models.data
+                ?.filter((x) => x.id.includes('embedding'))
+                .map((x) => x.id) ?? [],
+          });
+        } catch {}
       }
     }
     return emb_list;

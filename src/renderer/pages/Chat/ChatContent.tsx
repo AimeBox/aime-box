@@ -69,9 +69,10 @@ export default function ChatContent() {
   const editorRef = useRef<EditorRef>(null);
   const registerEvent = (id: string) => {
     const list = {
+      [`chat:changed:${id}`]: handleChatChanged,
       [`chat:message-finish:${id}`]: handleChatFinish,
       [`chat:message-stream:${id}`]: handleChatStream,
-      [`chat:message-changed:${id}`]: handleChatChanged,
+      [`chat:message-changed:${id}`]: handleChatMessageChanged,
     };
 
     Object.keys(list).forEach((eventId) => {
@@ -141,9 +142,18 @@ export default function ChatContent() {
   const onCancel = async (chatId: string) => {
     window.electron.chat.cancel(chatId);
   };
-  async function handleChatChanged(chatMessage: ChatMessage) {
+  async function handleChatChanged(chat?: Chat) {
     setCurrentChat((preChat) => {
-      if (preChat?.id === chatMessage.chat.id) {
+      if (chat && preChat?.id === chat.id) {
+        getChat(chat.id);
+        return preChat;
+      }
+      return preChat;
+    });
+  }
+  async function handleChatMessageChanged(chatMessage: ChatMessage) {
+    setCurrentChat((preChat) => {
+      if (chatMessage && preChat?.id === chatMessage.chat.id) {
         getChat(chatMessage.chat.id);
         return preChat;
       }
@@ -222,6 +232,7 @@ export default function ChatContent() {
     }
 
     return () => {
+      window.electron.ipcRenderer.removeAllListeners(`chat:changed:${id}`);
       window.electron.ipcRenderer.removeAllListeners(
         `chat:message-changed:${id}`,
       );
@@ -400,11 +411,28 @@ export default function ChatContent() {
                   {currentChat && (
                     <div className="flex flex-col py-8 w-full h-full">
                       <div className="pb-10">
-                        {currentChat?.chatMessages?.map(
-                          (chatMessage: ChatMessage) => {
+                        {currentChat?.chatMessages
+                          ?.filter((x) => x.role != 'tool')
+                          .map((chatMessage: ChatMessage) => {
+                            const toolMessages =
+                              chatMessage?.tool_calls?.length == 0
+                                ? []
+                                : currentChat?.chatMessages?.filter(
+                                    (x) =>
+                                      x.role == 'tool' &&
+                                      x.content.some(
+                                        (y) =>
+                                          y.type == 'tool_call' &&
+                                          chatMessage.tool_calls
+                                            ?.map((t) => t.id)
+                                            .includes(y.tool_call_id),
+                                      ),
+                                  );
+
                             return (
                               <ChatMessageBox
                                 key={chatMessage.id}
+                                toolMessages={toolMessages}
                                 // onRedo={() => onRedo(chatMessage)}
                                 onDeleted={() => onDelete(chatMessage)}
                                 onSetDivider={(v) =>
@@ -420,8 +448,7 @@ export default function ChatContent() {
                                 value={chatMessage}
                               />
                             );
-                          },
-                        )}
+                          })}
                       </div>
                     </div>
                   )}

@@ -10,7 +10,7 @@ import { getChatModel, getDefaultLLMModel } from '../llm';
 import settingsManager from '../settings';
 import providersManager from '../providers';
 import { ExtractAgent } from './extract/ExtractAgent';
-import { BaseAgent } from './BaseAgent';
+import { AgentMessageEvent, BaseAgent } from './BaseAgent';
 import { dbManager } from '../db';
 import { Agent } from '@/entity/Agent';
 import { Tool } from '@langchain/core/tools';
@@ -317,8 +317,16 @@ export class AgentManager {
     agent: Agent;
     store?: BaseStore;
     model?: string;
+    messageEvent?: AgentMessageEvent;
+    chatOptions?: ChatOptions;
   }) {
-    const { agent, store, model: providerModel } = config;
+    const {
+      agent,
+      store,
+      model: providerModel,
+      messageEvent,
+      chatOptions,
+    } = config;
     const { provider, modelName } = getProviderModel(
       providerModel || agent.model,
     );
@@ -368,7 +376,12 @@ export class AgentManager {
       }
     } else if (agent.type == 'built-in') {
       const _agent = this.agents.find((x) => x.info.name == agent.name);
-      return await _agent.agent.createAgent(store, model);
+      return await _agent.agent.createAgent(
+        store,
+        model,
+        messageEvent,
+        chatOptions,
+      );
     }
     return null;
   }

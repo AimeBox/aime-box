@@ -34,6 +34,8 @@ import nodeFetch, { RequestInit, Response } from 'node-fetch';
 import { getModelsPath } from '../utils/path';
 import { platform } from 'process';
 import { exec } from 'child_process';
+import serverManager from '../server/serverManager';
+import { isBoolean } from '../utils/is';
 
 export interface GlobalSettings {
   appName: string;
@@ -69,6 +71,7 @@ export interface GlobalSettings {
   huggingfaceUrl: string | null;
   serverEnable: boolean;
   serverPort: number | null;
+  showMcpWindows: boolean;
 }
 
 class SettingsManager {
@@ -102,6 +105,7 @@ class SettingsManager {
     huggingfaceUrl: 'https://huggingface.co',
     serverEnable: false,
     serverPort: 4560,
+    showMcpWindows: false,
   };
 
   downloadingModels: any[] = [];
@@ -183,12 +187,55 @@ class SettingsManager {
     const res = await this.settingsRepository.find();
     const obj = this.settingsCache;
 
-    res.forEach((item, index) => {
-      this.updateObject(obj, item.id.split('.'), item.value);
+    res.forEach((item) => {
+      // 获取当前值的类型信息
+      const keys = item.id.split('.');
+
+      let currentDefaultValue = obj;
+      let valueSet = false;
+
+      for (let i = 0; i < keys.length; i++) {
+        if (currentDefaultValue[keys[i]] === undefined) break;
+        if (i === keys.length - 1) {
+          const defaultValue = currentDefaultValue[keys[i]];
+          // 根据原始类型转换值
+          if (defaultValue === null && item.value === null) {
+            this.updateObject(obj, keys, null);
+          } else if (typeof defaultValue === 'boolean') {
+            this.updateObject(obj, keys, item.value === 'true');
+          } else if (typeof defaultValue === 'number') {
+            this.updateObject(obj, keys, Number(item.value));
+          } else if (typeof defaultValue === 'object') {
+            try {
+              // 尝试将JSON字符串解析为对象
+              const parsedValue = JSON.parse(item.value);
+              this.updateObject(obj, keys, parsedValue);
+            } catch (e) {
+              // 如果解析失败，直接使用字符串值
+              this.updateObject(obj, keys, item.value);
+            }
+          } else {
+            this.updateObject(obj, keys, item.value);
+          }
+          valueSet = true;
+        }
+        currentDefaultValue = currentDefaultValue[keys[i]];
+      }
+
+      // 如果没有匹配到类型信息，则直接设置
+      if (!valueSet) {
+        this.updateObject(obj, keys, item.value);
+      }
     });
+
     i18n.changeLanguage(obj.language);
     await this.updateProxy(obj.proxy);
     nativeTheme.themeSource = obj.theme.mode as 'system' | 'light' | 'dark';
+    if (obj.serverEnable) {
+      await serverManager.start();
+    } else {
+      await serverManager.close();
+    }
   }
 
   public async set(key: string, value: any) {
@@ -201,7 +248,20 @@ class SettingsManager {
         entity = new Settings();
         entity.id = key;
       }
-      entity.value = value || null;
+
+      // 确保所有类型的值都存储为字符串
+      if (value === null) {
+        entity.value = null;
+      } else if (typeof value === 'boolean') {
+        entity.value = value.toString();
+      } else if (typeof value === 'number') {
+        entity.value = value.toString();
+      } else if (typeof value === 'object') {
+        entity.value = JSON.stringify(value);
+      } else {
+        entity.value = value;
+      }
+
       await this.settingsRepository.save(entity);
       await this.loadSettings();
     }

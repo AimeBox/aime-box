@@ -50,7 +50,10 @@ export default function GeneralSettings() {
     window.electron.setting.set('serverEnable', value);
     getData();
   };
-
+  const onChangeShowMcpWindows = (value: boolean) => {
+    window.electron.setting.set('showMcpWindows', value);
+    getData();
+  };
   const onChangeServerPort = () => {
     if (
       serverPort &&
@@ -75,7 +78,7 @@ export default function GeneralSettings() {
       </div>
       <div className="flex flex-col gap-4 p-4">
         <div className="flex flex-col gap-2">
-          <div className="font-semibold">{t('settings.theme')}</div>
+          <div className="font-semibold">{t('settings.theme.theme')}</div>
           <Select
             value={settings?.theme.mode}
             style={{ width: 200 }}
@@ -100,7 +103,7 @@ export default function GeneralSettings() {
           />
         </div>
         <div className="flex flex-col gap-2">
-          <div className="font-semibold">{t('settings.proxy')}</div>
+          <div className="font-semibold">{t('settings.proxy.proxy')}</div>
           <div className="flex flex-row gap-2">
             <Select
               value={proxyMode}
@@ -146,6 +149,15 @@ export default function GeneralSettings() {
             <small className="text-sm text-gray-500">
               {t('settings.serverPort.description')}
             </small>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <div className="font-semibold">{t('settings.showMcpWindows')}</div>
+          <div className="flex flex-col gap-2 items-start">
+            <Switch
+              checked={settings?.showMcpWindows}
+              onChange={(v) => onChangeShowMcpWindows(v)}
+            />
           </div>
         </div>
       </div>

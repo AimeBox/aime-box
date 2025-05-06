@@ -59,6 +59,7 @@ import { getLoaderFromExt } from '../loaders';
 import { notificationManager } from '../app/NotificationManager';
 import { NotificationMessage } from '@/types/notification';
 import { ChatStatus } from '@/entity/Chat';
+import { appManager } from '../app/AppManager';
 
 export interface KnowledgeBaseDocument {
   document: DocumentInterface<Record<string, any>>;
@@ -287,7 +288,7 @@ export class KnowledgeBaseManager {
     if (document.metadata.source || document.metadata.title) {
       name = document.metadata.title ?? path.basename(document.metadata.source);
     }
-    await repository.insert({
+    let kbItem = {
       id: kbItemId,
       knowledgeBase: kb,
       name,
@@ -302,8 +303,9 @@ export class KnowledgeBaseManager {
         chunkOverlap: splitter.chunkOverlap,
       },
       content: document.pageContent,
-    } as KnowledgeBaseItem);
-
+    } as KnowledgeBaseItem;
+    await repository.insert(kbItem);
+    appManager.sendEvent(`kb:update-item`, kbItem);
     let documents = [];
     if (sourceType == KnowledgeBaseSourceType.Web) {
       splitter = RecursiveCharacterTextSplitter.fromLanguage('html', {
@@ -312,7 +314,10 @@ export class KnowledgeBaseManager {
       });
     }
     documents = await splitter.splitDocuments([document]);
-    const kbItem = await repository.findOne({ where: { id: kbItemId } });
+    kbItem = await repository.findOne({
+      where: { id: kbItemId },
+      relations: { knowledgeBase: true },
+    });
     if (documents.length > 0) {
       await vectraStore.addDocuments(documents, {
         kbid: Array(documents.length).fill(kb.id),
@@ -322,9 +327,11 @@ export class KnowledgeBaseManager {
       kbItem.chunkCount = documents.length;
       kbItem.state = KnowledgeBaseItemState.Completed;
     } else {
+      kbItem.isEnable = false;
       kbItem.state = KnowledgeBaseItemState.Fail;
     }
     await repository.save(kbItem);
+    appManager.sendEvent(`kb:update-item`, kbItem);
   }
 
   public queue = async (

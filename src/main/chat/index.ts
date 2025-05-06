@@ -394,21 +394,31 @@ export class ChatManager {
   }
 
   public async autoGenerationTitle(chat: Chat, content: string) {
-    const prompt = `Create a concise, 3-5 word phrase as a header for the following query, strictly adhering to the 3-5 word limit and avoiding the use of the word 'title': ${content}`;
+    const prompt = `Create a concise, 3-5 word phrase as a header for the following query, strictly adhering to the 3-5 word limit and avoiding the use of the word 'title', don't think`;
     chat.options = undefined;
     const defaultTitleLLM = settingsManager.getSettings()?.defaultTitleLLM;
     if (defaultTitleLLM) {
       try {
-        const res = await this.chat(defaultTitleLLM, [
-          new HumanMessage({ content: prompt }),
+        const { provider, modelName } = getProviderModel(defaultTitleLLM);
+        const llm = await getChatModel(provider, modelName, {
+          temperature: 0,
+          maxTokens: 100,
+        });
+        const res = await llm.invoke([
+          new SystemMessage({ content: prompt }),
+          new HumanMessage({ content: content }),
         ]);
-        if (res?.status == ChatStatus.SUCCESS) return res?.content;
+        let res_content: string | undefined = res?.content?.toString();
+        if (res_content) {
+          res_content = res_content.replace(/<think>[\s\S]*?<\/think>\n\n/, '');
+        }
+        return res_content?.trim().replace('\n', '');
       } catch (err) {
         console.error(err);
       }
     }
 
-    return content?.substring(0, 19);
+    return content?.substring(0, 20);
   }
 
   async getContent(
@@ -576,15 +586,26 @@ export class ChatManager {
             ChatStatus.SUCCESS,
           );
         } else {
+          const _content = isString(message.content)
+            ? [
+                {
+                  type: 'text',
+                  text: message.content,
+                },
+              ]
+            : message.content;
+          if (role == 'tool') {
+            _content[0].tool_call_id = (message as ToolMessage).tool_call_id;
+            _content[0].type = 'tool_call';
+          }
+
           msg = new ChatMessage(
             message.id,
             lastMesssageId,
             chat,
             modelName,
             role,
-            isString(message.content)
-              ? [{ type: 'text', text: message.content }]
-              : message.content,
+            _content,
             ChatStatus.RUNNING,
           );
         }
@@ -596,6 +617,13 @@ export class ChatManager {
         msg = await this.chatMessageRepository.save(msg);
         lastMesssageId = msg.id;
         event(`chat:message-changed:${chatId}`, msg);
+      },
+      handleMessageUpdate: async (message: BaseMessage) => {
+        event(`chat:message-changed:${chatId}`, {
+          chatId,
+          chatMessageId: message.id,
+          content: message.content,
+        });
       },
       handleMessageStream: async (message: AIMessage | ToolMessage) => {
         event(`chat:message-stream:${chatId}`, {
@@ -684,7 +712,10 @@ export class ChatManager {
             options: chat.options,
             callbacks,
             signal: controller.signal,
-            configurable: { chatRootPath: this.getChatPath(chatId) },
+            configurable: {
+              chatRootPath: this.getChatPath(chatId),
+              thread_id: chatId,
+            },
           });
         }
       } else if (chat.mode == 'planner' && chat.agent) {
@@ -806,7 +837,7 @@ export class ChatManager {
     configurable?: Record<string, any> | undefined,
   ) {
     const handlerMessageCreated = callbacks?.['handleMessageCreated'];
-    //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
+    const handlerMessageUpdate = callbacks?.['handleMessageUpdate'];
     const handlerMessageFinished = callbacks?.['handleMessageFinished'];
     const handlerMessageStream = callbacks?.['handleMessageStream'];
     const handlerMessageError = callbacks?.['handleMessageError'];
@@ -831,6 +862,7 @@ export class ChatManager {
       providerType,
       callbacks: {
         handlerMessageCreated,
+        handlerMessageUpdate,
         handlerMessageFinished,
         handlerMessageStream,
         handlerMessageError,
@@ -1007,16 +1039,36 @@ export class ChatManager {
     );
     const providerInfo = await providersManager.getProviders();
     const providerType = providerInfo.find((x) => x.name == provider)?.type;
+
+    const handlerMessageCreated = config.callbacks?.['handleMessageCreated'];
+    const handlerMessageUpdate = config.callbacks?.['handleMessageUpdate'];
+    const handlerMessageFinished = config.callbacks?.['handleMessageFinished'];
+    const handlerMessageStream = config.callbacks?.['handleMessageStream'];
+    const handlerMessageError = config.callbacks?.['handleMessageError'];
+
     const _agent = await agentManager.buildAgent({
       agent,
       store: new InMemoryStore(),
       model: config?.providerModel || agent.model,
+      chatOptions: config.options,
+      messageEvent: {
+        created: (msg) => {
+          msg.forEach((x) => {
+            handlerMessageCreated?.(x);
+          });
+        },
+        updated: (msg) => {
+          msg.forEach((x) => {
+            handlerMessageUpdate?.(x);
+          });
+        },
+        finished: (msg) => {
+          msg.forEach((x) => {
+            handlerMessageFinished?.(x);
+          });
+        },
+      },
     });
-    const handlerMessageCreated = config.callbacks?.['handleMessageCreated'];
-    //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
-    const handlerMessageFinished = config.callbacks?.['handleMessageFinished'];
-    const handlerMessageStream = config.callbacks?.['handleMessageStream'];
-    const handlerMessageError = config.callbacks?.['handleMessageError'];
     await runAgent(_agent, messages, {
       signal: config.signal,
       configurable: config.configurable,

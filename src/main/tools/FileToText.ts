@@ -59,11 +59,15 @@ export class FileToText extends Tool {
         const loader = new TextLoader(filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
-      } else if (ext.toLowerCase() == '.docx' || ext.toLowerCase() == '.doc') {
-        const loader = new DocxLoader(filePath);
+      } else if (ext.toLowerCase() == '.docx') {
+        const loader = new DocxLoader(filePath, { type: 'docx' });
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
-      } else if (ext.toLowerCase() == '.docx' || ext.toLowerCase() == '.pptx') {
+      } else if (ext.toLowerCase() == '.doc') {
+        const loader = new DocxLoader(filePath, { type: 'doc' });
+        const docs = await loader.load();
+        return docs.map((x) => x.pageContent).join('\n\n');
+      } else if (ext.toLowerCase() == '.pptx') {
         const loader = new PPTXLoader(filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');

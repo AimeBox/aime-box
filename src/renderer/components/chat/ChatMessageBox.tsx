@@ -58,6 +58,7 @@ import JSONPretty from 'react-json-pretty';
 import { JSONTree } from 'react-json-tree';
 import './ChatMessageBox.css';
 import ChatAttachment from './ChatAttachment';
+import { t } from 'i18next';
 // import 'katex/dist/katex.min.css';
 // import * as prod from 'react/jsx-runtime';
 // import { ProviderIcon } from '../common/ProviderIcon';
@@ -69,6 +70,7 @@ export interface ChatMessageProps {
   onChange?: (text: string | undefined, content: any[]) => void;
   onEdit?: (text: string) => void;
   onSetDivider?: (value: boolean) => void;
+  toolMessages?: ChatMessage[];
 }
 
 const ChatMessageBox = React.forwardRef(
@@ -80,6 +82,7 @@ const ChatMessageBox = React.forwardRef(
       onChange,
       onEdit,
       onSetDivider,
+      toolMessages,
     }: ChatMessageProps,
     ref: React.ForwardedRef<any>,
   ) => {
@@ -136,6 +139,10 @@ const ChatMessageBox = React.forwardRef(
       setContent(value?.content || []);
     }, [value]);
 
+    // useEffect(() => {
+    //   console.log('toolMessages', toolMessages);
+    // }, [toolMessages]);
+
     const toUrl = (video_path) => {
       const src = window.URL.createObjectURL(video_path);
       return src;
@@ -157,7 +164,26 @@ const ChatMessageBox = React.forwardRef(
     const onHistory = () => {
       console.log(value?.additional_kwargs?.history);
     };
-
+    const renderToolContent = (value: ChatMessage) => {
+      const toolContent = value?.content?.filter((x) => x.type == 'tool_call');
+      return (
+        <div>
+          {toolContent.map((x) => {
+            try {
+              if (isArray(JSON.parse(x.text))) {
+                return JSON.parse(x.text).map((item, index) => {
+                  return <ResponseCard value={item} key={item} />;
+                });
+              } else {
+                return <ResponseCard value={x.text} key={x.tool_call_id} />;
+              }
+            } catch (error) {
+              return <ResponseCard value={x.text} key={x} />;
+            }
+          })}
+        </div>
+      );
+    };
     return (
       <div className="w-full">
         <div className="flex flex-col justify-between px-5 mx-auto mb-3 max-w-5xl rounded-lg group">
@@ -254,7 +280,7 @@ const ChatMessageBox = React.forwardRef(
                               if (isArray(JSON.parse(x.text))) {
                                 return JSON.parse(x.text).map((item, index) => {
                                   return (
-                                    <ResponseCard value={item} key={index} />
+                                    <ResponseCard value={item} key={item} />
                                   );
                                 });
                               } else {
@@ -308,24 +334,72 @@ const ChatMessageBox = React.forwardRef(
                   )}
                   {value.tool_calls && value.tool_calls.length > 0 && (
                     <>
-                      <div className="mb-2 text-sm font-medium">工具调用</div>
+                      <div className="mb-2 text-sm font-medium">
+                        {t('tool_calls')}
+                      </div>
                       <div className="flex flex-row flex-wrap gap-2">
                         <Collapse
                           className="w-full"
                           items={value.tool_calls.map((toolCall, index) => {
+                            let toolMessageContent;
+
+                            const toolMessage = toolMessages?.find((t) =>
+                              t.content?.some(
+                                (c) =>
+                                  c.type == 'tool_call' &&
+                                  c.tool_call_id == toolCall.id,
+                              ),
+                            );
+                            if (toolMessage) {
+                              toolMessageContent = toolMessage.content?.find(
+                                (c) =>
+                                  c.type == 'tool_call' &&
+                                  c.tool_call_id == toolCall.id,
+                              );
+                            }
+
                             return {
                               key: toolCall.id,
-                              label: toolCall.name,
+                              label: (
+                                <div className="flex flex-row gap-3 items-center">
+                                  {' '}
+                                  <strong>{toolCall.name}</strong>
+                                  {toolMessage &&
+                                    toolMessage.status == 'success' && (
+                                      <Tag color="green">
+                                        {toolMessage.status}
+                                      </Tag>
+                                    )}
+                                  {toolMessage &&
+                                    toolMessage.status == 'error' && (
+                                      <Tag color="red">
+                                        {toolMessage.status}
+                                      </Tag>
+                                    )}
+                                  {toolMessage &&
+                                    toolMessage.status == 'running' && (
+                                      <Spin
+                                        indicator={
+                                          <LoadingOutlined
+                                            style={{ fontSize: 16 }}
+                                            spin
+                                          />
+                                        }
+                                      />
+                                    )}
+                                </div>
+                              ),
                               children: (
-                                <JSONTree
-                                  data={toolCall.args}
-                                  hideRoot
-                                  valueRenderer={(valueAsString, raw) => (
-                                    <span className="whitespace-pre-wrap">
-                                      {raw}
-                                    </span>
+                                <>
+                                  <div>input</div>
+                                  <ResponseCard value={toolCall.args} />
+                                  {toolMessageContent && (
+                                    <>
+                                      <div>output</div>
+                                      {renderToolContent(toolMessage)}
+                                    </>
                                   )}
-                                />
+                                </>
 
                                 // <pre className="overflow-x-scroll w-full whitespace-pre-wrap">
                                 //   {JSON.stringify(toolCall.args, null, 2)}

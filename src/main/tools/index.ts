@@ -1,23 +1,17 @@
 import { Calculator } from '@langchain/community/tools/calculator';
 import { SearchApi } from '@langchain/community/tools/searchapi';
-
-import {
-  TavilySearchResults,
-  type TavilySearchAPIRetrieverFields,
-} from '@langchain/community/tools/tavily_search';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { In, Like, Repository } from 'typeorm';
 import { DuckDuckGoSearchParameters } from '@langchain/community/tools/duckduckgo_search';
-import { SearxngSearch } from '@langchain/community/tools/searxng_search';
+
 import {
   GoogleRoutesAPI,
   GoogleRoutesAPIParams,
 } from '@langchain/community/tools/google_routes';
-import { TerminateTool } from './TerminateTool';
+import { TerminalTool } from './TerminalTool';
 import { DateTimeTool } from './DateTimeTool';
 import 'reflect-metadata';
-import settingsManager from '../settings';
 import { dbManager } from '../db';
 import Settings from '../../entity/Settings';
 import { DuckDuckGoSearchTool } from './DuckDuckGoSearch';
@@ -69,7 +63,7 @@ import fs from 'fs';
 import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket';
 import { createSmitheryUrl, MultiClient } from '@smithery/sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StdioClientTransport } from './mcp/StdioClientTransport';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { McpServers, Tools } from '@/entity/Tools';
 
@@ -84,6 +78,8 @@ import { TavilySearchTool } from './TavilySearch';
 import { UnixTimestampConvert } from './UnixTimestamp';
 import { BrowserUseTool } from './BrowserUse';
 import { Vision } from './Vision';
+import { MultiServerMCPClient } from '@langchain/mcp-adapters';
+import { SleepTool } from './Sleep';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -127,7 +123,7 @@ export class ToolsManager {
       if (!ts) {
         ts = new Tools(tool.name, tool.description, 'built-in', params);
         ts.enabled = false;
-        ts.toolkit_name = tool.toolKitName;
+        ts.toolkit_name = tool.toolKitName || tool.name;
 
         await this.toolRepository.save(ts);
       } else {
@@ -158,6 +154,7 @@ export class ToolsManager {
         id: ts.name,
         parameters: params,
         status: 'success',
+        toolkit_name: tool.toolKitName || tool.name,
         schema: zodToJsonSchema(tool.schema),
         officialLink: tool.officialLink,
         configSchema: tool.configSchema,
@@ -234,7 +231,6 @@ export class ToolsManager {
       );
       console.log(_tool.inputSchema);
       const schema = this.jsonSchemaToZod(_tool.inputSchema);
-      console.log(zodToJsonSchema(schema));
       return LangchainTool(
         async (input): Promise<string> => {
           const result = {};
@@ -418,6 +414,7 @@ export class ToolsManager {
     await this.refresh();
     this.refreshMcpList();
     if (!ipcMain) return;
+
     ipcMain.handle(
       'tools:getList',
       (
@@ -520,9 +517,12 @@ export class ToolsManager {
     this.tools = [];
 
     // await this.registerTool(new CmdTool());
+    if (!app.isPackaged) {
+      await this.registerTool(SleepTool);
+    }
     await this.registerTool(BrowserUseTool);
     await this.registerTool(ChartjsTool);
-    await this.registerTool(TerminateTool);
+    await this.registerTool(TerminalTool);
     await this.registerTool(Calculator);
     await this.registerTool(DateTimeTool);
     await this.registerTool(Translate);
@@ -719,6 +719,16 @@ export class ToolsManager {
     //const transport = this.createTransport(data.url, {});
     let mcpClient;
     try {
+      if (data.id) {
+        const client = this.mcpClients.find(
+          (x) => x.getServerVersion().name == data.id,
+        );
+        if (client) {
+          await client.transport?.close();
+          await client.close();
+        }
+      }
+
       mcpClient = await this.getMcpClient(
         undefined,
         data.command,
@@ -756,26 +766,7 @@ export class ToolsManager {
       try {
         const { tools } = await mcpClient.listTools();
         ts.id = serverName;
-        // const _tools = await this.toolRepository.find({
-        //   where: { mcp_id: serverName },
-        // });
-        // if (_tools.length > 0) {
-        //   await this.toolRepository.delete(_tools.map((x) => x.name));
-        // }
-        // let toolList = [];
-        // for (const tool of tools) {
-        //   let t = new Tools(
-        //     `${tool.name}@${ts.id}`,
-        //     tool.description,
-        //     'mcp',
-        //     {},
-        //   );
-        //   t.enabled = true;
-        //   t.mcp_id = ts.id;
-        //   t.toolkit_name = data.name;
-        //   toolList.push(t);
-        // }
-        // await this.toolRepository.save(toolList);
+        await mcpClient.transport?.close();
         await mcpClient.close();
         ts.enabled = true;
       } catch (err) {
@@ -787,7 +778,13 @@ export class ToolsManager {
         (x) => x.getServerVersion().name == ts.id,
       );
       if (client) {
-        await client.close();
+        try {
+          await client.transport.close();
+          await client.close();
+        } catch {}
+        await mcpClient.transport?.close();
+        await mcpClient.close();
+
         this.mcpClients = this.mcpClients.filter(
           (x) => x.getServerVersion().name != ts.id,
         );
@@ -819,6 +816,7 @@ export class ToolsManager {
         (x) => x.getServerVersion().name == ts.id,
       );
       if (client) {
+        await client.transport.close();
         await client.close();
         this.mcpClients = this.mcpClients.filter(
           (x) => x.getServerVersion().name != id,
@@ -858,7 +856,9 @@ export class ToolsManager {
       (x) => x.getServerVersion().name == mcpServer.id,
     );
     if (mcpClient) {
+      await mcpClient.transport?.close();
       await mcpClient.close();
+
       this.mcpClients = this.mcpClients.filter(
         (x) => x.getServerVersion().name != mcpServer.id,
       );
@@ -899,6 +899,7 @@ export class ToolsManager {
           t.toolkit_name = mcpServer.name;
           toolList.push(t);
           const toolInfo = { ...t } as ToolInfo;
+          toolInfo.id = `${mcpTool.name}@${mcpServer.id}`;
           toolInfo.schema = mcpTool.inputSchema;
           toolInfos.push(toolInfo);
         }
@@ -920,6 +921,7 @@ export class ToolsManager {
         );
         this.mcpClients.push(client);
         mcpServer.version = client.getServerVersion().version;
+        mcpServer.description = client.getServerVersion().description;
         await this.mcpServerRepository.save(mcpServer);
         console.log(`loaded success ${mcpServer.id}`);
       } catch (err) {
@@ -934,12 +936,6 @@ export class ToolsManager {
     this.mcpServerInfos.push(mcpServerInfo);
     return mcpServerInfo;
   };
-
-  private createTransport(smitheryServerUrl, config) {
-    return new WebSocketClientTransport(
-      createSmitheryUrl(`${smitheryServerUrl}/ws`, config),
-    );
-  }
 
   private async getMcpClient(
     mcpName?: string,
@@ -977,7 +973,6 @@ export class ToolsManager {
             env,
             cwd,
           });
-          transport.c;
         } else {
           transport = new StdioClientTransport({
             command: command,
@@ -999,11 +994,6 @@ export class ToolsManager {
           createSmitheryUrl(`${command}`, config),
         );
       }
-      // transport.onclose = () => {
-      //   this.mcpClients = this.mcpClients.filter(
-      //     (x) => x.getServerVersion().name != mcpName,
-      //   );
-      // };
       await client.connect(transport, { timeout: 1000 * 60 * 60 });
     }
 

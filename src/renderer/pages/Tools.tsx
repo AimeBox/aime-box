@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -275,70 +275,73 @@ export default function Tools() {
     if (tool.schema.required) required = tool.schema.required;
 
     Object.keys(tool.schema.properties).forEach((x) => {
-      if (
-        tool.schema.properties[x].type == 'string' ||
-        tool.schema.properties[x].type.includes('string')
-      ) {
-        if (Object.keys(tool.schema.properties[x]).includes('enum')) {
+      if (tool.schema.properties[x].type) {
+        if (
+          tool.schema.properties[x].type == 'string' ||
+          tool.schema.properties[x].type.includes('string')
+        ) {
+          if (Object.keys(tool.schema.properties[x]).includes('enum')) {
+            c.push({
+              field: x,
+              label: x,
+              required: required.includes(x),
+              component: 'Select',
+              subLabel: tool.schema.properties[x].description,
+              componentProps: {
+                options: tool.schema.properties[x].enum.map((e) => {
+                  return { label: e, value: e };
+                }),
+              },
+            } as FormSchema);
+          } else {
+            c.push({
+              field: x,
+              label: x,
+              required: required.includes(x),
+              subLabel: tool.schema.properties[x].description,
+              component: 'InputTextArea',
+            } as FormSchema);
+          }
+        } else if (tool.schema.properties[x].type == 'boolean') {
           c.push({
             field: x,
             label: x,
             required: required.includes(x),
-            component: 'Select',
             subLabel: tool.schema.properties[x].description,
+            component: 'Switch',
+            defaultValue: false,
+          } as FormSchema);
+        } else if (
+          tool.schema.properties[x].type == 'array' &&
+          tool.schema.properties[x].items.type == 'string'
+        ) {
+          c.push({
+            field: x,
+            label: x,
+            required: required.includes(x),
+            subLabel: tool.schema.properties[x].description,
+            component: 'Select',
+            defaultValue: false,
             componentProps: {
-              options: tool.schema.properties[x].enum.map((e) => {
-                return { label: e, value: e };
-              }),
+              mode: 'tags',
             },
           } as FormSchema);
-        } else {
+        } else if (
+          tool.schema.properties[x].type == 'number' ||
+          tool.schema.properties[x].type == 'integer'
+        ) {
           c.push({
             field: x,
             label: x,
             required: required.includes(x),
             subLabel: tool.schema.properties[x].description,
-            component: 'InputTextArea',
+            component: 'InputNumber',
+            defaultValue: tool.schema.properties[x].default,
+            componentProps: {},
           } as FormSchema);
         }
-      } else if (tool.schema.properties[x].type == 'boolean') {
-        c.push({
-          field: x,
-          label: x,
-          required: required.includes(x),
-          subLabel: tool.schema.properties[x].description,
-          component: 'Switch',
-          defaultValue: false,
-        } as FormSchema);
-      } else if (
-        tool.schema.properties[x].type == 'array' &&
-        tool.schema.properties[x].items.type == 'string'
-      ) {
-        c.push({
-          field: x,
-          label: x,
-          required: required.includes(x),
-          subLabel: tool.schema.properties[x].description,
-          component: 'Select',
-          defaultValue: false,
-          componentProps: {
-            mode: 'tags',
-          },
-        } as FormSchema);
-      } else if (
-        tool.schema.properties[x].type == 'number' ||
-        tool.schema.properties[x].type == 'integer'
-      ) {
-        c.push({
-          field: x,
-          label: x,
-          required: required.includes(x),
-          subLabel: tool.schema.properties[x].description,
-          component: 'InputNumber',
-          defaultValue: tool.schema.properties[x].default,
-          componentProps: {},
-        } as FormSchema);
       }
+
       // c.properties[x] = {
       //   type: tool.schema[x].type,
       //   title: x,
@@ -429,6 +432,36 @@ export default function Tools() {
     }
   };
 
+  const renderToolForm = useMemo(() => {
+    return currentMcp?.tools.map((item, index) => {
+      return {
+        key: item.name,
+        label: (
+          <div className="flex flex-col">
+            <strong>{item.name.split('@')[0]}</strong>
+            <small>{item.description}</small>
+          </div>
+        ),
+
+        children: (
+          <BasicForm
+            loading={invoking}
+            ref={toolTestFormRef[item.name]}
+            schemas={converFormSchemas(item)}
+            layout="vertical"
+            onFinish={async (value) => {
+              await invoke({
+                mcpToolName: item.name,
+                value: {
+                  ...value,
+                },
+              });
+            }}
+          />
+        ),
+      };
+    });
+  }, [currentMcp?.tools]);
   return (
     <Content>
       <FormModal
@@ -491,7 +524,7 @@ export default function Tools() {
                 </div>
               }
             >
-              <Button type="text" icon={<FaPlus />} className=""></Button>
+              <Button icon={<FaPlus />} className=""></Button>
             </Popover>
           }
         >
@@ -619,7 +652,10 @@ export default function Tools() {
                       <div className="flex justify-between items-start py-4 border-b border-gray-200">
                         <div className="ml-3 grow">
                           <div className="flex flex-row justify-between space-x-1 h-6 text-xl font-semibold">
-                            {currentMcp?.name}
+                            <div className="flex flex-row gap-2 items-center">
+                              {currentMcp?.name}
+                              <Tag>{currentMcp?.version}</Tag>
+                            </div>
 
                             <div className="flex flex-row flex-1 gap-2 justify-end mr-4">
                               <Button
@@ -650,6 +686,9 @@ export default function Tools() {
                               </Popconfirm>
                             </div>
                           </div>
+                          {currentMcp?.description && (
+                            <small>{currentMcp?.description}</small>
+                          )}
                           <div className="mt-2 text-sm font-normal text-gray-500 whitespace-pre-wrap">
                             {currentMcp?.command}
                           </div>
@@ -657,36 +696,7 @@ export default function Tools() {
                       </div>
                       <div className="flex flex-col gap-2 p-4">
                         {currentMcp.tools.length > 0 && (
-                          <Collapse
-                            items={currentMcp.tools.map((item, index) => {
-                              return {
-                                key: item.name,
-                                label: (
-                                  <div className="flex flex-col">
-                                    <strong>{item.name.split('@')[0]}</strong>
-                                    <small>{item.description}</small>
-                                  </div>
-                                ),
-
-                                children: (
-                                  <BasicForm
-                                    loading={invoking}
-                                    ref={toolTestFormRef[item.name]}
-                                    schemas={converFormSchemas(item)}
-                                    layout="vertical"
-                                    onFinish={async (value) => {
-                                      invoke({
-                                        mcpToolName: item.name,
-                                        value: {
-                                          ...value,
-                                        },
-                                      });
-                                    }}
-                                  />
-                                ),
-                              };
-                            })}
-                          ></Collapse>
+                          <Collapse items={renderToolForm}></Collapse>
                         )}
                       </div>
                     </div>

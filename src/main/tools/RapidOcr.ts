@@ -77,12 +77,14 @@ export class RapidOcrTool extends BaseTool {
             if (output != null && output.code == 100) {
               resolve(output);
             } else {
-              reject(output);
+              resolve(output);
             }
           });
         })) as any;
         if (json_res.code == 100) {
           return json_res.data.map((x) => x.text).join('');
+        } else if (json_res.code == 101) {
+          return 'Error:' + json_res.data;
         } else {
           return json_res.data;
         }

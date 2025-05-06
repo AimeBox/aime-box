@@ -7,6 +7,14 @@ import { Agent } from '@/entity/Agent';
 import { removeEmptyValues } from '../utils/common';
 import { BaseStore } from '@langchain/langgraph';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { BaseMessage } from '@langchain/core/messages';
+
+export interface AgentMessageEvent {
+  created?: (msg: BaseMessage[]) => void;
+  updated?: (msg: BaseMessage[]) => void;
+  finished?: (msg: BaseMessage[]) => void;
+  deleted?: (msg: BaseMessage[]) => void;
+}
 
 export abstract class BaseAgent extends Tool {
   abstract name: string;
@@ -70,7 +78,12 @@ export abstract class BaseAgent extends Tool {
     return { ...(this.config || {}), ...config };
   }
 
-  abstract createAgent(store?: BaseStore, model?: BaseChatModel): Promise<any>;
+  abstract createAgent(
+    store?: BaseStore,
+    model?: BaseChatModel,
+    messageEvent?: AgentMessageEvent,
+    chatOptions?: ChatOptions,
+  ): Promise<any>;
 
   // abstract invoke(input: z.infer<typeof this.schema> | string): Promise<any>;
 }

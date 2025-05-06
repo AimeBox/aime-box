@@ -10,16 +10,14 @@ export interface FileWriteParameters extends ToolParams {}
 export interface FileReadParameters extends ToolParams {}
 
 export class FileWrite extends BaseTool {
+  toolKitName?: string = 'file-system';
+
   schema = z.object({
     path: z.string().describe('local file path'),
     data: z.string().describe('file data'),
   });
 
   //output = und;
-
-  static lc_name() {
-    return 'file-write';
-  }
 
   name = 'file-write';
 
@@ -39,25 +37,33 @@ export class FileWrite extends BaseTool {
   }
 }
 
-export class FileRead extends Tool {
-  static lc_name() {
-    return 'file-read';
-  }
+export class FileRead extends BaseTool {
+  toolKitName?: string = 'file-system';
 
   name: string = 'file-read';
 
   description: string = 'read file';
 
+  schema = z.object({
+    path: z.string().describe('local file path'),
+  });
+
   constructor(params?: FileReadParameters) {
     super(params);
   }
 
-  async _call(input: string, runManager, config): Promise<string> {
-    return fs.readFileSync(input).toString();
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<string> {
+    return fs.readFileSync(input.path).toString();
   }
 }
 
 export class ListDirectory extends BaseTool {
+  toolKitName?: string = 'file-system';
+
   schema = z.object({
     path: z.string().describe('local dir path'),
     recursive: z
@@ -90,6 +96,8 @@ export class ListDirectory extends BaseTool {
 }
 
 export class CreateDirectory extends BaseTool {
+  toolKitName?: string = 'file-system';
+
   schema = z.object({
     paths: z.array(z.string()),
   });
@@ -120,6 +128,8 @@ export class CreateDirectory extends BaseTool {
 }
 
 export class SearchFiles extends BaseTool {
+  toolKitName?: string = 'file-system';
+
   schema = z.object({
     path: z.string(),
     pattern: z.string(),
@@ -196,6 +206,8 @@ export class MoveFile extends BaseTool {
 
   description: string =
     'Move or rename files and directories. Can move files between directories and rename them in a single operation. Both source and destination must be within allowed directories.';
+
+  toolKitName?: string = 'file-system';
 
   constructor(params?: FileWriteParameters) {
     super(params);

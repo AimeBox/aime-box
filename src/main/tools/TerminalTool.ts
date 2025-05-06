@@ -13,22 +13,22 @@ import { runCommand } from '../utils/exec';
 import { BaseTool } from './BaseTool';
 import { platform } from 'process';
 
-export interface TerminateToolParameters extends ToolParams {
+export interface TerminalToolParameters extends ToolParams {
   ask_human_input: boolean;
 }
 
-export class TerminateTool extends BaseTool {
+export class TerminalTool extends BaseTool {
   schema = z.object({
-    commands: z.string(),
+    command: z.string(),
   });
 
-  name: string = 'terminate';
+  name: string = 'terminal';
 
   description: string = `run ${platform == 'win32' ? 'cmd.exe' : 'bash'} commands on ${platform} system.`;
 
   ask_human_input: boolean = false;
 
-  constructor(params?: TerminateToolParameters) {
+  constructor(params?: TerminalToolParameters) {
     super();
     const { ask_human_input } = params ?? {};
     this.ask_human_input = ask_human_input ?? false;
@@ -39,7 +39,7 @@ export class TerminateTool extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    console.log(`Executing command:\n ${input.commands}`);
+    console.log(`Executing command:\n ${input.command}`);
 
     if (this.ask_human_input) {
       // if (user_input == 'y') {
@@ -48,7 +48,7 @@ export class TerminateTool extends BaseTool {
     } else {
       let res;
       try {
-        res = await runCommand(input.commands as string);
+        res = await runCommand(input.command as string);
       } catch (err) {
         console.error(err);
         res = err.message;

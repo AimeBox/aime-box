@@ -28,18 +28,9 @@ export interface MidjourneyParameters extends ToolParams {
 }
 
 export class Midjourney extends Tool {
-  // schema = z.object({
-  //   prompt: z.string().describe('prompt'),
-  //   state: z.string().optional().describe('state'),
-  // });
+  name: string = 'midjourney';
 
-  static lc_name() {
-    return 'Midjourney';
-  }
-
-  name: string;
-
-  description: string;
+  description: string = 'generate image';
 
   // officialLink: string;
 
@@ -51,18 +42,7 @@ export class Midjourney extends Tool {
 
   constructor(params?: MidjourneyParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'Midjourney',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'generate image',
-    });
+
     Object.defineProperty(this, 'apiKey', {
       enumerable: true,
       configurable: true,

@@ -21,6 +21,7 @@ import { FormSchema } from '@/types/form';
 export interface PythonInterpreterParameters extends ToolParams {
   pythonPath?: string;
   keepVenv?: boolean;
+  useVenv?: boolean;
 }
 
 export class PythonInterpreterTool extends BaseTool {
@@ -40,6 +41,12 @@ export class PythonInterpreterTool extends BaseTool {
       component: 'Switch',
       defaultValue: false,
     },
+    {
+      label: 'Use Venv',
+      field: 'useVenv',
+      component: 'Switch',
+      defaultValue: true,
+    },
   ];
 
   schema = z.object({
@@ -58,11 +65,14 @@ export class PythonInterpreterTool extends BaseTool {
 
   keepVenv: boolean = false;
 
+  useVenv: boolean = true;
+
   constructor(params?: PythonInterpreterParameters) {
     super(params);
 
     this.pythonPath = params?.pythonPath;
     this.keepVenv = params?.keepVenv ?? false;
+    this.useVenv = params?.useVenv ?? true;
   }
 
   async _call(
@@ -97,17 +107,25 @@ export class PythonInterpreterTool extends BaseTool {
           path.join(getTmpPath(), 'sandbox', `sandbox-`),
         );
       }
-      if (!fs.existsSync(path.join(tempDir, 'venv'))) {
-        await this.createVenv(path.join(tempDir, 'venv'));
+      if (this.useVenv) {
+        if (!fs.existsSync(path.join(tempDir, '.venv'))) {
+          await this.createVenv(path.join(tempDir, '.venv'));
+        }
+        if (platform == 'win32') {
+          this.pythonPath = path.join(
+            tempDir,
+            '.venv',
+            'Scripts',
+            'python.exe',
+          );
+        } else if (platform == 'darwin') {
+          this.pythonPath = path.join(tempDir, '.venv', 'bin', 'python');
+        } else if (platform == 'linux') {
+          this.pythonPath = path.join(tempDir, '.venv', 'bin', 'python');
+        }
+        console.log(`venv is allready created: ${path.join(tempDir, '.venv')}`);
       }
-      if (platform == 'win32') {
-        this.pythonPath = path.join(tempDir, 'venv', 'Scripts', 'python.exe');
-      } else if (platform == 'darwin') {
-        this.pythonPath = path.join(tempDir, 'venv', 'bin', 'python');
-      } else if (platform == 'linux') {
-        this.pythonPath = path.join(tempDir, 'venv', 'bin', 'python');
-      }
-      console.log(`venv is allready created: ${path.join(tempDir, 'venv')}`);
+
       if (
         input.dependencies &&
         input.dependencies.filter((x) => x.trim()).length > 0
@@ -135,7 +153,7 @@ export class PythonInterpreterTool extends BaseTool {
       }
       let isSuccess = false;
       console.log('check python virtual environment');
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 20; i++) {
         try {
           const res = await runCommand(`"${this.pythonPath}" -V`);
           console.log(res);

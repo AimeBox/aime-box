@@ -12,6 +12,8 @@ export enum ProviderType {
   OPENROUTER = 'openrouter',
   SILICONFLOW = 'siliconflow',
   DEEPSEEK = 'deepseek',
+  BAIDU = 'baidu',
+  LMSTUDIO = 'lmstudio',
 }
 
 @Entity('providers')

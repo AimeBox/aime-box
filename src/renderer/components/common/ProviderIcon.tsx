@@ -11,6 +11,8 @@ import siliconflowIcon from '../../../../assets/model-logos/siliconflow.png';
 import googleIcon from '../../../../assets/model-logos/google.png';
 import deepseekIcon from '../../../../assets/model-logos/deepseek.png';
 import togetheraiIcon from '../../../../assets/model-logos/togetherai.png';
+import baiduIcon from '../../../../assets/model-logos/baidu.png';
+import lmstudioIcon from '../../../../assets/model-logos/lmstudio.png';
 import { pathToFileURL } from 'url';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +25,7 @@ const logos = {
   tongyi: tongyiIcon,
   ollama: ollamaIcon,
   anthropic: anthropicIcon,
+  baidu: baiduIcon,
   zhipu: zhipuIcon,
   openai: openaiIcon,
   groq: groqIcon,
@@ -31,6 +34,7 @@ const logos = {
   google: googleIcon,
   deepseek: deepseekIcon,
   togetherai: togetheraiIcon,
+  lmstudio: lmstudioIcon,
 };
 // eslint-disable-next-line react/function-component-definition
 const ProviderIcon: React.FC<ProviderIconProps> = ({

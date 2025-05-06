@@ -10,7 +10,7 @@ const getDataPath = () => {
     userData = app.getAppPath();
   }
 
-  const dataPath = path.join(userData, '.data');
+  const dataPath = path.join(userData, 'data');
   if (!fs.existsSync(dataPath)) {
     fs.mkdirSync(dataPath, { recursive: true });
   }

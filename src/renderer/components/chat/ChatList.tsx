@@ -39,6 +39,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [addButtonOpen, setAddButtonOpen] = useState(false);
+  const [searchText, setSearchText] = useState<string | null>(null);
   const [isPackaged, setIsPackaged] = useState(true);
   const navigate = useNavigate();
   const getData = async (clear = false) => {
@@ -46,8 +47,8 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
       skip: clear ? 0 : chats.length,
       pageSize: 30,
       sort: 'timestamp desc',
+      filter: searchText,
     });
-
     setTotalCount(res.totalCount);
     setChats((preChats) => {
       if (clear) {
@@ -56,19 +57,11 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
       return [...preChats, ...res.items];
     });
   };
-  const onSearch = async (text: string) => {
-    const res = await window.electron.db.page<Chat>(
-      'chat',
-      text ? { title: text } : {},
-      0,
-      30,
-      'timestamp desc',
-    );
-    setTotalCount(res.totalCount);
-    setChats((preChats) => {
-      return res.items;
-    });
-  };
+
+  useEffect(() => {
+    getData(true);
+  }, [searchText]);
+
   async function onDelete(chat: Chat) {
     await window.electron.db.delete('chat', `id = '${chat.id}'`);
     message.success('delete success');
@@ -86,9 +79,9 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
     getData,
   }));
 
-  useEffect(() => {
-    getData();
-  }, []);
+  // useEffect(() => {
+  //   getData();
+  // }, []);
 
   useEffect(() => {
     const id = location.pathname.split('/')[2];
@@ -126,7 +119,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
 
   return (
     <List
-      onSearch={onSearch}
+      onSearch={setSearchText}
       dataLength={chats.length}
       hasMore={chats.length < totalCount}
       width={250}
@@ -181,7 +174,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
             </div>
           }
         >
-          <Button type="text" icon={<FaPlus />} className=""></Button>
+          <Button icon={<FaPlus />} className=""></Button>
         </Popover>
       }
     >
