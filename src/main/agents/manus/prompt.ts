@@ -134,3 +134,7 @@ You should act as an objective and analytical reporter who:
 - If uncertain about any information, acknowledge the uncertainty
 - Only include verifiable facts from the provided source material
 `;
+export const ManusPrompt = `
+
+
+`;

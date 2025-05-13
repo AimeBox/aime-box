@@ -16,6 +16,8 @@ import { Agent } from '@/entity/Agent';
 import { Tool } from '@langchain/core/tools';
 import {
   Runnable,
+  RunnableLambda,
+  RunnableParallel,
   RunnablePassthrough,
   RunnableSequence,
   RunnableWithMessageHistory,
@@ -33,18 +35,22 @@ import { BaseTool } from '../tools/BaseTool';
 import { toolsManager } from '../tools';
 import { getProviderModel } from '../utils/providerUtil';
 import { createSupervisor, OutputMode } from '@langchain/langgraph-supervisor';
-import {
-  BaseStore,
-  InMemoryStore,
-  MemorySaver,
-  StateGraph,
-} from '@langchain/langgraph';
+import { BaseStore } from '@langchain/langgraph';
 import { ManusAgent } from './manus/ManusAgent';
 import { notificationManager } from '../app/NotificationManager';
+import { createReactAgentWithSummary } from './react/ReActAgent';
+import { z } from 'zod';
+import {
+  ChatPromptTemplate,
+  PromptTemplate,
+  SystemMessagePromptTemplate,
+} from '@langchain/core/prompts';
+import dayjs from 'dayjs';
 
 export interface AgentInfo extends Agent {
   static: boolean;
   hidden: boolean;
+  fixedThreadId?: boolean;
   configSchema: FormSchema[];
 }
 
@@ -68,8 +74,9 @@ export class AgentManager {
     ipcMain.handle('agent:create', (event, data: any) =>
       this.createAgent(data),
     );
-    ipcMain.handle('agent:update', (event, data: any) =>
-      this.updateAgent(data),
+    ipcMain.handle(
+      'agent:update',
+      async (event, data: any) => await this.updateAgent(data),
     );
     ipcMain.handle('agent:delete', (event, id: string) => this.deleteAgent(id));
     ipcMain.on(
@@ -154,9 +161,11 @@ export class AgentManager {
     });
     if (!agent) throw new Error('找不到该agent');
     let configSchema;
+    let fixedThreadId = false;
     if (agent.type == 'built-in') {
-      configSchema = this.agents.find((x) => x.info.name == agent.name)?.info
-        .configSchema;
+      const baseagent = this.agents.find((x) => x.info.name == agent.name);
+      configSchema = baseagent?.info.configSchema;
+      fixedThreadId = baseagent?.info.fixedThreadId;
     }
 
     return {
@@ -164,7 +173,8 @@ export class AgentManager {
       config: agent.config || {},
       hidden: false,
       static: agent.type == 'built-in',
-      configSchema: configSchema,
+      configSchema,
+      fixedThreadId,
     };
   }
 
@@ -238,7 +248,6 @@ export class AgentManager {
         await agentRepository.save(ts);
       }
       this.agents = this.agents.filter((x) => x.info.name != agent.name);
-      //agent.config = ts.config;
       const config = await agent.getConfig();
 
       this.agents.push({
@@ -251,6 +260,7 @@ export class AgentManager {
           tags: agent.tags,
           config: config,
           configSchema: agent.configSchema,
+          fixedThreadId: agent.fixedThreadId,
         },
         agent,
       });
@@ -333,15 +343,17 @@ export class AgentManager {
             agent.mermaid = mermaid;
             await this.agentRepository.save(agent);
           } catch (err) {
-            console.error(`build agent '${agent.name}' fail, ${err.message}`);
+            console.error(
+              `agent "${agent.name}" draw mermaid fail, ${err.message}`,
+            );
           }
         }
       } catch (err) {
-        notificationManager.sendNotification(
-          `build agent "${agent.name}" fail, ${err.message}`,
-          'error',
-        );
-        throw new Error(`build agent ${agent.name} fail`);
+        // notificationManager.sendNotification(
+        //   `build agent "${agent.name}" fail, ${err.message}`,
+        //   'error',
+        // );
+        throw new Error(`build agent "${agent.name}" fail, ${err.message}`);
       }
     }
 
@@ -354,15 +366,18 @@ export class AgentManager {
 
   public async buildAgent(config: {
     agent: Agent;
+    tools?: BaseTool[];
     store?: BaseStore;
     model?: string;
     messageEvent?: AgentMessageEvent;
     chatOptions?: ChatOptions;
     signal?: AbortSignal;
+    responseFormat?: z.ZodObject<any>;
   }) {
     const {
       agent,
       store,
+      tools,
       model: providerModel,
       messageEvent,
       chatOptions,
@@ -376,18 +391,31 @@ export class AgentManager {
       model = await getChatModel(provider, modelName, agent.config);
     }
 
+    const commonParams = {
+      current_time: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      locale: settingsManager.getSettings()?.language,
+    };
+
     if (agent.type == 'react' || agent.type == 'supervisor') {
       const tools = await toolsManager.buildTools(agent?.tools);
       if (agent.type == 'react') {
+        const prompt = agent.prompt
+          ? await SystemMessagePromptTemplate.fromTemplate(agent.prompt).format(
+              commonParams,
+            )
+          : 'You are a ai agent, you can use the tools to help you answer the question.';
+
         const reactAgent = createReactAgent({
           llm: model,
           tools: tools,
           name: agent.name,
           store: store,
           checkpointSaver: dbManager.langgraphSaver,
-          prompt:
-            agent.prompt ||
-            'You are a ai agent, you can use the tools to help you answer the question.',
+          prompt: prompt,
+          // summaryOption: {
+          //   keepLastMessagesCount: 3,
+          // },
+          responseFormat: config.responseFormat,
         });
 
         return reactAgent;
@@ -407,13 +435,15 @@ export class AgentManager {
 
           agents.push(workflow);
         }
-
+        const prompt = await SystemMessagePromptTemplate.fromTemplate(
+          agent.prompt,
+        ).format(commonParams);
         const supervisorAgent = createSupervisor({
           supervisorName: agent.name,
           agents: agents,
           llm: model,
           tools: tools,
-          prompt: agent.prompt,
+          prompt: prompt,
           outputMode: (agent.supervisorOutputMode ||
             'last_message') as OutputMode,
         });

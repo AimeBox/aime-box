@@ -50,12 +50,14 @@ const ScrollArea = React.forwardRef<ScrollAreaRef, ScrollAreaProps>(
     const [scrollHeight, setScrollHeight] = useState(0);
     const internalScrollRef = useRef<HTMLDivElement | null>(null);
     const internalViewportRef = useRef<HTMLDivElement | null>(null);
+    const [isScrolling, setIsScrolling] = useState(false);
 
     const scrollBottom = (onlyIsBottom = false) => {
       const viewportElement = internalViewportRef.current;
       const rootElement = internalScrollRef.current;
 
       if (!viewportElement || !rootElement) return;
+      if (isScrolling) return;
 
       if (onlyIsBottom) {
         if (isBottom) {
@@ -88,6 +90,7 @@ const ScrollArea = React.forwardRef<ScrollAreaRef, ScrollAreaProps>(
       const rootElement = internalScrollRef.current;
 
       if (!viewportElement || !rootElement) return undefined;
+      let timeoutId: NodeJS.Timeout | null = null;
 
       // 初始设置滚动高度
       setScrollHeight(viewportElement.scrollHeight);
@@ -111,6 +114,11 @@ const ScrollArea = React.forwardRef<ScrollAreaRef, ScrollAreaProps>(
         setScrollHeight(viewportElement.scrollHeight);
         // 检查是否滚动到底部
         checkIfBottom(viewportElement);
+
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setIsScrolling(false);
+        }, 300);
       };
 
       // 创建ResizeObserver来监听元素大小变化
@@ -127,6 +135,7 @@ const ScrollArea = React.forwardRef<ScrollAreaRef, ScrollAreaProps>(
       return () => {
         resizeObserver.disconnect();
         viewportElement.removeEventListener('scroll', handleScroll);
+        if (timeoutId) clearTimeout(timeoutId);
       };
     }, []);
 

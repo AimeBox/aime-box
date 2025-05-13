@@ -74,18 +74,24 @@ export interface ChatMessageProps {
   onEdit?: (text: string) => void;
   onSetDivider?: (value: boolean) => void;
   toolMessages?: ChatMessage[];
+  editEnabled?: boolean;
+  hideHead?: boolean;
+  hideIcon?: boolean;
 }
 
 const ChatMessageBox = React.forwardRef(
   (
     {
       value,
+      editEnabled = true,
       onRedo,
       onDeleted,
       onChange,
       onEdit,
       onSetDivider,
       toolMessages,
+      hideHead = value.role == 'user',
+      hideIcon = value.role == 'user',
     }: ChatMessageProps,
     ref: React.ForwardedRef<any>,
   ) => {
@@ -194,50 +200,72 @@ const ChatMessageBox = React.forwardRef(
       <div className="w-full">
         <div className="flex flex-col justify-between px-5 mx-auto mb-3 max-w-5xl rounded-lg group">
           <div className="flex w-full">
-            <div className="flex justify-center items-center mr-4 w-10 h-10 bg-gray-100 rounded-2xl">
-              {value.provider_type && (
-                <ProviderIcon provider={value.provider_type} />
-              )}
-              {value.role == 'user' && <FaUser />}
-              {value.role == 'tool' && <FaToolbox />}
-            </div>{' '}
+            {!hideIcon && value.role == 'assistant' && value.provider_type && (
+              <ProviderIcon
+                size="2.5rem"
+                provider={value.provider_type}
+                className="flex justify-center items-center mr-4 w-10 h-10 bg-gray-100 rounded-2xl"
+              />
+            )}
+            {!hideIcon && value.role == 'user' && (
+              <div className="flex justify-center items-center mr-4 w-10 h-10 bg-gray-100 rounded-2xl">
+                <FaUser />
+              </div>
+            )}
+
             <div className="overflow-hidden flex-1 w-full">
-              <div className="user-message">
-                <div className="self-center font-bold mb-0.5 capitalize line-clamp-1 h-10 flex items-center">
-                  {value.role != 'tool' && (
-                    <span className="mr-2 text-lg">
-                      {value.role === 'user' ? 'You' : value.model}{' '}
-                    </span>
-                  )}
-                  {value.role == 'tool' && (
+              {hideHead === false && (
+                <div className="user-message">
+                  <div className="self-center font-bold mb-0.5 capitalize line-clamp-1 h-10 flex items-center text-gray-700 dark:text-gray-300">
+                    {value.role != 'tool' && (
+                      <span className="mr-2 text-lg">
+                        {value.role === 'user' ? 'You' : value.model}{' '}
+                      </span>
+                    )}
+                    {/* {value.role == 'tool' && (
                     <span className="flex flex-row items-center mr-2 text-lg">
                       {value?.content?.find((x) => x.type == 'tool_call')
                         ?.tool_call_name ?? value.model}
                     </span>
-                  )}
-                  <span className="invisible text-xs font-medium text-gray-400 group-hover:visible">
-                    {dayjs(value.timestamp).format('YYYY-MM-DD HH:mm:ss dddd')}
-                  </span>
+                  )} */}
+                    <span className="invisible text-xs font-medium text-gray-400 group-hover:visible">
+                      {dayjs(value.timestamp).format(
+                        'YYYY-MM-DD HH:mm:ss dddd',
+                      )}
+                    </span>
+                  </div>
                 </div>
-              </div>{' '}
+              )}
+
               <div className="w-full max-w-full">
                 {' '}
                 <div className="w-full">
                   {!edit && (
                     <>
                       {/* <ReactMarkdown>{textContent}</ReactMarkdown> */}
-                      <div className="flex flex-row flex-wrap gap-2">
+                      <div
+                        className={`flex flex-row flex-wrap gap-2 ${
+                          value.role == 'user' ? 'justify-end' : ''
+                        } w-full`}
+                      >
                         {value?.content.map((x) => {
                           return (
                             <>
                               {x.type == 'text' && (
-                                <div className="p-1 w-full">
+                                <div
+                                  className={`${
+                                    value.role == 'user'
+                                      ? 'bg-gray-100 dark:bg-gray-800 p-4 rounded-se-2xl rounded-ss-2xl rounded-es-2xl ml-10 '
+                                      : ''
+                                  }`}
+                                >
                                   <Markdown value={x.text} key={x} />
                                 </div>
                               )}
+
                               {x.type == 'image_url' && (
                                 <div
-                                  className="overflow-hidden rounded-2xl shadow max-h-[200px]"
+                                  className={`overflow-hidden rounded-2xl shadow max-h-[200px] ${value.role == 'user' ? 'ml-10' : ''}`}
                                   key={x}
                                 >
                                   <Image
@@ -333,11 +361,7 @@ const ChatMessageBox = React.forwardRef(
                     //   style={{ height }}
                     // />
                   )}
-                  {value.status == 'error' && (
-                    <div className="mt-2">
-                      <Alert message={value.error_msg} type="error" />
-                    </div>
-                  )}
+
                   {value.tool_calls && value.tool_calls.length > 0 && (
                     <>
                       {/* <div className="mb-2 text-sm font-medium">
@@ -345,7 +369,7 @@ const ChatMessageBox = React.forwardRef(
                       </div> */}
                       <div className="flex flex-row flex-wrap gap-2">
                         <Collapse
-                          className="w-full"
+                          className="w-full dark:border-gray-700"
                           items={value.tool_calls.map((toolCall, index) => {
                             let toolMessageContent;
 
@@ -367,7 +391,7 @@ const ChatMessageBox = React.forwardRef(
                             return {
                               key: toolCall.id,
                               label: (
-                                <div className="flex flex-row gap-3 items-center">
+                                <div className="flex flex-row gap-3 items-center text-gray-700 dark:text-gray-300">
                                   {' '}
                                   <strong>{toolCall.name}</strong>
                                   {toolMessage &&
@@ -440,6 +464,12 @@ const ChatMessageBox = React.forwardRef(
                     </>
                   )}
 
+                  {value.status == 'error' && (
+                    <div className="mt-2">
+                      <Alert message={value.error_msg} type="error" />
+                    </div>
+                  )}
+
                   {!edit && value.status != 'running' && (
                     <div className="flex overflow-x-auto gap-2 justify-start items-center mt-5 text-gray-700 opacity-0 transition-opacity duration-300 buttons dark:text-gray-500 group-hover:opacity-100">
                       <div className="flex flex-row space-x-1">
@@ -450,11 +480,14 @@ const ChatMessageBox = React.forwardRef(
                               icon={<FaPlay></FaPlay>}
                               onClick={onPlay}
                             ></Button>
-                            <Button
-                              type="text"
-                              icon={<FaEdit></FaEdit>}
-                              onClick={openEdit}
-                            ></Button>
+                            {editEnabled && (
+                              <Button
+                                type="text"
+                                icon={<FaEdit></FaEdit>}
+                                onClick={openEdit}
+                              ></Button>
+                            )}
+
                             <Button
                               type="text"
                               icon={<FaClipboard></FaClipboard>}
@@ -484,6 +517,7 @@ const ChatMessageBox = React.forwardRef(
                             content={
                               <div className="flex flex-col gap-2 max-w-[400px] max-h-[300px] overflow-y-auto">
                                 {value?.additional_kwargs?.history.map((x) => {
+                                  if (!x?.['kwargs']) return <></>;
                                   return (
                                     <div
                                       key={x['kwargs'].id}
@@ -492,11 +526,12 @@ const ChatMessageBox = React.forwardRef(
                                       <div>
                                         <Tag>{x['id'][x['id'].length - 1]}</Tag>
                                       </div>
-                                      {JSON.stringify(
-                                        x['kwargs']['tool_calls'],
-                                      )}
+                                      {x?.['kwargs']?.['tool_calls'] &&
+                                        JSON.stringify(
+                                          x['kwargs']['tool_calls'],
+                                        )}
                                       <small className="">
-                                        {JSON.stringify(x['kwargs'].content)}
+                                        {JSON.stringify(x?.['kwargs']?.content)}
                                       </small>
                                     </div>
                                   );

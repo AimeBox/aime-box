@@ -43,6 +43,9 @@ export class KnowledgeBase {
 
   @OneToMany((type) => KnowledgeBaseItem, (item) => item.knowledgeBase) // note: we will create author property in the Photo class below
   items?: KnowledgeBaseItem[];
+
+  @Column({ default: true })
+  isPrivate!: boolean;
 }
 
 export enum KnowledgeBaseItemState {

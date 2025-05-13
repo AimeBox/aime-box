@@ -62,7 +62,6 @@ import { BaseTool } from './BaseTool';
 import { KnowledgeBaseQuery } from './KnowledgeBaseQuery';
 import fs from 'fs';
 import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket';
-import { createSmitheryUrl, MultiClient } from '@smithery/sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from './mcp/StdioClientTransport';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -82,6 +81,9 @@ import { Vision } from './Vision';
 import { MultiServerMCPClient } from '@langchain/mcp-adapters';
 import { SleepTool } from './Sleep';
 import { appManager } from '../app/AppManager';
+import { BraveSearchTool } from './websearch/BraveSearch';
+import { ArxivTool } from './Arxiv';
+import { FireCrawl } from './FireCrawl';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -368,13 +370,15 @@ export class ToolsManager {
       return z.optional(validator);
     } else if (schema.type === 'object') {
       const shape = {};
+      let validator;
       if (schema.properties) {
         for (const [key, propSchema] of Object.entries(schema.properties)) {
           shape[key] = this.jsonSchemaToZod(propSchema);
         }
+        validator = z.object(shape);
+      } else {
+        validator = z.any();
       }
-
-      let validator = z.object(shape);
 
       // 处理必填字段
       if (schema.required && Array.isArray(schema.required)) {
@@ -411,7 +415,17 @@ export class ToolsManager {
       const tools = await this.toolRepository.find({
         where: { name: In(toolNames) },
       });
-      return Promise.all(tools.map((x) => this.buildTool(x, x.config)));
+      const buildedTools: BaseTool[] = [];
+      for (const tool of tools) {
+        const buildedTool = await this.buildTool(tool, tool.config);
+        if (buildedTool) {
+          buildedTools.push(buildedTool);
+        } else {
+          throw new Error(`build tool ${tool.name} failed`);
+        }
+      }
+
+      return buildedTools;
     }
     return [];
   };
@@ -515,7 +529,7 @@ export class ToolsManager {
     outputFormat: 'default' | 'markdown' = 'default',
   ): Promise<string> => {
     const tool = new WebSearchTool({ provider: provider, limit: limit });
-    let resJson = await tool.invoke(search);
+    let resJson = await tool.invoke({ query: search });
     if (isString(resJson)) {
       try {
         resJson = JSON.parse(resJson);
@@ -523,6 +537,7 @@ export class ToolsManager {
     }
     if (outputFormat == 'default') return resJson;
     else if (outputFormat == 'markdown') return this.toMarkdown(resJson);
+    return resJson;
   };
 
   public refresh = async () => {
@@ -611,6 +626,9 @@ export class ToolsManager {
     await this.registerTool(WebSearchTool);
     await this.registerTool(KnowledgeBaseQuery);
     await this.registerTool(TavilySearchTool);
+    await this.registerTool(BraveSearchTool);
+    await this.registerTool(FireCrawl);
+    await this.registerTool(ArxivTool);
   };
 
   public update = async (toolName: string, arg: any) => {
@@ -704,12 +722,14 @@ export class ToolsManager {
       entries.forEach((item) => {
         const key = item[0];
         const value = item[1];
-        if (isObject(value)) {
-          text += `**${key}**:\n${JSON.stringify(value, null, 2)}\n`;
-        } else if (isArray(value)) {
-          text += `**${key}**:\n${JSON.stringify(value, null, 2)}\n`;
-        } else {
-          text += `**${key}**:\n${value.toString()}\n`;
+        if (value != null) {
+          if (isObject(value)) {
+            text += `**${key}**:\n${JSON.stringify(value, null, 2)}\n`;
+          } else if (isArray(value)) {
+            text += `**${key}**:\n${JSON.stringify(value, null, 2)}\n`;
+          } else {
+            text += `**${key}**:\n${value?.toString() || ''}\n`;
+          }
         }
       });
       return text;
@@ -1013,23 +1033,32 @@ export class ToolsManager {
           });
         }
       } else if (type == 'sse') {
-        transport = new SSEClientTransport(
-          createSmitheryUrl(`${command}`, config),
-          {
-            requestInit: {
-              keepalive: true,
-            },
+        transport = new SSEClientTransport(this.createMcpUrl(command, config), {
+          requestInit: {
+            keepalive: true,
           },
-        );
+        });
       } else if (type == 'ws') {
         transport = new WebSocketClientTransport(
-          createSmitheryUrl(`${command}`, config),
+          this.createMcpUrl(command, config),
         );
       }
       await client.connect(transport, { timeout: 1000 * 60 * 60 });
     }
 
     return client;
+  }
+
+  createMcpUrl(command: string, config: any) {
+    const url = new URL(`${command}/mcp`);
+    if (config) {
+      const param =
+        typeof window !== 'undefined'
+          ? btoa(JSON.stringify(config))
+          : Buffer.from(JSON.stringify(config)).toString('base64');
+      url.searchParams.set('config', param);
+    }
+    return url;
   }
 }
 

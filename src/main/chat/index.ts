@@ -78,6 +78,7 @@ import { AgentExecutor } from 'langchain/agents';
 import { writeFile } from 'node:fs/promises';
 import { runAgent } from './runAgent';
 import {
+  Command,
   CompiledStateGraph,
   InMemoryStore,
   MessagesAnnotation,
@@ -613,7 +614,7 @@ export class ChatManager {
         msg.provider_type = message.additional_kwargs[
           'provider_type'
         ] as string;
-        msg.model = message.additional_kwargs['model'] as string;
+        msg.model = (message.additional_kwargs['model'] as string) || 'Unknown';
         msg = await this.chatMessageRepository.save(msg);
         lastMesssageId = msg.id;
         event(`chat:message-changed:${chatId}`, msg);
@@ -708,7 +709,7 @@ export class ChatManager {
             options: chat.options,
             callbacks,
             signal: controller.signal,
-            configurable: { chatRootPath: this.getChatPath(chatId) },
+            configurable: { workspace: this.getChatPath(chatId), chatId },
           });
         } else if (agent.type == 'react') {
           await this.chatReact(agent, messages, {
@@ -716,17 +717,20 @@ export class ChatManager {
             options: chat.options,
             callbacks,
             signal: controller.signal,
-            configurable: { chatRootPath: this.getChatPath(chatId) },
+            configurable: { workspace: this.getChatPath(chatId), chatId },
           });
         } else if (agent.type == 'built-in') {
           await this.chatBuiltIn(agent, messages, {
+            chatId,
             providerModel: chat.model,
             options: chat.options,
             callbacks,
             signal: controller.signal,
+            fixedThreadId: agent.fixedThreadId,
             configurable: {
-              chatRootPath: this.getChatPath(chatId),
-              thread_id: chatId,
+              workspace: this.getChatPath(chatId),
+              thread_id: agent.fixedThreadId === true ? chatId : undefined,
+              chatId,
             },
           });
         }
@@ -738,8 +742,9 @@ export class ChatManager {
           callbacks,
           signal: controller.signal,
           configurable: {
-            chatRootPath: this.getChatPath(chatId),
+            workspace: this.getChatPath(chatId),
             thread_id: chatId,
+            chatId,
           },
         });
       } else {
@@ -750,7 +755,7 @@ export class ChatManager {
           chat.options,
           callbacks,
           controller.signal,
-          { chatRootPath: this.getChatPath(chatId) },
+          { workspace: this.getChatPath(chatId) },
         );
       }
     } catch (err) {
@@ -1039,11 +1044,13 @@ export class ChatManager {
     agent: Agent,
     messages: BaseMessage[],
     config: {
+      chatId: string;
       providerModel: string;
       options?: ChatOptions | undefined;
       callbacks?: any | undefined;
       signal?: AbortSignal | undefined;
       configurable?: Record<string, any> | undefined;
+      fixedThreadId?: boolean;
     },
   ) {
     const { provider, modelName } = getProviderModel(
@@ -1064,25 +1071,45 @@ export class ChatManager {
       model: config?.providerModel || agent.model,
       chatOptions: config.options,
       messageEvent: {
-        created: (msg) => {
-          msg.forEach((x) => {
-            handlerMessageCreated?.(x);
-          });
+        created: async (msg) => {
+          await Promise.all(
+            msg.map(async (x) => {
+              await handlerMessageCreated?.(x);
+            }),
+          );
         },
-        updated: (msg) => {
-          msg.forEach((x) => {
-            handlerMessageUpdate?.(x);
-          });
+        updated: async (msg) => {
+          await Promise.all(
+            msg.map(async (x) => {
+              await handlerMessageUpdate?.(x);
+            }),
+          );
         },
-        finished: (msg) => {
-          msg.forEach((x) => {
-            handlerMessageFinished?.(x);
-          });
+        finished: async (msg) => {
+          await Promise.all(
+            msg.map(async (x) => {
+              await handlerMessageFinished?.(x);
+            }),
+          );
         },
       },
       signal: config.signal,
     });
-    await runAgent(_agent, messages, {
+    let _messages = messages;
+    if (config.fixedThreadId === true) {
+      const state = await _agent.getState({
+        configurable: { thread_id: config.chatId },
+      });
+      const { values } = state;
+      _messages = [];
+      if (values.messages) {
+        _messages = [...values.messages];
+      }
+      _messages.push(messages.pop());
+      //_messages = [_messages.pop()];
+    }
+
+    await runAgent(_agent, _messages, {
       signal: config.signal,
       configurable: config.configurable,
       modelName,

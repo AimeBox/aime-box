@@ -53,8 +53,12 @@ export default function AgentConfigDrawer(props: AgentConfigDrawerProps) {
 
   const onFinish = async (config: Record<string, any>) => {
     const data = { ...value, config: config };
-    await window.electron.agents.update(data);
-    onChange?.(value);
+    try {
+      await window.electron.agents.update(data);
+      onChange?.(value);
+    } catch (err) {
+      message.error(err.message);
+    }
   };
 
   useEffect(() => {}, []);
@@ -76,6 +80,7 @@ export default function AgentConfigDrawer(props: AgentConfigDrawerProps) {
         {...props}
         width={600}
         styles={{ body: { padding: 0 } }}
+        maskClosable={false}
       >
         <div className="flex flex-col h-full">
           <div className="px-4">

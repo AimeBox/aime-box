@@ -15,7 +15,7 @@ import path from 'path';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import fs from 'fs';
 // import Potrace from 'potrace';
-import { NodeVM, VM } from 'vm2';
+// import { NodeVM, VM } from 'vm2';
 import { getTmpPath } from '../utils/path';
 import { v4 as uuidv4 } from 'uuid';
 import util from 'util';

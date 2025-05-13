@@ -30,12 +30,16 @@ import bz2 from 'unbzip2-stream';
 import tar from 'tar';
 import node7z from 'node-7z';
 import axios from 'axios';
-import nodeFetch, { RequestInit, Response } from 'node-fetch';
+import nodeFetch, { RequestInfo, RequestInit, Response } from 'node-fetch';
 import { getDefaultModelsPath, getModelsPath } from '../utils/path';
 import { platform } from 'process';
 import { exec } from 'child_process';
 import serverManager from '../server/serverManager';
 import { isBoolean } from '../utils/is';
+import {
+  getSystemProxySettings,
+  SystemProxySettings,
+} from '../utils/systemProxy';
 
 export interface GlobalSettings {
   appName: string;
@@ -64,6 +68,9 @@ export interface GlobalSettings {
       apiKey: string | null;
     };
     serpapi: {
+      apiKey: string | null;
+    };
+    brave: {
       apiKey: string | null;
     };
   };
@@ -100,6 +107,7 @@ class SettingsManager {
       searxng: { apiBase: null },
       tavily: { apiKey: null },
       serpapi: { apiKey: null },
+      brave: { apiKey: null },
     },
     localModelPath: getDefaultModelsPath(),
     huggingfaceUrl: 'https://huggingface.co',
@@ -109,6 +117,8 @@ class SettingsManager {
   };
 
   downloadingModels: any[] = [];
+
+  systemProxy: SystemProxySettings;
 
   constructor() {
     this.settingsRepository = dbManager.dataSource.getRepository(Settings);
@@ -276,12 +286,20 @@ class SettingsManager {
       session.defaultSession,
       session.fromPartition('persist:webview'),
     ];
-    const proxyConfig: ProxyConfig =
-      proxy === 'system'
-        ? { mode: 'system' }
-        : proxy
-          ? { proxyRules: proxy }
-          : {};
+    let proxyConfig: ProxyConfig;
+    if (proxy === 'system') {
+      proxyConfig = { mode: 'system' };
+    } else if (proxy) {
+      proxyConfig = { proxyRules: proxy };
+    } else {
+      proxyConfig = {};
+    }
+    if (proxy === 'system') {
+      this.systemProxy = await getSystemProxySettings();
+      if (this.systemProxy.proxyEnable) {
+        proxyConfig.proxyRules = this.systemProxy.proxyServer;
+      }
+    }
     await Promise.all(sessions.map((session) => session.setProxy(proxyConfig)));
   }
 
@@ -293,6 +311,10 @@ class SettingsManager {
       ) {
         //const proxy = `${this.settingsCache?.proxy.substring(this.settingsCache?.proxy.indexOf('://') + 3)}`;
         return new HttpsProxyAgent(this.settingsCache?.proxy);
+      } else if (this.settingsCache.proxy == 'system') {
+        if (this.systemProxy.proxyEnable) {
+          return new HttpsProxyAgent(this.systemProxy.proxyServer);
+        }
       }
     }
     return undefined;
@@ -340,22 +362,14 @@ class SettingsManager {
     fs.rmSync(`${dir}`, { recursive: true });
   }
 
-  private async getProxyFetch() {
+  private async getProxyFetch(): Promise<typeof fetch> {
     const agent = await this.getHttpAgent();
     if (!agent) {
-      return async (url: RequestInfo | URL, init?: RequestInit) => {
-        return nodeFetch(url.toString(), {
-          ...init,
-        } as RequestInit);
-      }; // 使用默认的fetch
+      return nodeFetch as unknown as typeof fetch;
     }
-
-    // 返回一个包装了代理的fetch函数
-    return async (url: RequestInfo | URL, init?: RequestInit) => {
-      return nodeFetch(url.toString(), {
-        ...init,
-        agent: agent,
-      } as RequestInit);
+    // 这里直接返回一个 async 函数，类型自动推断为 Promise<Response>
+    return async (url: any, init?: RequestInit) => {
+      return nodeFetch(url.toString(), { ...init, agent } as any);
     };
   }
 

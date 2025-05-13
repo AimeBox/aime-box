@@ -256,6 +256,12 @@ export default function ChatContent() {
     window.electron.db.delete('chat_message', {
       chatId: currentChat.id,
     });
+    window.electron.db.delete('langgraph_checkpoints', {
+      thread_id: currentChat.id,
+    });
+    window.electron.db.delete('langgraph_writes', {
+      thread_id: currentChat.id,
+    });
     const res = await window.electron.chat.getChat(currentChat.id);
     setCurrentChat(res);
   };
@@ -531,17 +537,15 @@ export default function ChatContent() {
                     />
                   </div>
 
-                  {!currentChat.agent && (
-                    <div>
-                      <Button
-                        icon={<FaGear />}
-                        type="text"
-                        onClick={() => {
-                          setOpenChatOptionsDrawer(true);
-                        }}
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <Button
+                      icon={<FaGear />}
+                      type="text"
+                      onClick={() => {
+                        setOpenChatOptionsDrawer(true);
+                      }}
+                    />
+                  </div>
                 </div>
                 {attachments.length > 0 && (
                   <div className="flex flex-row flex-wrap gap-2 w-full">
@@ -582,30 +586,6 @@ export default function ChatContent() {
                       ></Input.TextArea>
                       {/* <FileDropZone></FileDropZone> */}
                     </div>
-
-                    {/* <ScrollArea className="flex-1 h-full rounded-xl border border-gray-300 border-solid dark:border-gray-700">
-                    <Editor
-                      ref={editorRef}
-                      className={`flex-1 w-full h-full text-sm bg-transparent outline-none resize-none`}
-                      value={chatInputMessage}
-                      onChange={setChatInputMessage}
-                    />
-                  </ScrollArea> */}
-
-                    {/* <textarea
-                    id="chat-textarea"
-                    className={`flex-1 w-full h-full text-sm bg-transparent outline-none resize-none custom-scrollbar`}
-                    placeholder="Send a message"
-                    rows={1}
-                    value={chatInputMessage}
-                    onChange={async (e) => {
-                      setChatInputMessage(e.target.value);
-                    }}
-                    style={{
-                      minHeight: '50px',
-                      overflowY: 'auto',
-                    }}
-                  /> */}
                   </div>
                 </div>
                 <div className="flex flex-row justify-between items-center w-full">
@@ -631,9 +611,14 @@ export default function ChatContent() {
                             ? 'filled'
                             : 'outlined'
                         }
-                        onClick={() =>
-                          tools.open(currentChat?.options?.toolNames || [])
-                        }
+                        onClick={() => {
+                          tools.open(currentChat?.options?.toolNames || []);
+                          tools.onSelect = (_tools) => {
+                            onChatOptionsChanged({
+                              toolNames: _tools.map((x) => x.name),
+                            });
+                          };
+                        }}
                       >
                         {t('chat.tool')}
                         <Tag className="mr-0 rounded-full">
@@ -669,6 +654,7 @@ export default function ChatContent() {
                           knowledgeBase.open(
                             currentChat?.options?.kbList || [],
                           );
+
                           knowledgeBase.onSelect = (kbs) => {
                             onChatOptionsChanged({
                               kbList: kbs.map((kb) => kb.id),

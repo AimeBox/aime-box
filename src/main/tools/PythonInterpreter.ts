@@ -98,8 +98,8 @@ export class PythonInterpreterTool extends BaseTool {
       }
       console.log(`Python Path: ${this.pythonPath}`);
 
-      if (config?.configurable?.chatRootPath) {
-        tempDir = path.join(config?.configurable?.chatRootPath, 'sandbox');
+      if (config?.configurable?.workspace) {
+        tempDir = path.join(config?.configurable?.workspace, 'sandbox');
         fs.mkdirSync(tempDir, { recursive: true });
       } else {
         fs.mkdirSync(path.join(getTmpPath(), 'sandbox'), { recursive: true });

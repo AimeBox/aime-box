@@ -1,0 +1,16 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+本项目是使用 @electron-react-boilerplate 为框架开发的本地桌面AI Chat软件
+
+技术栈包括
+- react
+- electron
+- langchainjs
+- langgraphjs
+- typescript
+- antd
+
+

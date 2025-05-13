@@ -39,8 +39,9 @@ type GlobalContextProviderState = {
     //isOpen: boolean;
     open: (selectToolNames: string[]) => void;
     close: () => void;
-    selectedTools: ToolInfo[];
-    setSelectedTools: (tools: ToolInfo[]) => void;
+    // selectedTools: ToolInfo[];
+    // setSelectedTools: (tools: ToolInfo[]) => void;
+    onSelect: (tools: ToolInfo[]) => void;
   };
   agents: {
     //isOpen: boolean;
@@ -64,8 +65,9 @@ const initialState = {
   tools: {
     open: (selectToolNames: string[]) => {},
     close: () => {},
-    selectedTools: [],
-    setSelectedTools: (tools: ToolInfo[]) => {},
+    // selectedTools: [],
+    // setSelectedTools: (tools: ToolInfo[]) => {},
+    onSelect: (tools: ToolInfo[]) => {},
   },
   agents: {
     open: (selectAgentNames: string[]) => {},
@@ -108,7 +110,7 @@ export function GlobalContextProvider({
   const [selectedKnowledgeBases, setSelectedKnowledgeBases] = useState<
     KnowledgeBase[]
   >([]);
-  const [tools, setTools] = useState<ToolInfo[]>([]);
+  //const [tools, setTools] = useState<ToolInfo[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [api, contextHolder] = notification.useNotification();
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -120,18 +122,14 @@ export function GlobalContextProvider({
   const value: GlobalContextProviderState = useMemo(
     () => ({
       tools: {
-        //isOpen: isToolModalOpen,
         open: async (selectToolNames: string[]) => {
           setIsToolModalOpen(true);
           const tools = await window.electron.tools.getList();
-          setTools(tools);
           setSelectedTools(tools.filter((t) => selectToolNames.includes(t.id)));
         },
         close: () => {
           setIsToolModalOpen(false);
         },
-        selectedTools,
-        setSelectedTools,
       },
       agents: {
         //isOpen: isAgentModalOpen,
@@ -175,7 +173,7 @@ export function GlobalContextProvider({
         },
       },
     }),
-    [selectedTools, selectedAgents, setPromptsRole],
+    [selectedAgents, setPromptsRole],
   );
 
   useEffect(() => {
@@ -269,15 +267,32 @@ export function GlobalContextProvider({
       <ToolsModal
         zIndex={2000}
         open={isToolModalOpen}
-        tools={tools}
+        //tools={tools}
+        destroyOnClose
         selectedTools={selectedTools}
-        onCancel={() => setIsToolModalOpen(false)}
-        footer={null}
-        onChange={(items) => {
-          setSelectedTools(items);
-        }}
         setSelectedTools={setSelectedTools}
+        onCancel={() => setIsToolModalOpen(false)}
+        // footer={null}
+        onOk={(e) => {
+          setIsToolModalOpen(false);
+          value.tools.onSelect?.(selectedTools);
+        }}
+        // onChange={(items) => {
+        //   setSelectedTools(items);
+        // }}
       ></ToolsModal>
+      <KnowledgeBaseModal
+        zIndex={2000}
+        open={isKnowledgeBaseModalOpen}
+        destroyOnClose
+        selectedKnowledgeBases={selectedKnowledgeBases}
+        setSelectedKnowledgeBases={setSelectedKnowledgeBases}
+        onOk={(e) => {
+          setIsKnowledgeBaseModalOpen(false);
+          value.knowledgeBase.onSelect?.(selectedKnowledgeBases);
+        }}
+        onCancel={() => setIsKnowledgeBaseModalOpen(false)}
+      ></KnowledgeBaseModal>
       <AgentsModal
         zIndex={2000}
         open={isAgentModalOpen}
@@ -302,19 +317,6 @@ export function GlobalContextProvider({
         }}
         onCancel={() => setIsPromptsModalOpen(false)}
       ></PromptsModal>
-      <KnowledgeBaseModal
-        zIndex={2000}
-        open={isKnowledgeBaseModalOpen}
-        destroyOnClose
-        selectedKnowledgeBases={selectedKnowledgeBases}
-        setSelectedKnowledgeBases={setSelectedKnowledgeBases}
-        footer={null}
-        onSelect={(kbs) => {
-          setIsPromptsModalOpen(false);
-          value.knowledgeBase.onSelect(kbs);
-        }}
-        onCancel={() => setIsKnowledgeBaseModalOpen(false)}
-      ></KnowledgeBaseModal>
     </GlobalContext.Provider>
   );
 }

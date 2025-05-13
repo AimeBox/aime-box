@@ -159,6 +159,27 @@ export default function DefaultWenSearchEnginSettings() {
             <Link href="https://www.serpapi.com">https://www.serpapi.com</Link>
           </div>
         </div>
+        <div className="flex flex-col gap-2">
+          <div className="font-semibold">{t('settings.braveApiKey')}</div>
+          <div className="flex flex-col">
+            <Space.Compact>
+              <Input.Password
+                value={settings?.webSearchEngine?.brave?.apiKey}
+                style={{ width: 400 }}
+                placeholder="xxxxx"
+                onChange={(e) =>
+                  onChange('webSearchEngine.brave.apiKey', e.target.value)
+                }
+              />
+              <Button type="primary" onClick={() => onSearchTest('brave')}>
+                Check
+              </Button>
+            </Space.Compact>
+            <Link href="https://api-dashboard.search.brave.com/">
+              https://api-dashboard.search.brave.com/
+            </Link>
+          </div>
+        </div>
       </div>
       <Modal
         title="Search Test"

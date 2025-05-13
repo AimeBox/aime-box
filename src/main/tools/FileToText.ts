@@ -17,58 +17,51 @@ import { TextLoader } from 'langchain/document_loaders/fs/text';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
+import { BaseTool } from './BaseTool';
 
 export interface FileToTextParameters extends ToolParams {}
 
-export class FileToText extends Tool {
-  static lc_name() {
-    return 'FileToText';
-  }
+export class FileToText extends BaseTool {
+  name: string = 'file_to_text';
 
-  name: string;
-
-  description: string;
+  description: string = 'file convert to text';
 
   constructor(params?: FileToTextParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'file_to_text',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'file convert to text',
-    });
   }
 
-  async _call(filePath: string, runManager, config): Promise<string> {
+  schema = z.object({
+    filePath: z.string().describe('file path'),
+  });
+
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<string> {
     try {
-      if (!isString(filePath)) {
+      if (!isString(input.filePath)) {
         return 'input value is not filePath';
       }
-      const ext = path.extname(filePath).toLowerCase();
+      const ext = path.extname(input.filePath).toLowerCase();
       if (ext.toLowerCase() == '.pdf') {
-        const loader = new PDFLoader(filePath);
+        const loader = new PDFLoader(input.filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
       } else if (ext.toLowerCase() == '.txt') {
-        const loader = new TextLoader(filePath);
+        const loader = new TextLoader(input.filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
       } else if (ext.toLowerCase() == '.docx') {
-        const loader = new DocxLoader(filePath, { type: 'docx' });
+        const loader = new DocxLoader(input.filePath, { type: 'docx' });
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
       } else if (ext.toLowerCase() == '.doc') {
-        const loader = new DocxLoader(filePath, { type: 'doc' });
+        const loader = new DocxLoader(input.filePath, { type: 'doc' });
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
       } else if (ext.toLowerCase() == '.pptx') {
-        const loader = new PPTXLoader(filePath);
+        const loader = new PPTXLoader(input.filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
       }

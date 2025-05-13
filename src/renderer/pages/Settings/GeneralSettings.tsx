@@ -38,7 +38,9 @@ export default function GeneralSettings() {
       window.electron.setting.set('proxy', proxyMode);
       getData();
     } else if (isUrl(proxy) || proxyMode === 'custom') {
-      window.electron.setting.set('proxy', proxy);
+      let _proxy = proxy;
+      if (!proxy) _proxy = 'http://127.0.0.1:10809';
+      window.electron.setting.set('proxy', _proxy);
       getData();
     }
   };
@@ -86,7 +88,7 @@ export default function GeneralSettings() {
             options={[
               { value: 'light', label: t('settings.theme.light') },
               { value: 'dark', label: t('settings.theme.dark') },
-              { value: 'system', label: t('settings.theme.system') },
+              // { value: 'system', label: t('settings.theme.system') },
             ]}
           />
         </div>

@@ -34,6 +34,15 @@ import promptsManager from './prompts';
 import fs from 'fs';
 import { exec } from 'node:child_process';
 import { notificationManager } from './app/NotificationManager';
+import {
+  AIMessage,
+  HumanMessage,
+  SystemMessage,
+  ToolMessage,
+} from '@langchain/core/messages';
+import tokenCounter from './utils/tokenCounter';
+import { getChatModel } from './llm';
+import checkAndSummarize from './utils/messages';
 
 dbManager
   .init()
@@ -48,6 +57,7 @@ dbManager
     await serverManager.init();
     await appManager.init();
     await promptsManager.init();
+
     return true;
   })
   .catch((error) => {
@@ -152,6 +162,30 @@ function registerPluginProtocol() {
     return net.fetch(url.toString());
   });
 }
+
+function registerAuthProtocol() {
+  const name = 'aimebox-auth';
+  app.setAsDefaultProtocolClient(name);
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    console.log('Deep link URL:', url);
+
+    // 从 URL 解析出 code
+    const urlObj = new URL(url);
+    const code = urlObj.searchParams.get('code');
+    debugger;
+    // 在这里调用 Supabase SDK
+    //exchangeCodeForSession(code);
+  });
+
+  // if (protocol.isProtocolHandled(name)) return false;
+  // return protocol.handle(name, (request) => {
+  //   const { hostname, pathname } = new URL(request.url);
+
+  //   return '';
+  // });
+}
+
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
   const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
@@ -170,6 +204,7 @@ const createWindow = async () => {
     // await installExtensions();
   }
   registerPluginProtocol();
+  registerAuthProtocol();
   const RESOURCES_PATH = app.isPackaged
     ? path.join(process.resourcesPath, 'assets')
     : path.join(__dirname, '../../assets');
@@ -181,8 +216,8 @@ const createWindow = async () => {
   mainWindow = new BrowserWindow({
     show: false,
     width: 1024,
-    height: 728,
-    minHeight: 728,
+    height: 808,
+    minHeight: 808,
     icon: getAssetPath('icon.png'),
     autoHideMenuBar: process.platform === 'darwin' ? false : app.isPackaged,
     //transparent: process.platform === 'darwin',

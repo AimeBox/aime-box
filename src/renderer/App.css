@@ -120,6 +120,7 @@ li b {
   scrollbar-color: #7a7a7a #e0e0e0;
   /* 滚动条的颜色 */
   scrollbar-width: thin;
+  
   /* 滚动条的宽度 */
   /* height: 200px; */
   /* 设置一个高度以启用滚动 */
@@ -146,4 +147,28 @@ li b {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #7a7a7a;
+}
+
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px; 
+}
+
+/* 滚动条轨道 */
+::-webkit-scrollbar-track {
+  background: #e0e0e000;
+
+}
+
+/* 滚动条滑块 */
+::-webkit-scrollbar-thumb {
+  background: #7a7a7a;
+  border-radius: 4px;
+}
+
+/* 滑块悬停时 */
+::-webkit-scrollbar-thumb:hover {
+  background: #7a7a7a7a;
+  
 }

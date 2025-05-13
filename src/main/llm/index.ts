@@ -1,7 +1,7 @@
 import { ChatOllama } from '@langchain/ollama';
 import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
 import { ChatZhipuAI } from '@langchain/community/chat_models/zhipuai';
-import { ChatOpenAI } from '@langchain/openai';
+import { ChatOpenAI, AzureChatOpenAI } from '@langchain/openai';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -134,6 +134,15 @@ export async function getChatModel(
     });
   } else if (provider?.type === ProviderType.TOGETHERAI) {
     llm = new ChatTogetherAI({
+      model: model.name,
+      apiKey: provider.api_key,
+      temperature: options?.temperature,
+      maxTokens: options?.maxTokens,
+      streaming: options?.streaming,
+      topP: options?.top_p,
+    });
+  } else if (provider?.type === ProviderType.AZURE) {
+    llm = new AzureChatOpenAI({
       model: model.name,
       apiKey: provider.api_key,
       temperature: options?.temperature,

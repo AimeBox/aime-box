@@ -26,7 +26,13 @@ import {
 import { McpServerInfo, ToolInfo } from '../../main/tools';
 import List from '../components/common/List';
 import FormModal, { FormModalRef } from '../components/modals/FormModal';
-import { isArray, isBoolean, isNumber, isString } from '../../main/utils/is';
+import {
+  isArray,
+  isBoolean,
+  isNumber,
+  isObject,
+  isString,
+} from '../../main/utils/is';
 import { FormSchema } from '../../types/form';
 
 import BasicForm from '../components/form/BasicForm';
@@ -174,6 +180,16 @@ export default function Tools() {
 
   const invoke = async (value) => {
     console.log(value);
+
+    // const _value = {};
+    // Object.keys(value.value).forEach((key) => {
+    //   if (isString(value.value[key])) {
+    //     _value[key] = value.value[key].trim();
+    //   } else if (isObject(value.value[key])) {
+    //     _value[key] = JSON.stringify(value.value[key]);
+    //   }
+    // });
+    // console.log(_value);
     let output: string | string[] = '';
     if (selectedFilterTag == 'built-in') {
       if (currentTool) {

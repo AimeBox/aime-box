@@ -4,4 +4,5 @@ export enum WebSearchEngine {
   Searxng = 'searxng',
   Tavily = 'tavily',
   Serpapi = 'serpapi',
+  Brave = 'brave',
 }

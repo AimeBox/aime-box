@@ -21,6 +21,7 @@ import 'katex/dist/katex.min.css';
 import { ChatInputAttachment } from '@/types/chat';
 import ChatAttachment from '../chat/ChatAttachment';
 import { marked } from 'marked';
+import rehypeMathjax from 'rehype-mathjax/browser';
 
 export interface MarkdownProps {
   value?: string;
@@ -105,7 +106,7 @@ export function Markdown(props: MarkdownProps) {
 
       .use(rehypeReact, production)
       .use(remarkGfm)
-      .use(remarkMath)
+      .use(rehypeMathjax)
       .use(remarkBreaks)
 
       .use(remarkRehype, { allowDangerousHtml: true })
@@ -113,8 +114,8 @@ export function Markdown(props: MarkdownProps) {
       .use(rehypeCodeTitles)
       .use(rehypeFormat)
 
-      .use(rehypeMath)
-      .use(rehypeKatex)
+      // .use(rehypeMath)
+      // .use(rehypeKatex)
       //.use(rehypeSanitize)
       .use(rehypeHighlight)
 
@@ -137,14 +138,17 @@ export function Markdown(props: MarkdownProps) {
     thinkContent: string | null;
     restContent: string;
   } {
-    const match = input.match(/^<think>([\s\S]*?)<\/think>\n\n/);
-    if (match) {
-      const thinkContent = match[1].trim(); // 提取 think 中的内容
-      const restContent = input.slice(match[0].length); // 剩下的正文
-      return { thinkContent, restContent };
-    } else {
-      return { thinkContent: null, restContent: input };
+    if (input) {
+      const match = input.match(/^<think>([\s\S]*?)<\/think>\n\n/);
+      if (match) {
+        const thinkContent = match[1].trim(); // 提取 think 中的内容
+        const restContent = input.slice(match[0].length); // 剩下的正文
+        return { thinkContent, restContent };
+      } else {
+        return { thinkContent: null, restContent: input };
+      }
     }
+    return { thinkContent: null, restContent: '' };
   }
 
   useEffect(() => {}, [renderedContent]);
@@ -160,11 +164,15 @@ export function Markdown(props: MarkdownProps) {
         dangerouslySetInnerHTML={{ __html: renderedContent }}
         key={renderedContent}
       />
-      <div className="flex flex-wrap gap-2 p-1">
-        {files.map((file) => {
-          return <ChatAttachment value={file} key={file.path}></ChatAttachment>;
-        })}
-      </div>
+      {files && files.length > 0 && (
+        <div className="flex flex-wrap gap-2 p-1">
+          {files.map((file) => {
+            return (
+              <ChatAttachment value={file} key={file.path}></ChatAttachment>
+            );
+          })}
+        </div>
+      )}
     </>
   ) : null;
 }

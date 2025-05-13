@@ -10,10 +10,10 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { BaseMessage } from '@langchain/core/messages';
 
 export interface AgentMessageEvent {
-  created?: (msg: BaseMessage[]) => void;
-  updated?: (msg: BaseMessage[]) => void;
-  finished?: (msg: BaseMessage[]) => void;
-  deleted?: (msg: BaseMessage[]) => void;
+  created?: (msg: BaseMessage[]) => Promise<void>;
+  updated?: (msg: BaseMessage[]) => Promise<void>;
+  finished?: (msg: BaseMessage[]) => Promise<void>;
+  deleted?: (msg: BaseMessage[]) => Promise<void>;
 }
 
 export abstract class BaseAgent extends Tool {
@@ -26,6 +26,8 @@ export abstract class BaseAgent extends Tool {
   declare schema;
 
   declare opener?: string;
+
+  declare fixedThreadId?: boolean;
 
   agentOptions?: {
     provider: string;

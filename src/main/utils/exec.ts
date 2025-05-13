@@ -33,6 +33,10 @@ export const runCommand = async (
       commands.push(_file);
       commands.push('/c');
       commands.push(`"${command}"`);
+    } else if (_file == 'pwsh.exe') {
+      commands.push(_file);
+      commands.push('-Command');
+      commands.push(`"${command}"`);
     } else {
       commands.push(command);
     }

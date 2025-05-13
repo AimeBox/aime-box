@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import {
   Link,
   Route,
@@ -32,6 +32,8 @@ import {
 import { useTheme } from '../theme/ThemeProvider';
 import ThemeToggle from '../theme/ThemeToggle';
 import { t } from 'i18next';
+import i18n from '@/i18n';
+import Login from '../Login';
 
 export default function Sidebar() {
   const { theme, setTheme } = useTheme();
@@ -46,69 +48,72 @@ export default function Sidebar() {
   const [defaultSelectedKeys, setDefaultSelectedKeys] = useState([]);
   const [openKeys, setOpenKeys] = useState([]);
 
-  const [meunList, setMeunList] = useState([
-    {
-      key: 'home',
-      icon: <FaHome />,
-      label: t('sidebar.home'),
-      href: '/home',
-    },
-    {
-      key: 'chat',
-      icon: <FaRegMessage />,
-      label: t('sidebar.chat'),
-      href: '/chat',
-    },
-    {
-      key: 'agent',
-      icon: <FaHubspot />,
-      label: t('sidebar.agent'),
-      href: '/agent',
-    },
-    {
-      key: 'tool',
-      icon: <FaTools />,
-      label: t('sidebar.tools'),
-      href: '/tools',
-    },
-    {
-      key: 'providers',
-      icon: <FaCloud />,
-      label: t('sidebar.providers'),
-      href: '/Providers',
-    },
-    {
-      key: 'knowledge-base',
-      icon: <FaBook />,
-      label: t('sidebar.knowledgebase'),
-      href: '/knowledge-base',
-    },
-    {
-      key: 'prompts',
-      icon: <FaRegKeyboard />,
-      label: t('sidebar.prompts'),
-      href: '/prompts',
-    },
+  const meunList = useMemo(
+    () => [
+      {
+        key: 'home',
+        icon: <FaHome />,
+        label: t('sidebar.home'),
+        href: '/home',
+      },
+      {
+        key: 'chat',
+        icon: <FaRegMessage />,
+        label: t('sidebar.chat'),
+        href: '/chat',
+      },
+      {
+        key: 'agent',
+        icon: <FaHubspot />,
+        label: t('sidebar.agent'),
+        href: '/agent',
+      },
+      {
+        key: 'tool',
+        icon: <FaTools />,
+        label: t('sidebar.tools'),
+        href: '/tools',
+      },
+      {
+        key: 'providers',
+        icon: <FaCloud />,
+        label: t('sidebar.providers'),
+        href: '/Providers',
+      },
+      {
+        key: 'knowledge-base',
+        icon: <FaBook />,
+        label: t('sidebar.knowledgebase'),
+        href: '/knowledge-base',
+      },
+      {
+        key: 'prompts',
+        icon: <FaRegKeyboard />,
+        label: t('sidebar.prompts'),
+        href: '/prompts',
+      },
 
-    // {
-    //   key: 'explores',
-    //   icon: <FaAtom />,
-    //   label: 'Explores',
-    //   href: '/explores',
-    // },
-    // {
-    //   key: 'plugins',
-    //   icon: <FaPlug />,
-    //   label: 'Plugins',
-    //   href: '/plugins',
-    // },
-    {
-      key: 'settings',
-      icon: <FaGear />,
-      label: t('sidebar.settings'),
-      href: '/settings',
-    },
-  ]);
+      // {
+      //   key: 'explores',
+      //   icon: <FaAtom />,
+      //   label: 'Explores',
+      //   href: '/explores',
+      // },
+      // {
+      //   key: 'plugins',
+      //   icon: <FaPlug />,
+      //   label: 'Plugins',
+      //   href: '/plugins',
+      // },
+      {
+        key: 'settings',
+        icon: <FaGear />,
+        label: t('sidebar.settings'),
+        href: '/settings',
+      },
+    ],
+    [i18n.language],
+  );
 
   const defaultMeunBottomList = [
     {
@@ -118,13 +123,9 @@ export default function Sidebar() {
       href: 'https://github.com/AimeBox/aime-box',
     },
   ] as any[];
-  const [meunBottomList, setMeunBottomList] = useState([
+  const [meunBottomList, setMeunBottomList] = useState<MenuItemType[]>([
     ...defaultMeunBottomList,
-    // {
-    //   key: 'profile',
-    //   icon: <FaUserCircle />,
-    //   label: 'Profile'
-    // } as SubMenuType,
+
     {
       key: 'theme',
       label: t('sidebar.theme'),
@@ -134,6 +135,12 @@ export default function Sidebar() {
         </div>
       ),
     },
+
+    {
+      key: 'profile',
+      icon: <FaUserCircle />,
+      label: 'Profile',
+    } as SubMenuType,
   ]);
 
   useEffect(() => {}, []);
@@ -161,6 +168,10 @@ export default function Sidebar() {
       /> */}
       {/* <AboutModel open={showAboutModel} onOk={() => setShowAboutModel(false)} />
       <LoginModal open={showLoginModal} onOk={() => setShowLoginModal(false)} /> */}
+      <Login
+        visible={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
       <div className="">
         <div className="flex overflow-hidden flex-col h-full">
           <Menu
@@ -189,10 +200,14 @@ export default function Sidebar() {
               //openKeys={openKeys}
               style={{ width: 80, border: 'none' }}
               items={meunBottomList}
-              onClick={({ item, key, keyPath, domEvent }) => {
+              onClick={(e) => {
                 //setOpenKeys([]);
-                if (item.props.href) {
-                  window.open(item.props.href, '_blank');
+
+                if (e.key === 'profile') {
+                  setShowLoginModal(true);
+                } else if (e.item.props.href) {
+                  console.log(e);
+                  window.open(e.item.props.href, '_blank');
                 }
               }}
               onSelect={({ item, key, keyPath, selectedKeys, domEvent }) => {}}

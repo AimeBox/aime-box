@@ -16,6 +16,7 @@ import * as fs from 'fs/promises';
 import { ChatInputAttachment } from '@/types/chat';
 import path from 'path';
 import { platform } from 'process';
+import { getDataPath } from '../utils/path';
 
 export class AppManager {
   textToSpeech: TextToSpeech;
@@ -120,6 +121,7 @@ export class AppManager {
       event.returnValue = {
         appPath: app.getAppPath(),
         userData: app.getPath('userData'),
+        dataPath: getDataPath(),
         version: app.getVersion(),
         platform: platform,
         resourcesPath: process.resourcesPath,

@@ -22,6 +22,7 @@ import { SearxngSearchTool } from './SearxngSearchTool';
 import { TavilySearchTool } from './TavilySearch';
 import { SerpAPI } from '@langchain/community/tools/serpapi';
 import { BaseTool } from './BaseTool';
+import { BraveWebSearchTool } from './websearch/BraveSearch';
 
 export interface WebSearchToolParameters extends ToolParams {
   provider?: string;
@@ -29,15 +30,11 @@ export interface WebSearchToolParameters extends ToolParams {
 }
 
 export class WebSearchTool extends BaseTool {
-  static lc_name() {
-    return 'web-search';
-  }
-
   schema = z.object({
     query: z.string().describe('The query to search the web for.'),
   });
 
-  name: string = 'web-search';
+  name: string = 'web_search';
 
   description: string = 'Search the web for information.';
 
@@ -133,6 +130,15 @@ export class WebSearchTool extends BaseTool {
       ) {
         const d = new SerpAPI(settings.webSearchEngine.serpapi.apiKey);
         const res = await d.invoke(input.query);
+        return res;
+      } else if (
+        this.provider == WebSearchEngine.Brave &&
+        settings.webSearchEngine.brave.apiKey
+      ) {
+        const d = new BraveWebSearchTool({
+          apiKey: settings.webSearchEngine.brave.apiKey,
+        });
+        const res = await d.invoke({ query: input.query });
         return res;
       }
       return 'config has error';

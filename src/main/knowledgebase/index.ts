@@ -319,13 +319,19 @@ export class KnowledgeBaseManager {
       relations: { knowledgeBase: true },
     });
     if (documents.length > 0) {
-      await vectraStore.addDocuments(documents, {
-        kbid: Array(documents.length).fill(kb.id),
-        kbitemid: Array(documents.length).fill(kbItemId),
-        isEnable: Array(documents.length).fill(true),
-      });
-      kbItem.chunkCount = documents.length;
-      kbItem.state = KnowledgeBaseItemState.Completed;
+      try {
+        await vectraStore.addDocuments(documents, {
+          kbid: Array(documents.length).fill(kb.id),
+          kbitemid: Array(documents.length).fill(kbItemId),
+          isEnable: Array(documents.length).fill(true),
+        });
+        kbItem.chunkCount = documents.length;
+        kbItem.state = KnowledgeBaseItemState.Completed;
+      } catch (err) {
+        console.error(err);
+        kbItem.isEnable = false;
+        kbItem.state = KnowledgeBaseItemState.Fail;
+      }
     } else {
       kbItem.isEnable = false;
       kbItem.state = KnowledgeBaseItemState.Fail;

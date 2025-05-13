@@ -1,6 +1,5 @@
 import { ChatOptions } from '@/entity/Chat';
 import { ToolInfo } from '@/main/tools';
-import { ToolsModalContext } from '@/renderer/context/ToolsModalProvider';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import {
   Button,
@@ -50,6 +49,9 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
 
   const openToolModal = () => {
     tools.open(props?.value?.toolNames || []);
+    tools.onSelect = (tools) => {
+      onChange({ toolNames: tools.map((x) => x.name) });
+    };
   };
   const openAgentModal = () => {
     agents.open(props?.value?.agentNames || []);
@@ -72,7 +74,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
 
   useEffect(() => {
     onChange({
-      toolNames: tools.selectedTools.map((t) => t.id),
+      //toolNames: tools.selectedTools.map((t) => t.id),
       agentNames: agents.selectedAgents.map((a) => a.name),
     });
   }, [tools, agents]);

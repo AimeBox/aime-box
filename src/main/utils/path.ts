@@ -10,6 +10,7 @@ const getDataPath = () => {
   } else {
     userData = app.getAppPath();
   }
+  userData = app.getPath('userData');
 
   const dataPath = path.join(userData, 'data');
   if (!fs.existsSync(dataPath)) {

@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 
 interface ProviderIconProps {
   provider: string;
-  size?: number | null;
+  size?: number | string | null;
   className?: string | null;
 }
 const logos = {

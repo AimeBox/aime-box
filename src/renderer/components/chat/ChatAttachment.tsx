@@ -55,7 +55,7 @@ export default function ChatAttachment({
 
   return (
     <div
-      className="h-8 max-w-[15rem] min-w-[10rem] items-center justify-between cursor-pointer group flex flex-row border gap-1 border-gray-200 dark:border-none rounded-xl px-2 hover:bg-gray-200 bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all duration-300"
+      className="h-8 max-w-[15rem] min-w-[10rem] items-center justify-between cursor-pointer group flex flex-row border gap-1 border-gray-200 dark:border-none rounded-xl px-2 hover:bg-gray-300 bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all duration-300"
       draggable
       onDragStart={handleDragStart}
     >

@@ -17,10 +17,6 @@ export class ChartjsTool extends Tool {
 
   description: string;
 
-  static lc_name() {
-    return 'Chartjs';
-  }
-
   constructor() {
     super();
     Object.defineProperty(this, 'name', {

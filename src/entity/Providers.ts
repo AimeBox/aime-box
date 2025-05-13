@@ -14,6 +14,7 @@ export enum ProviderType {
   DEEPSEEK = 'deepseek',
   BAIDU = 'baidu',
   LMSTUDIO = 'lmstudio',
+  AZURE = 'azure',
 }
 
 @Entity('providers')

@@ -28,7 +28,7 @@ import { KnowledgeBase } from '@/entity/KnowledgeBase';
 import Alert from 'antd/es/alert/Alert';
 
 interface KnowledgeBaseModalProps extends ModalProps {
-  onSelect: (kbs: KnowledgeBase[]) => void;
+  onSelect?: (kbs: KnowledgeBase[]) => void;
   selectedKnowledgeBases: KnowledgeBase[];
   setSelectedKnowledgeBases: (kbs: KnowledgeBase[]) => void;
 }
@@ -118,7 +118,7 @@ export const KnowledgeBaseModal = React.forwardRef(
                           }
 
                           setSelectedKnowledgeBases(items);
-                          onSelect(items);
+                          onSelect?.(items);
                         }}
                       >
                         <div className="flex flex-col p-2">

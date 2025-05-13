@@ -9,7 +9,6 @@ import { z } from 'zod';
 import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
 
-
 export interface SpeechToTextParameters extends ToolParams {
   ffmpegPath: string;
   model: string;
@@ -31,9 +30,9 @@ export class SpeechToText extends BaseTool {
       .describe('Speaker Diarization'),
   });
 
-  name: string = 'speech-to-text';
+  name: string = 'speech_to_text';
 
-  description: string;
+  description: string = '将音频文件转换为文本,支持wav, mp3';
 
   ffmpegPath: string;
 

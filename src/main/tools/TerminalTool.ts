@@ -12,26 +12,60 @@ import iconv from 'iconv-lite';
 import { runCommand } from '../utils/exec';
 import { BaseTool } from './BaseTool';
 import { platform } from 'process';
+import { FormSchema } from '@/types/form';
 
 export interface TerminalToolParameters extends ToolParams {
   ask_human_input: boolean;
+  defaultTerminal?: string;
 }
 
 export class TerminalTool extends BaseTool {
-  schema = z.object({
-    command: z.string(),
-  });
+  schema = z.object(
+    platform == 'win32'
+      ? {
+          command: z.string(),
+          terminal: z.enum(['cmd.exe', 'pwsh.exe']).optional(),
+        }
+      : { command: z.string() },
+  );
 
   name: string = 'terminal';
 
-  description: string = `run ${platform == 'win32' ? 'cmd.exe' : 'bash'} commands on ${platform} system.`;
+  description: string = `run ${platform == 'win32' ? 'Cmd or PowerShell' : 'bash'} command on ${platform} system.`;
 
   ask_human_input: boolean = false;
 
+  terminale: string = platform == 'win32' ? 'cmd.exe' : 'bash';
+
+  configSchema?: FormSchema[] = [
+    {
+      field: 'defaultTerminal',
+      component: 'Select',
+      label: 'Default Terminal',
+      componentProps: {
+        options: [
+          {
+            label: 'Cmd',
+            value: 'cmd.exe',
+          },
+          {
+            label: 'PowerShell',
+            value: 'pwsh.exe',
+          },
+        ],
+      },
+    },
+  ];
+
   constructor(params?: TerminalToolParameters) {
     super();
-    const { ask_human_input } = params ?? {};
+    const { ask_human_input, defaultTerminal } = params ?? {};
     this.ask_human_input = ask_human_input ?? false;
+    if (platform == 'win32') {
+      this.terminale = defaultTerminal || 'cmd.exe';
+    } else {
+      this.terminale = defaultTerminal || 'bash';
+    }
   }
 
   async _call(
@@ -48,7 +82,10 @@ export class TerminalTool extends BaseTool {
     } else {
       let res;
       try {
-        res = await runCommand(input.command as string);
+        res = await runCommand(
+          input.command as string,
+          (input.terminal as string) || this.terminale,
+        );
       } catch (err) {
         console.error(err);
         res = err.message;

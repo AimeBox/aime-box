@@ -7,7 +7,7 @@ import {
   isToolMessage,
   ToolMessage,
 } from '@langchain/core/messages';
-import { CompiledStateGraph, StateGraph } from '@langchain/langgraph';
+import { Command, CompiledStateGraph, StateGraph } from '@langchain/langgraph';
 import { v4 as uuidv4 } from 'uuid';
 import { notificationManager } from '../app/NotificationManager';
 import { isArray } from '../utils/is';
@@ -32,9 +32,6 @@ export const runAgent = async (
     };
   },
 ) => {
-  let lastMessage;
-  // const toolCalls = [];
-  // const messages = [];
   messages.forEach((x) => {
     // filter file content
     if (isArray(x.content) && x.content.find((x) => x.type == 'file')) {
@@ -67,33 +64,41 @@ export const runAgent = async (
     }
 
     if (isHumanMessage(x)) {
-      if (x.content.length == 1 && (x.content[0] as any)?.type == 'text') {
-        x.content = (x.content[0] as any)?.text;
-      } else if (
-        x.content.length > 1 &&
-        (x.content as any[]).filter((x) => x.type == 'text').length ==
-          x.content.length
-      ) {
-        x.content = (x.content as any[]).map((x) => x.text).join('\n');
+      if (isArray(x.content)) {
+        if (x.content.length == 1 && (x.content[0] as any)?.type == 'text') {
+          x.content = (x.content[0] as any)?.text;
+        } else if (
+          x.content.length > 1 &&
+          (x.content as any[]).filter((x) => x.type == 'text').length ==
+            x.content.length
+        ) {
+          x.content = (x.content as any[]).map((x) => x.text).join('\n');
+        }
       }
     }
   });
   let _lastMessage;
+  let resume;
   try {
     const configurable = {
       thread_id: uuidv4(),
       ...(options?.configurable || {}),
     };
-    const eventStream = await agent.streamEvents(
-      { messages, current_time: new Date().toISOString() },
-      {
-        version: 'v2',
-        signal: options?.signal,
-        recursionLimit: options?.recursionLimit || 25,
-        configurable,
-        subgraphs: true,
-      },
-    );
+
+    if (
+      messages.length > 1 &&
+      messages[messages.length - 2].additional_kwargs?.model == 'ask'
+    ) {
+      resume = new Command({ resume: messages[messages.length - 1] });
+    }
+
+    const eventStream = await agent.streamEvents(resume || { messages }, {
+      version: 'v2',
+      signal: options?.signal,
+      recursionLimit: options?.recursionLimit || 25,
+      configurable,
+      //subgraphs: true,
+    });
     let _toolCalls = [];
     let _toolStart = [];
     const _messages = [];
@@ -188,16 +193,18 @@ export const runAgent = async (
           const msg = _messages.find(
             (x) => x.tool_call_id == data.output.tool_call_id,
           );
-          msg.content = data.output.content;
-          msg.tool_call_id = data.output.tool_call_id;
-          msg.name = data.output.name;
-          msg.status = ChatStatus.SUCCESS;
-          msg.additional_kwargs = {
-            provider_type: undefined,
-            model: data.output.name,
-          };
-          await options?.callbacks?.handlerMessageFinished?.(msg);
-          _lastMessage = msg;
+          if (msg) {
+            msg.content = data.output.content;
+            msg.tool_call_id = data.output.tool_call_id;
+            msg.name = data.output.name;
+            msg.status = ChatStatus.SUCCESS;
+            msg.additional_kwargs = {
+              provider_type: undefined,
+              model: data.output.name,
+            };
+            await options?.callbacks?.handlerMessageFinished?.(msg);
+            _lastMessage = msg;
+          }
         } else {
           const _toolMessage =
             data.output?.update?.messages[
@@ -230,7 +237,7 @@ export const runAgent = async (
           const msg = _messages.find(
             (x) => x.tool_call_id == data.output.messages[0].tool_call_id,
           );
-          if (msg.status === undefined) {
+          if (msg && msg.status === undefined) {
             msg.content = data.output.messages[0].content;
             msg.status = data.output.messages[0].status;
             await options?.callbacks?.handlerMessageFinished?.(msg);
