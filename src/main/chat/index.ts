@@ -65,7 +65,6 @@ import { Serialized } from '@langchain/core/dist/load/serializable';
 import { notificationManager } from '../app/NotificationManager';
 import { BaseTool } from '../tools/BaseTool';
 import { KnowledgeBaseQuery } from '../tools/KnowledgeBaseQuery';
-import { fromPath } from 'pdf2pic';
 import { getDataPath } from '../utils/path';
 import {
   createReactAgent,

@@ -23,7 +23,6 @@
     "@modelcontextprotocol/sdk": "^1.7.0",
     "apache-arrow": "^17.0.0",
     "better-sqlite3": "^9.6.0",
-    "browser-use-js": "^1.0.6",
     "langchain": "^0.3.24",
     "playwright": "^1.50.1",
     "sharp": "^0.33.5",
