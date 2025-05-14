@@ -456,6 +456,7 @@ export class AgentManager {
       }
     } else if (agent.type == 'built-in') {
       const _agent = this.agents.find((x) => x.info.name == agent.name);
+
       return await _agent.agent.createAgent(
         store,
         model,

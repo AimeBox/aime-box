@@ -1,6 +1,10 @@
 import { Tiktoken } from 'js-tiktoken/lite';
 import { getEncodingNameForModel, getEncoding } from 'js-tiktoken';
-import { BaseMessage } from '@langchain/core/messages';
+import {
+  BaseMessage,
+  isAIMessage,
+  isToolMessage,
+} from '@langchain/core/messages';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 const tokenCounter = async (
@@ -11,7 +15,17 @@ const tokenCounter = async (
     try {
       const listTokenCounter = async (msgs: BaseMessage[]) => {
         const tokenCounts = await Promise.all(
-          msgs.map((msg) => model.getNumTokens(msg.content)),
+          msgs.map((msg) => {
+            if (isAIMessage(msg)) {
+              if (msg.tool_calls && msg.tool_calls.length > 0) {
+                return model.getNumTokens(
+                  JSON.stringify(msg.tool_calls) + msg.content,
+                );
+              }
+              return model.getNumTokens(msg.content);
+            }
+            return model.getNumTokens(msg.content);
+          }),
         );
         return tokenCounts.reduce((sum, count) => sum + count, 0);
       };
@@ -22,7 +36,14 @@ const tokenCounter = async (
     }
   }
   const iktoken = getEncoding('o200k_base');
-  const content = messages.map((m) => m.content).join('\n');
+  const content = messages
+    .map((m) => {
+      if (isAIMessage(m)) {
+        return JSON.stringify(m.tool_calls) + m.content;
+      }
+      return m.content;
+    })
+    .join('\n');
   const tokens = iktoken.encode(content);
 
   return tokens.length;

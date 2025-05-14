@@ -187,7 +187,7 @@
     "antd": "^5.24.0",
     "autoprefixer": "^10.4.20",
     "better-sqlite3": "^11.10.0",
-    "browser-use-js": "^1.0.6",
+    "browser-use-js": "^1.0.7",
     "browserslist-config-erb": "^0.0.3",
     "chalk": "^4.1.2",
     "concurrently": "^8.2.1",

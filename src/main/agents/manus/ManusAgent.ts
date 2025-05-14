@@ -46,13 +46,14 @@ import {
 import { tool } from '@langchain/core/tools';
 import { dbManager } from '@/main/db';
 import { PlannerPrompt, ReporterPrompt, ResearcherPrompt } from './prompt';
-import checkAndSummarize from '@/main/utils/messages';
+import { checkAndSummarize } from '@/main/utils/messages';
 import dayjs from 'dayjs';
 import { agentManager } from '..';
 import { Repository } from 'typeorm';
 import { Agent } from '@/entity/Agent';
 import { message } from 'antd';
 import { BaseTool } from '@/main/tools/BaseTool';
+import { MessageManager } from '../message_manager';
 
 export type PlanStep = {
   id: string;
@@ -120,6 +121,8 @@ export class ManusAgent extends BaseAgent {
   ];
 
   config: any = {};
+
+  messageManager?: MessageManager;
 
   constructor(options: {
     provider: string;
@@ -225,6 +228,7 @@ export class ManusAgent extends BaseAgent {
     messageEvent?: AgentMessageEvent,
     chatOptions?: ChatOptions,
     signal?: AbortSignal,
+    state?: any,
   ) {
     const StateAnnotation = Annotation.Root({
       task: Annotation<BaseMessage>,
@@ -249,6 +253,36 @@ export class ManusAgent extends BaseAgent {
     let agentNames = chatOptions?.agentNames || [];
     agentNames.push(...this.defaultAgents);
     agentNames = [...new Set(agentNames)];
+
+    this.messageManager = new MessageManager({
+      llm: this.model,
+    });
+
+    this.messageManager?.addMessage(
+      new SystemMessage(this.systemPrompt),
+      undefined,
+      'init',
+    );
+
+    this.messageManager?.addMessage(
+      new HumanMessage('Example Output:'),
+      undefined,
+      'init',
+    );
+
+    this.messageManager?.addMessage(
+      new AIMessage({
+        content: '',
+        tool_calls: [
+          { id: this.messageManager.toolId, name: 'AgentOutput', args: {} },
+        ],
+      }),
+      undefined,
+      'init',
+    );
+
+    this.messageManager?.addToolMessage('', 'init');
+
     const that = this;
 
     const agents = [];
@@ -270,339 +304,6 @@ export class ManusAgent extends BaseAgent {
       });
       agentDescription += `- [${_agent.name}]: ${_agent.description}\n`;
       agents.push(agent);
-    }
-    const agentMap = {
-      browser: {
-        agent: this.browserAgent,
-        description:
-          '你是一个 ai browser, 你可以使用browser_use工具来帮助用户自动化操作浏览器',
-      },
-      coder: {
-        agent: this.coderAgent,
-        description:
-          '你是一个 ai coder, 你可以使用python_interpreter,或命令行工具来帮助编写代码或执行命令',
-      },
-      reporter: {
-        agent: this.reporterAgent,
-        description:
-          '你是一个 ai reporter, 你可以使用python_interpreter工具来帮助用户生成报告',
-      },
-      researcher: {
-        agent: this.researcherAgent,
-        description:
-          '你是一个 ai researcher, 你可以使用web_search和web_loader工具来帮助用户搜索信息',
-      },
-    };
-
-    const editTodo = tool(
-      (input) => {
-        return 'todo.md';
-      },
-      {
-        name: 'edit_todo',
-        description: 'create or update a todo list in todo.md',
-        schema: z.object({
-          todo: z.string(),
-        }),
-      },
-    );
-
-    // async function plannerNode({
-    //   messages,
-    //   plans,
-    //   task,
-    // }: typeof StateAnnotation.State) {
-    //   const promptTemplate = PromptTemplate.fromTemplate(PlannerPrompt);
-    //   const prompt = await promptTemplate.format({
-    //     current_time: new Date().toISOString(),
-    //     team_members: 'researcher, coder, browser, reporter',
-    //   });
-    //   const promptTemplate2 = ChatPromptTemplate.fromMessages([
-    //     ['system', prompt],
-    //     new MessagesPlaceholder('messages'),
-    //   ]);
-    //   const llmWithStructured = that.model.withStructuredOutput(
-    //     z.object({
-    //       plans: z.array(
-    //         z.object({
-    //           title: z.string().describe('任务大纲的标题'),
-    //           steps: z.array(z.string()).describe('任务大纲的步骤'),
-    //           //thought: z.string(),
-    //         }),
-    //       ),
-    //     }),
-    //   );
-
-    //   const chain = promptTemplate2.pipe(llmWithStructured);
-    //   const response = await chain.invoke(
-    //     { messages: messages },
-    //     { tags: ['ignore'] },
-    //   );
-
-    //   if (response.plans) {
-    //     await dispatchCustomEvent('plans_updated', { plans: response.plans });
-    //   }
-    //   let index = 0;
-    //   return new Command({
-    //     update: {
-    //       messages: [...messages],
-    //       plans: response.plans.map((plan) => {
-    //         return {
-    //           title: plan.title,
-    //           steps: plan.steps.map((step) => {
-    //             return {
-    //               id: index++,
-    //               description: step,
-    //               note: '',
-    //               status: 'not_started',
-    //             };
-    //           }),
-    //         };
-    //       }),
-    //     },
-    //     goto: '__end__',
-    //   });
-    // }
-
-    // async function receptionistNode({
-    //   messages,
-    //   plans,
-    //   task,
-    // }: typeof StateAnnotation.State) {
-    //   let goto;
-    //   if (!plans) {
-    //     const promptTemplate = ChatPromptTemplate.fromMessages([
-    //       [
-    //         'system',
-    //         [
-    //           '你是前台接待员，请根据用户的需求给出相应的回复',
-    //           '- 把复杂的任务交给专门的任务规划师`handoff_to_planner`,必须提供`task`的用户任务描述',
-    //           '- 如果用户需要更改任务的规划,则把任务交给专门的任务规划师`handoff_to_replanner`重新规划,必须提供`task`的用户任务描述',
-    //           '- 如果是非任务相关的问题,则回复用户的问题`response`',
-    //           '- `task`你将保留一切的细节,不能遗漏信息',
-    //         ].join('\n'),
-    //       ],
-    //       new MessagesPlaceholder('messages'),
-    //     ]);
-    //     const llmWithStructuredOutput = that.model.withStructuredOutput(
-    //       z.object({
-    //         action: z.enum([
-    //           'response',
-    //           'handoff_to_planner',
-    //           'handoff_to_replanner',
-    //         ]),
-    //         response: z.string().describe('回复用户的问题').optional(),
-    //         task: z.string().describe('用户任务').optional(),
-    //       }),
-    //     );
-    //     //const prompt = await promptTemplate.invoke({ messages: state.messages });
-    //     // const llmWithTool = this.llm.bindTools([responseTool]);
-
-    //     const response = await promptTemplate
-    //       .pipe(llmWithStructuredOutput)
-    //       .invoke({ messages: messages }, { tags: ['ignore'] });
-
-    //     if (response.action == 'response') {
-    //       goto = '__end__';
-    //     } else if (response.action == 'handoff_to_planner') {
-    //       goto = 'planner';
-    //     } else if (response.action == 'handoff_to_replanner') {
-    //       goto = 'planner';
-    //     }
-
-    //     if (response.task) {
-    //       await dispatchCustomEvent('task_updated', { task: response.task });
-    //     }
-
-    //     return new Command({
-    //       update: {
-    //         messages: messages,
-    //         plans:
-    //           response.action == 'handoff_to_replanner' ? plans : undefined,
-    //         task: response.task,
-    //       },
-    //       goto,
-    //     });
-    //   } else {
-    //     const promptTemplate = ChatPromptTemplate.fromMessages([
-    //       [
-    //         'system',
-    //         [
-    //           '你是前台接待员，请根据用户的需求给出相应的回复',
-    //           '- 如果用户需要更改任务的规划',
-    //           '- 如果用户要开始任务,则把任务交给专门的任务执行师`handoff_to_execute`处理',
-    //           '- 如果是非任务相关的问题,则回复用户的问题`response`',
-    //         ].join('\n'),
-    //       ],
-    //       new MessagesPlaceholder('messages'),
-    //     ]);
-    //     const llmWithStructuredOutput = that.model.withStructuredOutput(
-    //       z.object({
-    //         action: z.enum(['response', 'handoff_to_execute']),
-    //         response: z.string().describe('回复用户的问题').optional(),
-    //       }),
-    //     );
-    //     //const prompt = await promptTemplate.invoke({ messages: state.messages });
-    //     // const llmWithTool = this.llm.bindTools([responseTool]);
-
-    //     const response = await promptTemplate
-    //       .pipe(llmWithStructuredOutput)
-    //       .invoke({ messages: messages });
-
-    //     if (response.action == 'response') {
-    //       goto = '__end__';
-    //     } else if (response.action == 'handoff_to_execute') {
-    //       goto = 'execute';
-    //     }
-
-    //     return new Command({
-    //       update: {
-    //         messages: messages,
-    //       },
-    //       goto,
-    //     });
-    //   }
-    // }
-
-    // async function agentNode({
-    //   messages,
-    //   plans,
-    //   current_step,
-    //   task,
-    // }: typeof StateAnnotation.State) {
-    //   const agentFunction = agentMap[current_step.agent];
-    //   const agentInstance = await agentFunction.agent(store);
-    //   const input_msg = [
-    //     new HumanMessage(
-    //       [`[当前任务]\n${current_step.description}`].join('\n'),
-    //     ),
-    //   ];
-    //   try {
-    //     const stream = await agentInstance.invoke(
-    //       { messages: input_msg },
-    //       {
-    //         streamMode: 'values',
-    //         signal: undefined,
-    //       },
-    //     );
-    //   } catch (err) {
-    //     console.error(err);
-    //   }
-
-    //   const llmWithStructuredOutput = that.model.withStructuredOutput(
-    //     z.object({
-    //       action: z.enum(['replan', 'handoff_to_human', 'next']),
-    //       ask_human: z.string().optional(),
-    //       current_step_status: z.enum(['done', 'failed']),
-    //     }),
-    //   );
-
-    //   const chain = ChatPromptTemplate.fromMessages([
-    //     ['system', '你是一个任务执行员，请根据用户的需求给出相应的回复'],
-    //     new MessagesPlaceholder('messages'),
-    //   ]).pipe(llmWithStructuredOutput);
-
-    //   const response = await chain.invoke({ messages: agentResult.messages });
-
-    //   return new Command({
-    //     update: { messages: agentResult.messages },
-    //     goto: 'execute',
-    //   });
-    // }
-
-    // const executeNode = async ({
-    //   messages,
-    //   plans,
-    //   task,
-    // }: typeof StateAnnotation.State) => {
-    //   let plan_step: PlanStep | undefined;
-    //   for (const plan of plans) {
-    //     for (const step of plan.steps) {
-    //       if (step.status == 'not_started') {
-    //         plan_step = step;
-    //         break;
-    //       }
-    //     }
-    //   }
-    //   if (plan_step) {
-    //     const agents = Object.keys(agentMap).map((x) => `handoff_to_${x}`);
-    //     agents.push('handoff_to_human');
-    //     const llmWithStructuredOutput = that.model.withStructuredOutput(
-    //       z.object({
-    //         action: z.enum(agents as [string, ...string[]]),
-    //         ask_human: z.string().describe('询问用户的问题').optional(),
-    //       }),
-    //     );
-    //     const promptTemplate = ChatPromptTemplate.fromMessages([
-    //       [
-    //         'system',
-    //         [
-    //           '## 任务',
-    //           '你是任务执行员，请根据用户的需求给出相应的回复',
-    //           '你可以选择一个符合当前任务的agent来完成任务',
-    //           '[Agent]:',
-    //           Object.keys(agentMap)
-    //             .map((x) => `${x}: ${agentMap[x].description}`)
-    //             .join('\n'),
-    //           '[当前任务]:',
-    //           plan_step.description,
-    //         ].join('\n'),
-    //       ],
-    //       new MessagesPlaceholder('messages'),
-    //     ]);
-    //     const response = await promptTemplate
-    //       .pipe(llmWithStructuredOutput)
-    //       .invoke({ messages: messages }, { tags: ['ignore'] });
-    //     if (response.action == 'handoff_to_human') {
-    //       messages.push(new AIMessage(response.ask_human));
-    //       return new Command({
-    //         update: { messages: messages, current_step: plan_step },
-    //         goto: '__end__',
-    //       });
-    //     } else {
-    //       const agent = response.action.split('_')[2];
-    //       plan_step.agent = agent;
-    //       plan_step.status = 'in_progress';
-    //       return new Command({
-    //         update: { messages: messages, current_step: plan_step },
-    //         goto: 'agent',
-    //       });
-    //     }
-    //   } else {
-    //     return new Command({
-    //       update: { messages: messages, current_step: plan_step },
-    //       goto: '__end__',
-    //     });
-    //   }
-    // };
-
-    async function checkAndSummarizeMessages(
-      state: typeof MessagesAnnotation.State,
-    ) {
-      const { messages } = state;
-      if (messages.length > 10) {
-        // const _messages = messages
-        //   .slice(0, -3)
-        //   .map((m) => new RemoveMessage({ id: m.id }));
-        const { systemMessage, keepMessages, deleteMessages, summaryMessage } =
-          await checkAndSummarize(messages, that.model, true, {
-            keepLastMessagesCount: 3,
-          });
-
-        const _messages = [];
-        if (systemMessage) _messages.push(systemMessage);
-        _messages.push(summaryMessage);
-        _messages.push(...keepMessages);
-        return new Command({
-          update: {
-            messages: _messages,
-          },
-          goto: 'manus',
-        });
-      }
-      return new Command({
-        goto: 'manus',
-      });
     }
 
     const complete = tool(
@@ -870,10 +571,12 @@ export class ManusAgent extends BaseAgent {
       { messages, todoList, task, logList }: typeof StateAnnotation.State,
       config: RunnableConfig,
     ) => {
-      const prompt = ChatPromptTemplate.fromMessages([
-        ['system', that.systemPrompt],
-        new MessagesPlaceholder('messages'),
-      ]);
+      if (!that.messageManager?.task && task) {
+        that.messageManager?.addTaskMessage(task.text);
+      }
+
+      const _messages = that.messageManager?.getMessages();
+
       // const resmsg = await that.model.invoke(messages);
       // return { messages: [resmsg] };
 

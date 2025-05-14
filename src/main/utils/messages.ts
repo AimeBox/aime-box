@@ -7,6 +7,8 @@ import {
   SystemMessage,
   mergeContent,
   mergeMessageRuns,
+  isAIMessage,
+  AIMessage,
 } from '@langchain/core/messages';
 import tokenCounter from './tokenCounter';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -154,4 +156,35 @@ The above is a summary of the conversation history. The conversation continues b
   };
 };
 
-export default checkAndSummarize;
+const convertMessagesForNonFunctionCallingModels = (
+  messages: BaseMessage[],
+): BaseMessage[] => {
+  return messages.map((message) => {
+    if (isToolMessage(message)) {
+      return new HumanMessage({ content: message.content });
+    } else if (isAIMessage(message)) {
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        return new AIMessage({
+          content: message.content
+            ? `${message.content}\ntool_calls: ${JSON.stringify(message.tool_calls)}`
+            : `tool_calls: ${JSON.stringify(message.tool_calls)}`,
+        });
+      } else {
+        return new AIMessage({
+          content: message.content,
+        });
+      }
+    }
+    return message;
+  });
+};
+
+const removeThinkTags = (text: string): string => {
+  return text.replaceAll(/<think>(.*?)<\/think>/g, '');
+};
+
+export {
+  checkAndSummarize,
+  convertMessagesForNonFunctionCallingModels,
+  removeThinkTags,
+};
