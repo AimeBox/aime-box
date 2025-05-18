@@ -327,6 +327,32 @@ export class ProvidersManager {
             };
           })
           .sort((a, b) => a.name.localeCompare(b.name));
+      } else if (connection.type === ProviderType.AZURE_OPENAI) {
+        //const apiKey = new AzureKeyCredential(connection.api_key);
+        const endpoint = connection.api_base;
+        const apiVersion = connection.config?.apiVersion || '2024-10-21';
+        // const deployment =
+        //   connection.extend_params?.deployment || 'gpt-35-turbo';
+        const options = {
+          method: 'GET',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            Authorization: `Bearer ${connection.api_key}`,
+          },
+        };
+        const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
+        const res = await fetch(url, options);
+        const models = await res.json();
+        return models.data
+          .map((x) => {
+            return {
+              name: x.id,
+              enable:
+                connection.models?.find((z) => z.name == x.id)?.enable || false,
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
       }
     } catch (e) {
       console.log(e);

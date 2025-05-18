@@ -51,7 +51,7 @@ export default function Connections() {
   const [form] = Form.useForm();
   const [formModels] = Form.useForm();
   const formModelsValue = Form.useWatch('models', formModels);
-
+  const formTypeValue = Form.useWatch('type', form);
   const getData = async () => {
     try {
       setLoading(true);
@@ -170,6 +170,14 @@ export default function Connections() {
         form.setFieldsValue({
           api_base: 'http://localhost:1234/v1',
           api_key: 'NULL',
+        });
+      } else if (changedFields[0].value === 'azure_openai') {
+        form.setFieldsValue({
+          api_base: 'https://<instance-name>.cognitiveservices.azure.com',
+          api_key: 'NULL',
+          config: {
+            apiVersion: '2024-10-21',
+          },
         });
       }
     }
@@ -382,11 +390,17 @@ export default function Connections() {
               >
                 <Input.Password />
               </Form.Item>
-              {/* <Form.Item>
-                <Button type="primary">Check</Button>
-              </Form.Item> */}
             </Space.Compact>
           </Form.Item>
+          {(formTypeValue === 'azure_openai' ||
+            form.getFieldValue('type') === 'azure_openai') && (
+            <Form.Item<Providers>
+              label="API Version"
+              name={['config', 'apiVersion']}
+            >
+              <Input />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
       <Modal

@@ -68,7 +68,6 @@ import fs from 'fs';
 import { isArray } from '@/main/utils/is';
 import { PlannerAnnotation, PlannerNode } from '../nodes/PlannerNode';
 import { JsonOutputParser } from '@langchain/core/output_parsers';
-import { cat } from '@huggingface/transformers';
 
 export class ManusAgent extends BaseAgent {
   name: string = 'aime_manus';
