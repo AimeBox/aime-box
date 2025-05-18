@@ -34,5 +34,6 @@
     "src/i18n/locales"
   ],
   "i18next.i18nPaths": "src/i18n/locales",
-  "i18n-ally.keystyle": "nested"
+  "i18n-ally.keystyle": "nested",
+  "i18n-ally.sourceLanguage": "en-us"
 }

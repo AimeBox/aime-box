@@ -15,6 +15,9 @@ import { PlaywrightWebBaseLoader } from '@langchain/community/document_loaders/w
 import settingsManager from '../settings';
 import { getDataPath } from '../utils/path';
 import { chromium } from 'playwright';
+import { v4 as uuidv4 } from 'uuid';
+import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
+import { a } from 'js-tiktoken/dist/core-cb1c5044';
 
 export interface WebLoaderParameters extends ToolParams {
   headless: boolean;
@@ -76,7 +79,7 @@ export class WebLoader extends Tool {
       const browser_context = await chromium.launchPersistentContext(
         userDataDir,
         {
-          channel: 'msedge',
+          // channel: 'msedge',
           headless: false,
 
           proxy: httpProxy
@@ -93,37 +96,42 @@ export class WebLoader extends Tool {
       } catch {}
 
       //await page.waitForLoadState('domcontentloaded', { timeout: 3000 });
-      html = await page.content();
+      // html = await page.content();
+      const pdfDir = path.join(getDataPath(), 'tmp');
+      if (!fs.existsSync(pdfDir)) {
+        fs.mkdirSync(pdfDir, { recursive: true });
+      }
+
+      const pdfPath = path.join(getDataPath(), 'tmp', `${uuidv4()}.pdf`);
+      //创建文件夹
+
+      await page.emulateMedia({ media: 'screen' });
+      // await page.pdf({
+      //   path: pdfPath,
+      //   printBackground: false,
+      // });
+      const pdfBuffer = await page.pdf({
+        displayHeaderFooter: false,
+        printBackground: false,
+      });
+
+      //const pdfPath = `./${Date.now()}.pdf`;
+      //fs.writeFileSync(pdfPath, pdfBuffer);
+
+      // 将Buffer转换为Blob对象
+      const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
+      const loader = new PDFLoader(blob);
+      const docs = await loader.load();
+      const text = docs.map((x) => x.pageContent).join('\n\n');
+
+      // 删除pdf文件
+      await fs.promises.unlink(pdfPath);
+
       const title = await page.title();
       await page.close();
       await browser_context.close();
 
-      // const text = convert(res);
-
-      // return {
-      //   title,
-      //   content: text,
-      //   url,
-      // };
-
-      const response = await fetch('http://0.0.0.0:8300/tools/parse/web', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: url, html: html }),
-      });
-      if (!response.ok) {
-        throw new Error(`Network response was not ok ${response.statusText}`);
-      }
-      const b = await response.json();
-      // console.log(b);
-      // const loader = new PlaywrightWebBaseLoader(url, {
-      //   launchOptions: { headless: this.headless, proxy: { server: proxy } },
-      // });
-      // const doc = await loader.load();
-
-      return b;
+      return text;
     } catch (err) {
       return JSON.stringify(err);
     }

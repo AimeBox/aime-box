@@ -373,6 +373,7 @@ export class AgentManager {
     chatOptions?: ChatOptions;
     signal?: AbortSignal;
     responseFormat?: z.ZodObject<any>;
+    configurable?: Record<string, any>;
   }) {
     const {
       agent,
@@ -382,6 +383,7 @@ export class AgentManager {
       messageEvent,
       chatOptions,
       signal,
+      configurable,
     } = config;
     let model;
     if (providerModel || agent.model) {
@@ -457,13 +459,14 @@ export class AgentManager {
     } else if (agent.type == 'built-in') {
       const _agent = this.agents.find((x) => x.info.name == agent.name);
 
-      return await _agent.agent.createAgent(
+      return await _agent.agent.createAgent({
         store,
         model,
         messageEvent,
         chatOptions,
         signal,
-      );
+        configurable,
+      });
     }
     return null;
   }

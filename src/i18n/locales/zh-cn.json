@@ -131,7 +131,8 @@
     "defaultWebSearchEngine": "默认网页搜索引擎",
     "localModelManager": "本地模型管理",
     "defaultModel": "默认模型设置",
-    "showMcpWindows": "显示MCP窗口"
+    "showMcpWindows": "显示MCP窗口",
+    "braveApiKey": "Brave Api Key"
   },
   "knowledgebase": {
     "create_knowledgebase": "创建知识库",
@@ -163,7 +164,8 @@
     "model": "模型",
     "mode": "模式",
     "agents": "AI助手",
-    "parameters": "参数"
+    "parameters": "参数",
+    "quit": "退出"
   },
   "agents": {
     "name": "名称",

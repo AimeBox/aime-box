@@ -91,9 +91,10 @@
     "addMcp": "Add Mcp",
     "tool_config": "Tool Config",
     "mcp": "Mcp",
-    "chromeInstancePath": "Browser Instance Path",
+    "chromeInstancePath": "ChromeInstance Path",
     "useVision": "Use Vision",
-    "plannerModel": "Planner Model"
+    "plannerModel": "Planner Model",
+    "userDataDir": "UserDataDir Path"
   },
   "common": {
     "edit": "Edit",
@@ -104,7 +105,8 @@
     "model": "Model",
     "mode": "Mode",
     "agents": "Agents",
-    "parameters": "Parameters"
+    "parameters": "Parameters",
+    "quit": "Quit"
   },
   "agents": {
     "name": "Name",
@@ -171,6 +173,7 @@
     "defaultWebSearchEngine": "Default Web Search Engine",
     "localModelManager": "Local Model Manager",
     "defaultModel": "Default Model",
-    "showMcpWindows": "Show Mcp Windows"
+    "showMcpWindows": "Show Mcp Windows",
+    "braveApiKey": "Brave Api Key"
   }
 }

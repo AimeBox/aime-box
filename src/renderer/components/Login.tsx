@@ -5,8 +5,8 @@ import { supabase } from '@/main/supabase/supabaseClient';
 
 const { Title } = Typography;
 
-function Login(props: { visible: boolean; onClose: () => void }) {
-  const { onClose, visible } = props;
+function Login(props: { open: boolean; onClose: () => void }) {
+  const { onClose, open } = props;
   //const [visible, setVisible] = useState(_visible);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -16,9 +16,10 @@ function Login(props: { visible: boolean; onClose: () => void }) {
     setErrorMsg(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
-      // options: {
-      //   redirectTo: `aime-box://auth/callback`,
-      // },
+      options: {
+        //redirectTo: `aime-box://auth/callback`,
+        //skipBrowserRedirect: true,
+      },
     });
     setLoading(false);
     if (error) {
@@ -30,11 +31,11 @@ function Login(props: { visible: boolean; onClose: () => void }) {
 
   return (
     <Modal
-      open={visible}
+      open={open}
       footer={null}
       centered
       width={350}
-      onClose={onClose}
+      onCancel={onClose}
       maskClosable
     >
       <Title level={3}>AI Chat 登录</Title>

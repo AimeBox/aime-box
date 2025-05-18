@@ -14,20 +14,22 @@ const tokenCounter = async (
   if (model && 'getNumTokens' in model) {
     try {
       const listTokenCounter = async (msgs: BaseMessage[]) => {
-        const tokenCounts = await Promise.all(
-          msgs.map((msg) => {
-            if (isAIMessage(msg)) {
-              if (msg.tool_calls && msg.tool_calls.length > 0) {
-                return model.getNumTokens(
-                  JSON.stringify(msg.tool_calls) + msg.content,
-                );
-              }
-              return model.getNumTokens(msg.content);
+        let tokenCounts = 0;
+        for (const msg of msgs) {
+          if (isAIMessage(msg)) {
+            if (msg.tool_calls && msg.tool_calls.length > 0) {
+              tokenCounts += await model.getNumTokens(
+                JSON.stringify(msg.tool_calls) + msg.content,
+              );
+            } else {
+              tokenCounts += await model.getNumTokens(msg.content);
             }
-            return model.getNumTokens(msg.content);
-          }),
-        );
-        return tokenCounts.reduce((sum, count) => sum + count, 0);
+          } else {
+            tokenCounts += await model.getNumTokens(msg.content);
+          }
+        }
+
+        return tokenCounts;
       };
       const count = await listTokenCounter(messages);
       return count;

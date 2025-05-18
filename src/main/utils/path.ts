@@ -24,6 +24,10 @@ const getTmpPath = () => {
   return path.join(userData, 'tmp');
 };
 
+const getAssetPath = (...paths: string[]): string => {
+  return path.join(app.getAppPath(), 'assets', ...paths);
+};
+
 const rootPath = app.isPackaged ? app.getAppPath() : __dirname;
 
 const getModelsPath = () => {
@@ -62,5 +66,6 @@ export {
   getTmpPath,
   getModelsPath,
   getDefaultModelsPath,
+  getAssetPath,
   rootPath,
 };

@@ -391,6 +391,7 @@ export class ProvidersManager {
       provider.api_base = input.api_base;
       provider.api_key = input.api_key;
       provider.models = input.models;
+      provider.config = input.config;
       await this.repository.save(provider);
     } else {
       if (

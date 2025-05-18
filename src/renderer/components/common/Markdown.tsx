@@ -160,7 +160,7 @@ export function Markdown(props: MarkdownProps) {
         </div>
       )}
       <div
-        className="overflow-auto w-full max-w-max break-words prose dark:prose-invert dark prose-hr:m-0 prose-td:whitespace-pre-line"
+        className="overflow-auto w-full  break-all max-w-max break-words prose dark:prose-invert dark prose-hr:m-0 prose-td:whitespace-pre-line"
         dangerouslySetInnerHTML={{ __html: renderedContent }}
         key={renderedContent}
       />

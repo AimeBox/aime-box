@@ -54,7 +54,9 @@ export class BraveSearchTool extends BaseTool {
     super(fields);
     const { apiKey } = fields ?? {};
     this.apiKey =
-      fields?.apiKey ?? getEnvironmentVariable('BRAVE_SEARCH_API_KEY');
+      apiKey ||
+      settingsManager.getSettings().webSearchEngine.brave.apiKey ||
+      getEnvironmentVariable('BRAVE_SEARCH_API_KEY');
   }
 
   async _call(

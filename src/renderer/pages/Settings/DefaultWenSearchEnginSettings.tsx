@@ -6,10 +6,7 @@ import { useTheme } from '../../components/theme/ThemeProvider';
 import { GlobalSettings } from '@/main/settings';
 import { is, isArray, isString, isUrl } from '@/main/utils/is';
 import i18n from '@/i18n';
-import LLMProviders from '@/renderer/components/providers/LLMProviders';
-// import EmbeddingProviders from '@/renderer/components/providers/EmbeddingProviders';
-// import RerankerProviders from '@/renderer/components/providers/RerankerProviders';
-// import TTSProviders from '@/renderer/components/providers/TTSProviders';
+
 import ProviderSelect from '@/renderer/components/providers/ProviderSelect';
 import Link from 'antd/es/typography/Link';
 import { ResponseCard } from '@/renderer/components/common/ResponseCard';

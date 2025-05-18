@@ -15,6 +15,7 @@ export enum ProviderType {
   BAIDU = 'baidu',
   LMSTUDIO = 'lmstudio',
   AZURE = 'azure',
+  VOLCANOENGINE = 'volcanoengine',
 }
 
 @Entity('providers')
@@ -39,4 +40,8 @@ export class Providers {
   models?: any;
 
   static: boolean;
+
+  @Column('json', { nullable: true })
+  config?: any;
+
 }

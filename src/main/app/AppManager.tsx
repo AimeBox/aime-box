@@ -191,7 +191,7 @@ export class AppManager {
     const defaultTTS = settingsManager.getSettings()?.defaultTTS;
     if (defaultTTS) {
       const model = defaultTTS.split('@')[0];
-      this.textToSpeech = new TextToSpeech({ model });
+      this.textToSpeech = new TextToSpeech({ model: defaultTTS });
       const config = this.textToSpeech.getConfig(model);
       if (!this.offlineTts) {
         if (config) {

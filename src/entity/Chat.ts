@@ -233,6 +233,9 @@ export class ChatMessage {
   @Column('json', { nullable: true })
   additional_kwargs?: any;
 
+  @Column({ nullable: true })
+  name?: string;
+
   public setUsage(usage_metadata: {
     total_tokens?: number;
     input_tokens?: number;

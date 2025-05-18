@@ -1050,7 +1050,7 @@ export class ToolsManager {
   }
 
   createMcpUrl(command: string, config: any) {
-    const url = new URL(`${command}/mcp`);
+    const url = new URL(`${command}`);
     if (config) {
       const param =
         typeof window !== 'undefined'

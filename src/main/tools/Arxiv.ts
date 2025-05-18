@@ -10,6 +10,7 @@ import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import settingsManager from '@/main/settings';
 import { parseStringPromise } from 'xml2js';
+import { isArray } from '../utils/is';
 
 export interface ArxivParameters extends ToolParams {}
 
@@ -76,12 +77,20 @@ export class ArxivTool extends BaseTool {
     const result = await parseStringPromise(parsedResponse, {
       explicitArray: false,
     });
-    const finalResults = result.feed.entry.map((x) => {
+    const finalResults = result.feed?.entry?.map((x) => {
+      let author = '';
+      if (x.author) {
+        if (isArray(x.author)) {
+          author = x.author.map((a) => a.name).join(',');
+        } else {
+          author = x.author.name;
+        }
+      }
       return {
         id: x.id,
         title: x.title,
         summary: x.summary,
-        author: x.author.map((a) => a.name).join(','),
+        author: author,
 
         link: x.link
           .filter((a) => a['$'].type == 'application/pdf')
@@ -93,6 +102,6 @@ export class ArxivTool extends BaseTool {
       };
     });
 
-    return JSON.stringify(finalResults);
+    return finalResults ? JSON.stringify(finalResults) : 'empty results';
   }
 }

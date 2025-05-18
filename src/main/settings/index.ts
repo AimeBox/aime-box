@@ -35,7 +35,7 @@ import { getDefaultModelsPath, getModelsPath } from '../utils/path';
 import { platform } from 'process';
 import { exec } from 'child_process';
 import serverManager from '../server/serverManager';
-import { isBoolean } from '../utils/is';
+import { isBoolean, isUrl } from '../utils/is';
 import {
   getSystemProxySettings,
   SystemProxySettings,

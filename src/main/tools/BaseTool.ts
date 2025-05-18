@@ -13,4 +13,6 @@ export abstract class BaseTool extends StructuredTool {
   outputFormat?: 'json' | 'markdown' = 'markdown';
 
   configSchema?: FormSchema[] = [];
+
+  displayMode?: 'list' | 'markdown' = 'markdown';
 }

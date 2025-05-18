@@ -2,6 +2,8 @@ import { Chat, ChatMessage, ChatOptions } from '@/entity/Chat';
 import ChatMessageBox from '@/renderer/components/chat/ChatMessageBox';
 import ChatQuickInput from '@/renderer/components/chat/ChatQuickInput';
 import ProviderSelect from '@/renderer/components/providers/ProviderSelect';
+
+import { motion } from 'motion/react';
 import {
   ScrollArea,
   ScrollAreaProps,
@@ -17,7 +19,16 @@ import {
   Tag,
   Tooltip,
 } from 'antd';
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  MutableRefObject,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   FaAngleDown,
   FaAngleUp,
@@ -49,6 +60,7 @@ import ChatAttachment from '@/renderer/components/chat/ChatAttachment';
 import domtoimage from 'dom-to-image';
 import { ChatInfo } from '@/main/chat';
 import FileDropZone from '@/renderer/components/common/FileDropZone';
+import ChatCanvasView from './ChatCanvasView';
 
 export default function ChatContent() {
   const location = useLocation();
@@ -68,6 +80,9 @@ export default function ChatContent() {
   const { agents, tools, knowledgeBase } = useContext(GlobalContext);
   const scrollRef = useRef<ScrollAreaRef | null>(null);
   const editorRef = useRef<EditorRef>(null);
+  const [openCanvasView, setOpenCanvasView] = useState<boolean>(false);
+
+  const [canvasViewValue, setCanvasViewValue] = useState<any>({});
   const registerEvent = (id: string) => {
     const list = {
       [`chat:changed:${id}`]: handleChatChanged,
@@ -225,6 +240,7 @@ export default function ChatContent() {
 
   useEffect(() => {
     const id = location.pathname.split('/')[2];
+    closeCanvas();
     if (id) {
       getChat(id);
       scrollToBottom();
@@ -262,6 +278,7 @@ export default function ChatContent() {
     window.electron.db.delete('langgraph_writes', {
       thread_id: currentChat.id,
     });
+    closeCanvas();
     const res = await window.electron.chat.getChat(currentChat.id);
     setCurrentChat(res);
   };
@@ -355,351 +372,409 @@ export default function ChatContent() {
     setAttachments(attachments.filter((x) => x.path != attachment.path));
   };
 
+  const closeCanvas = () => {
+    setOpenCanvasView(false);
+    setCanvasViewValue({});
+    setCanvasSize(0);
+  };
+
+  const openCanvas = (value: any) => {
+    setOpenCanvasView(true);
+    setCanvasViewValue(value);
+    setCanvasSize(400);
+  };
+
+  const [canvasSize, setCanvasSize] = useState(0);
+
   return (
     <div className="h-full">
       <FileDropZone onSelectedFiles={onSelectFile}>
         {currentChat && (
           <Splitter
-            layout="vertical"
-            className="h-full"
-            style={{
-              height: '100%',
+            className="flex flex-row h-full w-full"
+            onResize={(size) => {
+              setCanvasSize(size[1]);
             }}
           >
             <Splitter.Panel min={400}>
-              <div className="flex flex-col w-full h-full">
-                <div className="w-full border-b border-gray-200">
-                  <div className="flex flex-row flex-1 justify-between items-center p-2 w-full text-lg font-semibold">
-                    <div className="flex flex-col flex-1">
-                      <Input
-                        value={currentChat.title}
-                        onChange={(e) => {
-                          setCurrentChat({
-                            ...currentChat,
-                            title: e.target.value,
-                          });
-                        }}
-                        size="large"
-                        variant="borderless"
-                        className="flex-1 w-full text-lg"
-                        onBlur={handleChangedTitle}
-                      />
-                      <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400">
-                        {currentChat.id}
-                        <span>token: {currentChat.totalToken}</span>
-                        <span className="flex flex-row items-center">
-                          <FaAngleUp /> {currentChat.inputToken}
-                        </span>
-                        <span className="flex flex-row items-center">
-                          <FaAngleDown /> {currentChat.outputToken}
-                        </span>
-                      </small>
-                    </div>
-
-                    <div className="">
-                      <Popover
-                        placement="bottomRight"
-                        trigger="click"
-                        content={
-                          <div className="flex flex-col w-full">
-                            {/* <Button
-                            icon={<FaFileExport />}
-                            type="text"
-                            block
-                            onClick={() => {
-                              onExport();
+              <Splitter
+                layout="vertical"
+                className="h-full flex-1"
+                style={{
+                  height: '100%',
+                }}
+              >
+                <Splitter.Panel min={400}>
+                  <div className="flex flex-col w-full h-full">
+                    <div className="w-full border-b border-gray-200">
+                      <div className="flex flex-row flex-1 justify-between items-center p-2 w-full text-lg font-semibold">
+                        <div className="flex flex-col flex-1">
+                          <Input
+                            value={currentChat.title}
+                            onChange={(e) => {
+                              setCurrentChat({
+                                ...currentChat,
+                                title: e.target.value,
+                              });
                             }}
-                          >
-                            {t('chat.export')}
-                          </Button> */}
-                            <Button
+                            size="large"
+                            variant="borderless"
+                            className="flex-1 w-full text-lg"
+                            onBlur={handleChangedTitle}
+                          />
+                          <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400">
+                            {currentChat.id}
+                            <span>token: {currentChat.totalToken}</span>
+                            <span className="flex flex-row items-center">
+                              <FaAngleUp /> {currentChat.inputToken}
+                            </span>
+                            <span className="flex flex-row items-center">
+                              <FaAngleDown /> {currentChat.outputToken}
+                            </span>
+                          </small>
+                        </div>
+
+                        <div className="">
+                          <Popover
+                            placement="bottomRight"
+                            trigger="click"
+                            content={
+                              <div className="flex flex-col w-full">
+                                {/* <Button
                               icon={<FaFileExport />}
                               type="text"
                               block
                               onClick={() => {
-                                onExportImage();
+                                onExport();
                               }}
                             >
-                              {t('chat.export_image')}
-                            </Button>
-                          </div>
-                        }
-                      >
-                        <Button icon={<FaEllipsisH />} type="text" />
-                      </Popover>
-                    </div>
-                  </div>
-                </div>
-                <ScrollArea
-                  className="flex-1 h-full"
-                  ref={scrollRef}
-                  showScrollBottom
-                >
-                  <div className="" id="chat-content">
-                    {currentChat && (
-                      <div className="flex flex-col py-8 w-full h-full">
-                        <div className="pb-10">
-                          {currentChat?.chatMessages
-                            ?.filter((x) => x.role != 'tool')
-                            .map((chatMessage: ChatMessage) => {
-                              const toolMessages =
-                                chatMessage?.tool_calls?.length == 0
-                                  ? []
-                                  : currentChat?.chatMessages?.filter(
-                                      (x) =>
-                                        x.role == 'tool' &&
-                                        x.content.some(
-                                          (y) =>
-                                            y.type == 'tool_call' &&
-                                            chatMessage.tool_calls
-                                              ?.map((t) => t.id)
-                                              .includes(y.tool_call_id),
-                                        ),
-                                    );
-
-                              return (
-                                <ChatMessageBox
-                                  key={chatMessage.id}
-                                  toolMessages={toolMessages}
-                                  // onRedo={() => onRedo(chatMessage)}
-                                  onDeleted={() => onDelete(chatMessage)}
-                                  onSetDivider={(v) =>
-                                    onSetDivider(chatMessage, v)
-                                  }
-                                  onChange={async (text, content) => {
-                                    const res =
-                                      await window.electron.chat.getChat(
-                                        chatMessage.chatId,
-                                      );
-                                    setCurrentChat(res);
+                              {t('chat.export')}
+                            </Button> */}
+                                <Button
+                                  icon={<FaFileExport />}
+                                  type="text"
+                                  block
+                                  onClick={() => {
+                                    onExportImage();
                                   }}
-                                  value={chatMessage}
-                                />
-                              );
-                            })}
+                                >
+                                  {t('chat.export_image')}
+                                </Button>
+                              </div>
+                            }
+                          >
+                            <Button icon={<FaEllipsisH />} type="text" />
+                          </Popover>
                         </div>
                       </div>
-                    )}
+                    </div>
+                    <ScrollArea
+                      className="flex-1 h-full"
+                      ref={scrollRef}
+                      showScrollBottom
+                    >
+                      <div className="" id="chat-content">
+                        {currentChat && (
+                          <div className="flex flex-col py-8 w-full h-full">
+                            <div className="pb-10">
+                              {currentChat?.chatMessages
+                                ?.filter((x) => x.role != 'tool')
+                                .map((chatMessage: ChatMessage) => {
+                                  const toolMessages =
+                                    chatMessage?.tool_calls?.length == 0
+                                      ? []
+                                      : currentChat?.chatMessages?.filter(
+                                          (x) =>
+                                            x.role == 'tool' &&
+                                            x.content.some(
+                                              (y) =>
+                                                y.type == 'tool_call' &&
+                                                chatMessage.tool_calls
+                                                  ?.map((t) => t.id)
+                                                  .includes(y.tool_call_id),
+                                            ),
+                                        );
+
+                                  return (
+                                    <ChatMessageBox
+                                      key={chatMessage.id}
+                                      toolMessages={toolMessages}
+                                      // onRedo={() => onRedo(chatMessage)}
+                                      onToolClick={(
+                                        toolCall,
+                                        toolMessageContent,
+                                      ) => {
+                                        console.log(
+                                          toolCall,
+                                          toolMessageContent,
+                                        );
+                                        if (toolMessageContent) {
+                                          openCanvas({
+                                            title: toolCall.name,
+                                            content: toolMessageContent,
+                                            toolCall: toolCall,
+                                          });
+                                        }
+                                      }}
+                                      onDeleted={() => onDelete(chatMessage)}
+                                      onSetDivider={(v) =>
+                                        onSetDivider(chatMessage, v)
+                                      }
+                                      onChange={async (text, content) => {
+                                        const res =
+                                          await window.electron.chat.getChat(
+                                            chatMessage.chatId,
+                                          );
+                                        setCurrentChat(res);
+                                      }}
+                                      value={chatMessage}
+                                    />
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
                   </div>
-                </ScrollArea>
-              </div>
-            </Splitter.Panel>
-            <Splitter.Panel min={220} defaultSize={220}>
-              <div className="flex flex-col gap-2 p-2 h-full">
-                <div className="flex flex-row justify-between">
-                  <div className="flex flex-row items-center">
-                    <ProviderSelect
-                      type="llm"
-                      value={currentModel}
-                      onChange={onChangeCurrentModel}
-                      style={{ width: '200px' }}
-                      className="mr-2"
-                    />
-                    <Popconfirm
-                      icon={null}
-                      open={emojiOpen}
-                      onOpenChange={setEmojiOpen}
-                      title={
-                        <EmojiPicker
-                          className="!border-none"
-                          onEmojiClick={(v) => {
-                            editorRef.current?.insertText(v.emoji);
-                            setEmojiOpen(false);
+                </Splitter.Panel>
+                <Splitter.Panel min={220} defaultSize={220}>
+                  <div className="flex flex-col gap-2 p-2 h-full">
+                    <div className="flex flex-row justify-between">
+                      <div className="flex flex-row items-center">
+                        <ProviderSelect
+                          type="llm"
+                          value={currentModel}
+                          onChange={onChangeCurrentModel}
+                          style={{ width: '200px' }}
+                          className="mr-2"
+                        />
+                        <Popconfirm
+                          icon={null}
+                          open={emojiOpen}
+                          onOpenChange={setEmojiOpen}
+                          title={
+                            <EmojiPicker
+                              className="!border-none"
+                              onEmojiClick={(v) => {
+                                editorRef.current?.insertText(v.emoji);
+                                setEmojiOpen(false);
+                              }}
+                            />
+                          }
+                          onConfirm={() => {}}
+                          okText="Yes"
+                          cancelText="No"
+                        >
+                          <Button
+                            icon={<FaRegFaceLaugh />}
+                            type="text"
+                            onClick={() => {
+                              setEmojiOpen(!emojiOpen);
+                            }}
+                          />
+                        </Popconfirm>
+
+                        <Button
+                          icon={<FaPaperclip />}
+                          type="text"
+                          onClick={() => {
+                            onSelectFile([]);
+                          }}
+                        ></Button>
+                        <ChatQuickInput
+                          onClick={(text) => {
+                            editorRef.current?.insertText(text);
+                            setChatInputMessage(text);
+                          }}
+                          className="ml-2"
+                        />
+                      </div>
+
+                      <div>
+                        <Button
+                          icon={<FaGear />}
+                          type="text"
+                          onClick={() => {
+                            setOpenChatOptionsDrawer(true);
                           }}
                         />
-                      }
-                      onConfirm={() => {}}
-                      okText="Yes"
-                      cancelText="No"
-                    >
-                      <Button
-                        icon={<FaRegFaceLaugh />}
-                        type="text"
-                        onClick={() => {
-                          setEmojiOpen(!emojiOpen);
-                        }}
-                      />
-                    </Popconfirm>
-
-                    <Button
-                      icon={<FaPaperclip />}
-                      type="text"
-                      onClick={() => {
-                        onSelectFile([]);
-                      }}
-                    ></Button>
-                    <ChatQuickInput
+                      </div>
+                    </div>
+                    {attachments.length > 0 && (
+                      <div className="flex flex-row flex-wrap gap-2 w-full">
+                        {attachments.map((attachment) => (
+                          <ChatAttachment
+                            key={attachment.path}
+                            value={attachment}
+                            onDelete={() => onDeleteAttachment(attachment)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex flex-col flex-1 gap-2 h-full bg-gray-100 dark:bg-gray-800">
+                      <div className="flex flex-col flex-1 h-full">
+                        {/* <ChatQuickInput
                       onClick={(text) => {
                         editorRef.current?.insertText(text);
                         setChatInputMessage(text);
                       }}
-                      className="ml-2"
-                    />
-                  </div>
-
-                  <div>
-                    <Button
-                      icon={<FaGear />}
-                      type="text"
-                      onClick={() => {
-                        setOpenChatOptionsDrawer(true);
-                      }}
-                    />
-                  </div>
-                </div>
-                {attachments.length > 0 && (
-                  <div className="flex flex-row flex-wrap gap-2 w-full">
-                    {attachments.map((attachment) => (
-                      <ChatAttachment
-                        key={attachment.path}
-                        value={attachment}
-                        onDelete={() => onDeleteAttachment(attachment)}
-                      />
-                    ))}
-                  </div>
-                )}
-                <div className="flex flex-col flex-1 gap-2 h-full bg-gray-100 dark:bg-gray-800">
-                  <div className="flex flex-col flex-1 h-full">
-                    {/* <ChatQuickInput
-                    onClick={(text) => {
-                      editorRef.current?.insertText(text);
-                      setChatInputMessage(text);
-                    }}
-                    className="mb-1"
-                  /> */}
-                    <div
-                      className={`flex-1 w-full h-full text-sm bg-transparent outline-none resize-none`}
-                    >
-                      <Input.TextArea
-                        className="w-full !h-full !outline-none !shadow-none"
-                        rows={1}
-                        value={chatInputMessage}
-                        onChange={(e) => {
-                          setChatInputMessage(e.target.value);
-                        }}
-                        onPressEnter={(e) => {
-                          if (!e.shiftKey) {
-                            e.preventDefault();
-                            onChat();
+                      className="mb-1"
+                    /> */}
+                        <div className="flex-1 w-full h-full text-sm bg-transparent outline-none resize-none">
+                          <Input.TextArea
+                            className="w-full !h-full !outline-none !shadow-none"
+                            rows={1}
+                            value={chatInputMessage}
+                            onChange={(e) => {
+                              setChatInputMessage(e.target.value);
+                            }}
+                            onPressEnter={(e) => {
+                              if (!e.shiftKey) {
+                                e.preventDefault();
+                                onChat();
+                              }
+                            }}
+                          ></Input.TextArea>
+                          {/* <FileDropZone></FileDropZone> */}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-row justify-between items-center w-full">
+                      <div className="flex gap-2 items-center">
+                        <Tooltip
+                          placement="top"
+                          title={
+                            <div className="flex flex-col">
+                              <strong>{t('chat.tool')}</strong>
+                              {currentChat?.options?.toolNames?.join(',')}
+                            </div>
                           }
-                        }}
-                      ></Input.TextArea>
-                      {/* <FileDropZone></FileDropZone> */}
+                        >
+                          <Button
+                            className="flex flex-row items-center rounded-full"
+                            color={
+                              currentChat?.options?.toolNames?.length > 0
+                                ? 'primary'
+                                : 'default'
+                            }
+                            variant={
+                              currentChat?.options?.toolNames?.length > 0
+                                ? 'filled'
+                                : 'outlined'
+                            }
+                            onClick={() => {
+                              tools.open(currentChat?.options?.toolNames || []);
+                              tools.onSelect = (_tools) => {
+                                onChatOptionsChanged({
+                                  toolNames: _tools.map((x) => x.name),
+                                });
+                              };
+                            }}
+                          >
+                            {t('chat.tool')}
+                            <Tag className="mr-0 rounded-full">
+                              +{' '}
+                              {currentChat?.options?.toolNames?.length > 0
+                                ? currentChat?.options?.toolNames?.length
+                                : 'add'}
+                            </Tag>
+                          </Button>
+                        </Tooltip>
+                        <Tooltip
+                          placement="top"
+                          title={
+                            <div className="flex flex-col">
+                              <strong>{t('chat.knowledgebase')}</strong>
+                              {currentChat?.options?.toolNames?.join(',')}
+                            </div>
+                          }
+                        >
+                          <Button
+                            className="flex flex-row items-center rounded-full"
+                            color={
+                              currentChat?.options?.kbList?.length > 0
+                                ? 'primary'
+                                : 'default'
+                            }
+                            variant={
+                              currentChat?.options?.kbList?.length > 0
+                                ? 'filled'
+                                : 'outlined'
+                            }
+                            onClick={() => {
+                              knowledgeBase.open(
+                                currentChat?.options?.kbList || [],
+                              );
+
+                              knowledgeBase.onSelect = (kbs) => {
+                                onChatOptionsChanged({
+                                  kbList: kbs.map((kb) => kb.id),
+                                });
+                              };
+                            }}
+                          >
+                            {t('chat.knowledgebase')}
+                            <Tag className="mr-0 rounded-full">
+                              +{' '}
+                              {currentChat?.options?.kbList?.length > 0
+                                ? currentChat?.options?.kbList?.length
+                                : 'add'}
+                            </Tag>
+                          </Button>
+                        </Tooltip>
+                        <Tooltip placement="top" title="Clear All Message">
+                          <Popconfirm
+                            title="Delete All Message?"
+                            onConfirm={onClearChatMessages}
+                            okText="Yes"
+                            cancelText={t('cancel')}
+                          >
+                            <Button icon={<FaTrashAlt />} type="text" />
+                          </Popconfirm>
+                        </Tooltip>
+                      </div>
+                      {currentChat.status == 'running' && (
+                        <Button
+                          type="primary"
+                          icon={<FaStop />}
+                          onClick={() => {
+                            onCancel(currentChat.id);
+                          }}
+                        />
+                      )}
+                      {currentChat.status != 'running' && (
+                        <Button
+                          type="primary"
+                          disabled={!chatInputMessage?.trim()}
+                          icon={<FaPaperPlane />}
+                          onClick={onChat}
+                        />
+                      )}
                     </div>
                   </div>
-                </div>
-                <div className="flex flex-row justify-between items-center w-full">
-                  <div className="flex gap-2 items-center">
-                    <Tooltip
-                      placement="top"
-                      title={
-                        <div className="flex flex-col">
-                          <strong>{t('chat.tool')}</strong>
-                          {currentChat?.options?.toolNames?.join(',')}
-                        </div>
-                      }
-                    >
-                      <Button
-                        className="flex flex-row items-center rounded-full"
-                        color={
-                          currentChat?.options?.toolNames?.length > 0
-                            ? 'primary'
-                            : 'default'
-                        }
-                        variant={
-                          currentChat?.options?.toolNames?.length > 0
-                            ? 'filled'
-                            : 'outlined'
-                        }
-                        onClick={() => {
-                          tools.open(currentChat?.options?.toolNames || []);
-                          tools.onSelect = (_tools) => {
-                            onChatOptionsChanged({
-                              toolNames: _tools.map((x) => x.name),
-                            });
-                          };
-                        }}
-                      >
-                        {t('chat.tool')}
-                        <Tag className="mr-0 rounded-full">
-                          +{' '}
-                          {currentChat?.options?.toolNames?.length > 0
-                            ? currentChat?.options?.toolNames?.length
-                            : 'add'}
-                        </Tag>
-                      </Button>
-                    </Tooltip>
-                    <Tooltip
-                      placement="top"
-                      title={
-                        <div className="flex flex-col">
-                          <strong>{t('chat.knowledgebase')}</strong>
-                          {currentChat?.options?.toolNames?.join(',')}
-                        </div>
-                      }
-                    >
-                      <Button
-                        className="flex flex-row items-center rounded-full"
-                        color={
-                          currentChat?.options?.kbList?.length > 0
-                            ? 'primary'
-                            : 'default'
-                        }
-                        variant={
-                          currentChat?.options?.kbList?.length > 0
-                            ? 'filled'
-                            : 'outlined'
-                        }
-                        onClick={() => {
-                          knowledgeBase.open(
-                            currentChat?.options?.kbList || [],
-                          );
-
-                          knowledgeBase.onSelect = (kbs) => {
-                            onChatOptionsChanged({
-                              kbList: kbs.map((kb) => kb.id),
-                            });
-                          };
-                        }}
-                      >
-                        {t('chat.knowledgebase')}
-                        <Tag className="mr-0 rounded-full">
-                          +{' '}
-                          {currentChat?.options?.kbList?.length > 0
-                            ? currentChat?.options?.kbList?.length
-                            : 'add'}
-                        </Tag>
-                      </Button>
-                    </Tooltip>
-                    <Tooltip placement="top" title={'Clear All Message'}>
-                      <Popconfirm
-                        title="Delete All Message?"
-                        onConfirm={onClearChatMessages}
-                        okText="Yes"
-                        cancelText={t('cancel')}
-                      >
-                        <Button icon={<FaTrashAlt />} type="text" />
-                      </Popconfirm>
-                    </Tooltip>
-                  </div>
-                  {currentChat.status == 'running' && (
-                    <Button
-                      type="primary"
-                      icon={<FaStop />}
-                      onClick={() => {
-                        onCancel(currentChat.id);
-                      }}
-                    />
-                  )}
-                  {currentChat.status != 'running' && (
-                    <Button
-                      type="primary"
-                      disabled={!chatInputMessage?.trim()}
-                      icon={<FaPaperPlane />}
-                      onClick={onChat}
-                    />
-                  )}
-                </div>
+                </Splitter.Panel>
+              </Splitter>
+            </Splitter.Panel>
+            <Splitter.Panel
+              // min={openCanvasView ? 400 : 0}
+              // max={openCanvasView ? 600 : 0}
+              // collapsible
+              // size={canvasSize}
+              // defaultSize={openCanvasView ? 400 : 0}
+              // size={400}
+              min={400}
+              size={canvasSize}
+              defaultSize={400}
+              collapsible
+            >
+              <div>
+                <ChatCanvasView
+                  className={`flex-1 w-full`}
+                  open={openCanvasView}
+                  onClose={() => closeCanvas()}
+                  value={canvasViewValue}
+                />
               </div>
             </Splitter.Panel>
           </Splitter>
@@ -710,7 +785,7 @@ export default function ChatContent() {
         value={currentChat?.options}
         open={openChatOptionsDrawer}
         onChange={onChatOptionsChanged}
-        width={'50vw'}
+        width="50vw"
         onClose={() => setOpenChatOptionsDrawer(false)}
       />
     </div>

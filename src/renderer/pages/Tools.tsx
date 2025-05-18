@@ -273,12 +273,13 @@ export default function Tools() {
     const searchParams = new URLSearchParams(location.search);
     const toolsId = searchParams.get('id');
     if (toolsId) {
+      if (currentTool?.id == toolsId) {
+        return;
+      }
       const tool = tools.find((x) => x.name == toolsId);
       console.log(tool);
       setCurrentTool(tool);
-      let c = converFormSchemas(tool);
-
-      setToolInvokeSchemas(c);
+      setToolInvokeSchemas(converFormSchemas(tool));
     } else {
       setCurrentTool(undefined);
       setToolInvokeSchemas(undefined);

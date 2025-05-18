@@ -150,6 +150,7 @@ const electronHandler = {
       options,
     ): Promise<Chat> =>
       ipcRenderer.invoke('chat:update', chatId, title, model, options),
+    delete: (chatId: string) => ipcRenderer.invoke('chat:delete', chatId),
     export: async (
       type: string,
       chatId: string,

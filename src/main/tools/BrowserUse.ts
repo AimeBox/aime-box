@@ -19,12 +19,16 @@ import { getChatModel } from '../llm';
 import { getProviderModel } from '../utils/providerUtil';
 import fs from 'fs';
 import { dialog } from 'electron';
+import settingsManager from '../settings';
+import os from 'os';
+import path from 'path';
 
 export interface BrowserUseParameters extends ToolParams {
   model: string;
   plannerModel?: string;
   useVision: boolean;
   chromeInstancePath: string;
+  userDataDir?: string;
 }
 
 export class BrowserUseTool extends BaseTool {
@@ -65,6 +69,11 @@ export class BrowserUseTool extends BaseTool {
       field: 'chromeInstancePath',
       component: 'Input',
     },
+    {
+      label: t('tools.userDataDir'),
+      field: 'userDataDir',
+      component: 'Input',
+    },
   ];
 
   model: string;
@@ -75,12 +84,20 @@ export class BrowserUseTool extends BaseTool {
 
   chromeInstancePath?: string;
 
+  userDataDir?: string;
+
   constructor(params?: BrowserUseParameters) {
     super();
-    const { model, useVision = false, chromeInstancePath } = params ?? {};
+    const {
+      model,
+      useVision = false,
+      chromeInstancePath,
+      userDataDir,
+    } = params ?? {};
     this.model = model;
     this.useVision = useVision;
     this.chromeInstancePath = chromeInstancePath;
+    this.userDataDir = userDataDir;
   }
 
   async _call(
@@ -102,22 +119,69 @@ export class BrowserUseTool extends BaseTool {
         temperature: 0,
       });
     }
-    let browser;
-    if (this.chromeInstancePath && fs.existsSync(this.chromeInstancePath)) {
-      browser = new Browser({
-        chromeInstancePath: this.chromeInstancePath,
-      } as BrowserConfig);
+    const browser = new Browser({
+      chromeInstancePath: this.chromeInstancePath,
+      // userDataDir: this.userDataDir,
+      proxy: {
+        server: settingsManager.getPorxy(),
+      },
+      headless: false,
+      extraChromiumArgs: [
+        '--disable-blink-features=AutomationControlled',
+        //`-user-data-dir=${this.userDataDir}`,
+      ],
+    } as BrowserConfig);
+
+    try {
+      const agent = new Agent({
+        task: input.task,
+        llm: llm,
+        plannerLlm: plannerLlm,
+        useVision: this.useVision,
+        browser: browser,
+      });
+
+      const result = await agent.run();
+      await browser.close();
+      if (result.history.length > 0) {
+        return result.history
+          .map((x) => x.result.map((r) => r.extractedContent).join('\n'))
+          .join('\n');
+      } else {
+        return 'error';
+      }
+    } catch (err) {
+      await browser.close();
+      console.log(err);
+      return err.message;
     }
-    const agent = new Agent({
-      task: input.task,
-      llm: llm,
-      plannerLlm: plannerLlm,
-      useVision: this.useVision,
-      browser: browser,
-    });
-    const result = await agent.run();
-    return result.history
-      .map((x) => x.result.map((r) => r.extractedContent).join('\n'))
-      .join('\n');
+  }
+
+  getChromeUserDataPath() {
+    const homeDir = os.homedir();
+
+    switch (process.platform) {
+      case 'win32':
+        return path.join(
+          homeDir,
+          'AppData',
+          'Local',
+          'Google',
+          'Chrome',
+          'User Data',
+        );
+      case 'darwin':
+        return path.join(
+          homeDir,
+          'Library',
+          'Application Support',
+          'Google',
+          'Chrome',
+        );
+      case 'linux':
+        return path.join(homeDir, '.config', 'google-chrome');
+      default:
+        return null;
+    }
   }
 }

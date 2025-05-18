@@ -84,6 +84,7 @@ import {
   Pregel,
   StateDefinition,
   StateGraph,
+  StateSnapshot,
   StateType,
 } from '@langchain/langgraph';
 import { isArray, isString } from '../utils/is';
@@ -152,6 +153,9 @@ export class ChatManager {
         model: string,
         options?: ChatOptions,
       ) => this.updateChat(event, chatId, title, model, options),
+    );
+    ipcMain.handle('chat:delete', (event, chatId: string) =>
+      this.deleteChat(event, chatId),
     );
     ipcMain.on(
       'chat:chat-resquest',
@@ -328,6 +332,17 @@ export class ChatManager {
       return res;
     }
     return undefined;
+  }
+
+  public async deleteChat(event: IpcMainInvokeEvent, chatId: string) {
+    const res = await this.chatRepository.delete(chatId);
+    await dbManager.delete('langgraph_checkpoints', {
+      thread_id: chatId,
+    });
+    await dbManager.delete('langgraph_writes', {
+      thread_id: chatId,
+    });
+    return res;
   }
 
   public async getChatPage(input: {
@@ -609,11 +624,13 @@ export class ChatManager {
             ChatStatus.RUNNING,
           );
         }
+
         msg.additional_kwargs = message.additional_kwargs;
         msg.provider_type = message.additional_kwargs[
           'provider_type'
         ] as string;
         msg.model = (message.additional_kwargs['model'] as string) || 'Unknown';
+        msg.name = message.name;
         msg = await this.chatMessageRepository.save(msg);
         lastMesssageId = msg.id;
         event(`chat:message-changed:${chatId}`, msg);
@@ -637,6 +654,7 @@ export class ChatManager {
           where: { id: message.id },
           relations: { chat: true },
         });
+
         if (isAIMessage(message)) {
           msg.content = [{ type: 'text', text: message.content }];
           msg.tool_calls = message?.tool_calls || [];
@@ -884,159 +902,6 @@ export class ChatManager {
         handlerMessageError,
       },
     });
-    // let _lastMessage;
-    // try {
-    //   const eventStream = await reactAgent.streamEvents(
-    //     { messages },
-    //     {
-    //       version: 'v2',
-    //       signal,
-    //       // callbacks:
-    //       // chatCallbacks(
-    //       //   modelName,
-    //       //   providerType,
-    //       //   handlerMessageCreated,
-    //       //   handlerMessageStream,
-    //       //   handlerMessageError,
-    //       //   handlerMessageFinished,
-    //       // ),
-    //       //   [
-    //       //   ...chatCallbacks(
-    //       //     modelName,
-    //       //     providerType,
-    //       //     handlerMessageCreated,
-    //       //     handlerMessageStream,
-    //       //     handlerMessageError,
-    //       //     handlerMessageFinished,
-    //       //   ),
-    //       //   {
-    //       //     handleLLMStart(llm, prompts: string[]) {
-    //       //       console.log('handleLLMStart', {
-    //       //         prompts,
-    //       //       });
-    //       //     },
-    //       //   },
-    //       // ],
-    //     },
-    //   );
-    //   const _toolCalls = [];
-    //   const _messages = [];
-    //   for await (const { event, tags, data } of eventStream) {
-    //     if (event == 'on_chat_model_start') {
-    //       console.log('on_chat_model_start', data);
-    //       _lastMessage =
-    //         data.input.messages[0][data.input.messages[0].length - 1];
-    //       if (isHumanMessage(_lastMessage)) {
-    //         await handlerMessageCreated?.(_lastMessage);
-    //         _messages.push(_lastMessage);
-    //       }
-    //       const aiMessage = new AIMessage({
-    //         id: uuidv4(),
-    //         content: '',
-    //         additional_kwargs: {
-    //           model: modelName,
-    //           provider_type: providerType,
-    //         },
-    //       });
-    //       await handlerMessageCreated?.(aiMessage);
-    //       _lastMessage = aiMessage;
-    //       _messages.push(aiMessage);
-    //     } else if (event == 'on_chat_model_stream') {
-    //       console.log('on_chat_model_start', data);
-
-    //       if (data.chunk.content && _lastMessage) {
-    //         if (isAIMessage(_lastMessage)) {
-    //           _lastMessage.content += data.chunk.content;
-    //           await handlerMessageStream?.(_lastMessage);
-    //         }
-    //       }
-    //     } else if (event == 'on_chat_model_end') {
-    //       console.log('on_chat_model_start', data);
-    //       if (data.output && _lastMessage) {
-    //         _lastMessage.content = data.output.content;
-    //         _lastMessage.tool_calls = data.output.tool_calls;
-    //         if (_lastMessage.tool_calls && _lastMessage.tool_calls.length > 0) {
-    //           _toolCalls.push(..._lastMessage.tool_calls);
-    //         }
-    //         _lastMessage.usage_metadata = data.output.usage_metadata;
-    //         await handlerMessageFinished?.(_lastMessage);
-    //       }
-    //     } else if (event == 'on_tool_start') {
-    //       console.log('on_tool_start', data);
-    //       const toolCall = _toolCalls.shift();
-    //       const toolMessage = new ToolMessage({
-    //         id: uuidv4(),
-    //         content: '',
-    //         tool_call_id: toolCall.id,
-    //         name: toolCall.name,
-    //         additional_kwargs: {
-    //           provider_type: undefined,
-    //           model: toolCall.name,
-    //         },
-    //       });
-    //       await handlerMessageCreated?.(toolMessage);
-    //       _lastMessage = toolMessage;
-    //       _messages.push(toolMessage);
-    //     } else if (event == 'on_tool_end') {
-    //       console.log('on_tool_end', data);
-    //       let _isToolMessage = false;
-    //       try {
-    //         _isToolMessage = isToolMessage(data.output);
-    //       } catch {}
-    //       if (_isToolMessage) {
-    //         const msg = _messages.find(
-    //           (x) => x.tool_call_id == data.output.tool_call_id,
-    //         );
-    //         msg.content = data.output.content;
-    //         msg.tool_call_id = data.output.tool_call_id;
-    //         msg.name = data.output.name;
-    //         msg.status = ChatStatus.SUCCESS;
-    //         msg.additional_kwargs = {
-    //           provider_type: undefined,
-    //           model: data.output.name,
-    //         };
-    //         await handlerMessageFinished?.(msg);
-    //         _lastMessage = msg;
-    //       } else {
-    //         //lastMessage.content = output.content;
-    //         _lastMessage.status = ChatStatus.SUCCESS;
-    //         _lastMessage.additional_kwargs = {
-    //           provider_type: undefined,
-    //           model: _lastMessage.name,
-    //         };
-    //         await handlerMessageFinished?.(_lastMessage);
-    //       }
-    //     } else if (
-    //       event == 'on_chain_end' ||
-    //       tags.find((x) => x.startsWith('graph:'))
-    //     ) {
-    //       if (
-    //         data?.output?.messages?.length > 0 &&
-    //         isToolMessage(data.output.messages[0])
-    //       ) {
-    //         const msg = _messages.find(
-    //           (x) => x.tool_call_id == data.output.messages[0].tool_call_id,
-    //         );
-    //         if (msg.status === undefined) {
-    //           msg.content = data.output.messages[0].content;
-    //           msg.status = data.output.messages[0].status;
-    //           await handlerMessageFinished?.(msg);
-    //         }
-    //       }
-    //     } else {
-    //       console.log(event, tags, data);
-    //     }
-    //   }
-    // } catch (err) {
-    //   if (_lastMessage) {
-    //     if (isToolMessage(_lastMessage)) {
-    //       _lastMessage.status = ChatStatus.ERROR;
-    //     }
-    //     _lastMessage.additional_kwargs['error'] = err.message || err.name;
-    //     await handlerMessageError?.(_lastMessage);
-    //   }
-    //   console.error(err);
-    // }
   }
 
   public async chatBuiltIn(
@@ -1093,10 +958,12 @@ export class ChatManager {
         },
       },
       signal: config.signal,
+      configurable: config.configurable,
     });
     let _messages = messages;
+    let state: StateSnapshot | undefined;
     if (config.fixedThreadId === true) {
-      const state = await _agent.getState({
+      state = await _agent.getState({
         configurable: { thread_id: config.chatId },
       });
       const { values } = state;
@@ -1113,6 +980,7 @@ export class ChatManager {
       configurable: config.configurable,
       modelName,
       providerType,
+      state,
       callbacks: {
         handlerMessageCreated,
         handlerMessageFinished,
