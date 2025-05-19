@@ -137,13 +137,26 @@ export class MessageManager {
     );
   }
 
+  getMessagesWithMetadata(
+    withOutType?: MessageType[],
+  ): { message: BaseMessage; metadata: MessageMetadata }[] {
+    if (withOutType && withOutType.length > 0) {
+      return this.history.messages.filter(
+        (message) => !withOutType.includes(message.metadata.type),
+      );
+    }
+    const msg = this.history.messages;
+    return msg;
+  }
+
   getMessages(withOutType?: MessageType[]): BaseMessage[] {
     if (withOutType && withOutType.length > 0) {
       return this.history.messages
         .filter((message) => !withOutType.includes(message.metadata.type))
         .map((message) => message.message);
     }
-    return this.history.messages.map((message) => message.message);
+    const msg = this.history.messages.map((message) => message.message);
+    return msg;
   }
 
   removeAllFromTypeMessage(messageType: MessageType) {

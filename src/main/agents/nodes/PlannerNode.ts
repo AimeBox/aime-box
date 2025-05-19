@@ -126,7 +126,7 @@ const renderPlan = (
           status = '-';
         }
       }
-      content += `- ${showIndex && status != 'done' ? `${index}.` : ''} [${status}] ${step.title || step}\n`;
+      content += `- ${showIndex && status == ' ' ? `${index}.` : ''} [${status}] ${step.title || step}\n`;
       index++;
     }
     content += '\n';
@@ -333,6 +333,7 @@ export const PlannerNode = (params: {
                 const steps = plans.outline[i].steps;
                 for (let j = 0; j < steps.length; j++) {
                   if (steps[j].status == 'done' || steps[j].status == 'skip') {
+                    stepIndex += 1;
                     continue;
                   }
                   if (stepIndex == index) {

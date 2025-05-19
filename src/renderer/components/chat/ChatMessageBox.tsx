@@ -255,7 +255,7 @@ const ChatMessageBox = React.forwardRef(
                     <>
                       {/* <ReactMarkdown>{textContent}</ReactMarkdown> */}
                       <div
-                        className={`flex flex-row flex-wrap gap-2 ${
+                        className={`flex flex-col flex-wrap gap-2 ${
                           value.role == 'user' ? 'justify-end' : ''
                         } w-full`}
                       >
@@ -472,7 +472,7 @@ const ChatMessageBox = React.forwardRef(
                         </div>
                       )}
                       {size == 'small' && (
-                        <div className="flex flex-col gap-2 flex-wrap">
+                        <div className="flex flex-col flex-wrap gap-2">
                           {value.tool_calls.map((toolCall) => {
                             let toolMessageContent;
                             const toolMessage = toolMessages?.find((t) =>
@@ -501,7 +501,7 @@ const ChatMessageBox = React.forwardRef(
                             }
                             return (
                               <motion.div
-                                className="bg-gray-100 p-0 px-2 rounded-2xl w-fit flex flex-row items-center gap-2 cursor-pointer"
+                                className="flex flex-row gap-2 items-center p-0 px-2 bg-gray-100 rounded-2xl cursor-pointer w-fit"
                                 onClick={() =>
                                   onToolClick?.(toolCall, toolMessageContent)
                                 }

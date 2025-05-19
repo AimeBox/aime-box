@@ -421,7 +421,7 @@ export class ManusAgent extends BaseAgent {
             .describe(
               '任务的详细总结,若有文件则在全文最后使用<file>[文件名](文件路径)</file>输出文件',
             ),
-          fail_reason: z.string().describe('任务失败的原因').optional(),
+          fail_reason: z.string().describe('任务失败的原因').nullable(),
         }),
       });
       agentDescription += `- \`${_agent.name}\`: ${_agent.description}\n`;
@@ -738,7 +738,36 @@ export class ManusAgent extends BaseAgent {
 
       that.messageManager?.removeAllFromTypeMessage('plan');
 
-      const inputMessages = that.messageManager?.getMessages();
+      let _inputMessages = that.messageManager?.getMessagesWithMetadata([
+        'agent',
+      ]);
+
+      const limit = 3;
+      const typeIndices: number[] = [];
+      _inputMessages.forEach((item, index) => {
+        if (item.metadata.type === 'action') {
+          typeIndices.push(index);
+        }
+      });
+
+      // 如果指定类型的元素数量小于等于限制数量，则保留所有元素
+      if (typeIndices.length > limit) {
+        // 计算要保留的指定类型元素的起始索引
+        const startIndex = typeIndices.length - limit;
+
+        // 创建一个集合，存储要删除的元素索引
+        const indicesToRemove = new Set<number>();
+        typeIndices.slice(0, startIndex).forEach((index) => {
+          indicesToRemove.add(index);
+        });
+
+        _inputMessages = _inputMessages.filter(
+          (_, index) => !indicesToRemove.has(index),
+        );
+      }
+
+      const inputMessages = _inputMessages.map((x) => x.message);
+      // 保留最后3条action
 
       if (
         isHumanMessage(lastMessage) &&
@@ -761,10 +790,11 @@ export class ManusAgent extends BaseAgent {
       }
 
       let nextAction;
+      let failTimes = state.failTimes || 0;
       try {
         nextAction = await getNextAction(inputMessages, task);
+        failTimes = 0;
       } catch (err) {
-        let failTimes = state.failTimes || 0;
         console.error(
           `🚨 失败[${failTimes} / ${this.maxFailTimes}]: ${err.message}`,
         );
@@ -851,6 +881,7 @@ action: {
           }),
           undefined,
           'action',
+          this.name,
         );
 
         await this.messageManager.addToolMessage('action success', 'action');
@@ -882,6 +913,7 @@ action: {
           toolCallMessage,
           undefined,
           'action',
+          this.name,
         );
         await this.messageManager.addToolMessage('', 'action');
         // await sendMessage(toolCallMessage);
@@ -904,6 +936,7 @@ action: {
           toolCallMessage,
           undefined,
           'action',
+          this.name,
         );
         await this.messageManager.addToolMessage('', 'action');
         await sendMessage(toolCallMessage);
@@ -911,6 +944,7 @@ action: {
 
       return new Command({
         update: {
+          failTimes: failTimes,
           messages: this.messageManager.getMessages(),
           history: this.messageManager.history,
           current_state: nextAction.current_state,
