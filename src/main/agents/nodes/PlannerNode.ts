@@ -30,6 +30,7 @@ import { RunnableConfig } from '@langchain/core/runnables';
 import { v4 as uuidv4 } from 'uuid';
 import { MessageManager } from '../message_manager';
 import { title } from 'node:process';
+import { isArray } from '@/main/utils/is';
 
 const PlannerSystemPrompt = `
 You are a planning agent that helps break down tasks into smaller steps and reason about the current state.
@@ -89,19 +90,19 @@ export const UpdatePlanSchema = z.object({
   actions: z.object({
     update_status: z.array(
       z.object({
-        index: z.number(),
+        index: z.number().min(1),
         status: z.enum(['done', 'skip']),
       }),
     ),
     update_title: z.array(
       z.object({
-        index: z.number(),
+        index: z.number().min(1),
         title: z.string(),
       }),
     ),
     insert_step: z.array(
       z.object({
-        index: z.number(),
+        index: z.number().min(1),
         title: z.string(),
       }),
     ),
@@ -125,7 +126,7 @@ const renderPlan = (
           status = '-';
         }
       }
-      content += `- ${showIndex && status != 'done' ? `${index}. ` : ''} [${status}] ${step.title || step}\n`;
+      content += `- ${showIndex && status != 'done' ? `${index}.` : ''} [${status}] ${step.title || step}\n`;
       index++;
     }
     content += '\n';
@@ -211,7 +212,11 @@ export const PlannerNode = (params: {
     // );
     actions.push(update_steps);
 
-    const messages = params.messageManager.getMessages(['init']);
+    const messages = params.messageManager.getMessages([
+      'init',
+      'task',
+      'agent',
+    ]);
 
     if (state.plans) {
       const todo = renderPlan(state.plans, true);
@@ -221,7 +226,11 @@ export const PlannerNode = (params: {
         ),
       );
     } else {
-      messages.push(new HumanMessage(`The Main Task: ${state.task}`));
+      messages.push(
+        new HumanMessage(
+          `The Main Task: \n${state.task}\n\n---\nPlease create a plan to action the task`,
+        ),
+      );
     }
 
     const renderedTools = renderTextDescription(tools);
@@ -261,7 +270,7 @@ export const PlannerNode = (params: {
           { tags: ['ignore'] },
         );
         const plan_json = await new JsonOutputParser<
-          z.infer<typeof PlanSchema>
+          z.infer<typeof CreatePlanSchema>
         >().parse(res.text);
         plans = plan_json;
       } else {
@@ -278,10 +287,18 @@ export const PlannerNode = (params: {
           },
           { tags: ['ignore'] },
         );
-
-        plans = res.parsed;
+        plans = {
+          ...res.parsed,
+          outline: res.parsed.outline.map((outline) => {
+            const _steps = outline.steps.map((step) => {
+              const _step = { title: step, status: 'not_started' as const };
+              return _step;
+            });
+            return { ...outline, steps: _steps };
+          }),
+        };
       }
-      const todo = renderPlan(plans);
+      const todo = renderPlan(plans, true);
       console.log(todo);
       toolMessage.content = todo;
       await callBack?.(toolMessage, 'end');
@@ -306,11 +323,12 @@ export const PlannerNode = (params: {
           if (tool_call.name == 'update_steps') {
             const { actions } = args;
             const { plans } = state;
-            const new_plans = {
+            const new_plans: z.infer<typeof PlanSchema> = {
               ...plans,
             };
+
             const getStep = (index: number) => {
-              let stepIndex = 0;
+              let stepIndex = 1;
               for (let i = 0; i < plans.outline.length; i++) {
                 const steps = plans.outline[i].steps;
                 for (let j = 0; j < steps.length; j++) {
@@ -328,32 +346,61 @@ export const PlannerNode = (params: {
               }
               return null;
             };
+            console.log(actions);
+            if (isArray(actions.update_status)) {
+              for (const action of actions.update_status) {
+                const step = getStep(action.index);
+                if (step) {
+                  new_plans.outline[step.outlineIndex].steps[
+                    step.stepIndex
+                  ].status = action.status;
+                }
+              }
+            }
+            if (isArray(actions.update_title)) {
+              for (const action of actions.update_title) {
+                const step = getStep(action.index);
+                if (step) {
+                  new_plans.outline[step.outlineIndex].steps[
+                    step.stepIndex
+                  ].title = action.title;
+                }
+              }
+            }
+            if (isArray(actions.insert_step)) {
+              for (const action of actions.insert_step) {
+                const step = getStep(action.index);
+                if (step) {
+                  new_plans.outline[step.outlineIndex].steps.splice(
+                    step.stepIndex,
+                    0,
+                    { title: action.title, status: 'not_started' as const },
+                  );
+                }
+              }
+            }
+            const todo = renderPlan(new_plans, true);
+            console.log(todo);
+            toolMessage.content = todo;
+            await callBack?.(toolMessage, 'end');
 
-            actions.update_status.forEach((action) => {
-              const step = getStep(action.index);
-              if (step) {
-                new_plans.outline[step.outlineIndex].steps[
-                  step.stepIndex
-                ].status = action.status;
+            let currentStep;
+            for (let i = 0; i < new_plans.outline.length; i++) {
+              const { steps } = new_plans.outline[i];
+              for (let j = 0; j < steps.length; j++) {
+                if (steps[j].status == 'not_started') {
+                  currentStep = steps[j];
+                  break;
+                }
               }
-            });
-            actions.update_title.forEach((action) => {
-              const step = getStep(action.index);
-              if (step) {
-                new_plans.outline[step.outlineIndex].steps[
-                  step.stepIndex
-                ].title = action.title;
-              }
-            });
-            actions.insert_step.forEach((action) => {
-              const step = getStep(action.index);
-            });
+            }
+            return {
+              plans: new_plans,
+              todo,
+              currentStep: currentStep,
+            };
           }
         }
-
-        return {
-          response,
-        };
       }
     }
   };

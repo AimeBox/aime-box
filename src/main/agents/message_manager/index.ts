@@ -15,11 +15,15 @@ type MessageType =
   | 'assistant'
   | 'task'
   | 'plan'
-  | 'agent';
+  | 'agent'
+  | 'action'
+  | 'handoff';
 
 interface MessageMetadata {
   type: MessageType;
   tokens: number;
+  name?: string;
+  inMemory?: boolean;
 }
 
 export class MessageHistory {
@@ -117,13 +121,17 @@ export class MessageManager {
     message: BaseMessage,
     position?: number,
     messageType?: MessageType,
+    name?: string,
+    inMemory?: boolean,
   ) {
     const tokenCount = await this.countTokens(message);
     this.history.addMessage(
       message,
       {
         type: messageType,
+        name,
         tokens: tokenCount,
+        inMemory,
       },
       position,
     );

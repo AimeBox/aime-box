@@ -18,11 +18,11 @@ You are a professional task execution planner responsible for breaking down user
 
 ```md
 # title
-
-- [x] step title1
-- [-] step title2
-- 1. [ ] step title3
-- 2. [ ] step title4
+## outline
+- 1. [x] step title1
+- 2. [-] step title2
+- 3. [ ] step title3
+- 4. [ ] step title4
 ```
 
 - Steps marked "[x]" are completed , "[ ]" are not started, and "[-]" are skipped.
@@ -49,6 +49,17 @@ You are a professional task execution planner responsible for breaking down user
   ]
 }}
 ```
+
+# Update Plan Output Format
+{{
+  "update_status": [
+    {{ "index": 1, "status": "done"}}, ...
+  ],
+  "update_title": [
+    {{ "index": 2, "title": "xxxx"}}, ...
+  ]
+}}
+
 
 # Note
 

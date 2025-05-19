@@ -141,7 +141,7 @@ export class ManusAgent extends BaseAgent {
     evaluation_previous_goal: z.string(),
     memory: z.string().optional(),
     next_goal: z.string().describe('Your next goal'),
-    reply: z.string().optional(),
+    reply: z.string().optional().nullable(),
   });
 
   createAgentOutput = (actions: (BaseAction | BaseTool)[]) => {
@@ -562,7 +562,11 @@ export class ManusAgent extends BaseAgent {
         inputMessage.id = uuidv4();
         inputMessage.name = that.name;
         inputMessage.content = `@${handoffAgent} Help me complete the following tasks: \n${handoffTask}`;
-        await that.messageManager?.addMessage(inputMessage);
+        await that.messageManager?.addMessage(
+          inputMessage,
+          undefined,
+          'handoff',
+        );
         // if (!isToolMessage(lastMessage)) {
         //   throw new Error('last message is not a tool message');
         // }
@@ -592,6 +596,7 @@ export class ManusAgent extends BaseAgent {
                 message,
                 undefined,
                 'agent',
+                handoffAgent,
               );
               await sendMessage(message);
             }
@@ -603,6 +608,7 @@ export class ManusAgent extends BaseAgent {
                 message,
                 undefined,
                 'agent',
+                handoffAgent,
               );
               await sendMessage(message);
             }
@@ -618,7 +624,12 @@ export class ManusAgent extends BaseAgent {
             content: `@${that.name} task failed!\nFail Reason: ${structuredResponse.fail_reason}\nTask Summary: \n${structuredResponse.summary}`,
             name: handoffAgent,
           });
-          await that.messageManager?.addMessage(lastResultMessage);
+          await that.messageManager?.addMessage(
+            lastResultMessage,
+            undefined,
+            'handoff',
+            handoffAgent,
+          );
           await sendMessage(lastResultMessage);
 
           return new Command({
@@ -633,7 +644,12 @@ export class ManusAgent extends BaseAgent {
             content: `@${that.name} task completed!\nTask Summary: \n${structuredResponse.summary}`,
             name: handoffAgent,
           });
-          await that.messageManager?.addMessage(lastResultMessage);
+          await that.messageManager?.addMessage(
+            lastResultMessage,
+            undefined,
+            'handoff',
+            handoffAgent,
+          );
           await sendMessage(lastResultMessage);
 
           return new Command({
@@ -770,6 +786,8 @@ action: {
   },
 }`,
             ),
+            undefined,
+            'action',
           );
 
           failTimes += 1;
@@ -831,9 +849,11 @@ action: {
               },
             ],
           }),
+          undefined,
+          'action',
         );
 
-        await this.messageManager.addToolMessage('action success');
+        await this.messageManager.addToolMessage('action success', 'action');
 
         if (nextAction.current_state.reply) {
           await sendMessage(
@@ -858,8 +878,12 @@ action: {
         });
         toolCallMessage.name = this.name;
         toolCallMessage.additional_kwargs.model = model['modelName'];
-        await this.messageManager.addMessage(toolCallMessage);
-        await this.messageManager.addToolMessage('');
+        await this.messageManager.addMessage(
+          toolCallMessage,
+          undefined,
+          'action',
+        );
+        await this.messageManager.addToolMessage('', 'action');
         // await sendMessage(toolCallMessage);
       }
       if (goto == 'tool') {
@@ -876,8 +900,12 @@ action: {
         });
         toolCallMessage.name = this.name;
         toolCallMessage.additional_kwargs.model = model['modelName'];
-        this.messageManager.addMessage(toolCallMessage);
-        // this.messageManager.addToolMessage('');
+        await this.messageManager.addMessage(
+          toolCallMessage,
+          undefined,
+          'action',
+        );
+        await this.messageManager.addToolMessage('', 'action');
         await sendMessage(toolCallMessage);
       }
 
@@ -892,17 +920,6 @@ action: {
         },
         goto: goto,
       });
-    };
-
-    const shouldContinue = (state: typeof StateAnnotation.State) => {
-      const { messages, action } = state;
-      return END;
-    };
-
-    const summarizeConversationNode = async ({
-      messages,
-    }: typeof StateAnnotation.State) => {
-      return { messages: [new AIMessage('任务总结')] };
     };
 
     const workflow = new StateGraph(StateAnnotation)

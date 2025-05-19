@@ -63,6 +63,7 @@
 
 ### 🐞 **Dev**
 ```sh
+# node 22
 npm install
 npm run start
 ```

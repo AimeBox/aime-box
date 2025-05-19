@@ -153,6 +153,7 @@
     "tailwind-merge": "^3.0.1",
     "tree-node-cli": "^1.6.0",
     "unbzip2-stream": "^1.4.3",
+    "undici": "^7.9.0",
     "word-extractor": "^1.0.4",
     "yahoo-finance": "^0.3.8",
     "zhipuai-sdk-nodejs-v4": "^0.1.12",
