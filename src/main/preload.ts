@@ -136,7 +136,10 @@ const electronHandler = {
       skip: number;
       pageSize: number;
       sort?: string | undefined;
-    }) => ipcRenderer.invoke('chat:getChatPage', input),
+    }): Promise<{
+      items: ChatInfo[];
+      totalCount: number;
+    }> => ipcRenderer.invoke('chat:getChatPage', input),
     create: (
       mode: ChatMode,
       providerModel?: string,

@@ -51,10 +51,12 @@ export class PythonInterpreterTool extends BaseTool {
 
   schema = z.object({
     script: z.string().describe('python script'),
-    sensitive: z.optional(z.boolean().describe('if the script is sensitive')),
-    dependencies: z.optional(
-      z.array(z.string()).describe('python pip dependencies to install'),
-    ),
+    // sensitive: z.optional(z.boolean().optional.describe('if the script is sensitive')),
+    dependencies: z
+      .array(z.string())
+      .optional()
+      .nullable()
+      .describe('python pip dependencies to install'),
   });
 
   name: string = 'python_interpreter';

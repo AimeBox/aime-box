@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useState } from 'react';
+import React, { createElement, ReactNode, useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeKatex from 'rehype-katex';
@@ -22,6 +22,7 @@ import { ChatInputAttachment } from '@/types/chat';
 import ChatAttachment from '../chat/ChatAttachment';
 import { marked } from 'marked';
 import rehypeMathjax from 'rehype-mathjax/browser';
+import { visit } from 'unist-util-visit';
 
 export interface MarkdownProps {
   value?: string;
@@ -32,6 +33,15 @@ const production = {
   jsxs: prod.jsxs,
   //createElement: React.createElement,
 };
+function remarkEncodeLinks() {
+  return (tree) => {
+    visit(tree, 'link', (node) => {
+      if (typeof node.url === 'string') {
+        node.url = node.url.replace(/ /g, '%20');
+      }
+    });
+  };
+}
 
 export function Markdown(props: MarkdownProps) {
   const [renderedContent, setRenderedContent] = useState<string | null>(null);
@@ -71,45 +81,34 @@ export function Markdown(props: MarkdownProps) {
     md: string,
     type: 'file' | 'folder',
   ): ChatInputAttachment | undefined {
-    const match = md.match(/\[([^\]]+?)\]\((.+?)\)$/);
-    const tokens = marked.lexer(md);
-    if (tokens.length == 1) {
-      const linkToken = tokens
-        .at(0)
-        ?.tokens.find((token) => token.type === 'link');
-      if (linkToken) {
-        console.log(linkToken);
-        const name = linkToken.text;
-        const path = linkToken.href;
-        const ext = `.${name.split('.').pop()}`;
-        return {
-          name,
-          path,
-          type: 'file',
-          ext: ext,
-        };
-      }
-    }
-
-    return undefined;
+    const name = md.split(/[/\\]/).pop();
+    const path = md;
+    const ext = `.${name.split('.').pop()}`;
+    return {
+      name,
+      path,
+      type: type,
+      ext: ext,
+    };
   }
 
   useEffect(() => {
     const { thinkContent, restContent } = splitThinkTag(props?.value);
     const { context, attachments } = splitContextAndFiles(restContent);
+
     setFiles(attachments);
     setThinkContent(thinkContent);
     setRenderedContent(context);
 
     unified()
       .use(remarkParse, { fragment: true })
-
-      .use(rehypeReact, production)
+      .use(remarkEncodeLinks)
       .use(remarkGfm)
       .use(rehypeMathjax)
       .use(remarkBreaks)
 
       .use(remarkRehype, { allowDangerousHtml: true })
+      .use(rehypeReact, production)
       .use(rehypeRaw, true)
       .use(rehypeCodeTitles)
       .use(rehypeFormat)

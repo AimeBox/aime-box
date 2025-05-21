@@ -10,12 +10,13 @@ import {
   FaTrashAlt,
 } from 'react-icons/fa';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Chat } from '../../../entity/Chat';
+import { Chat, ChatStatus } from '../../../entity/Chat';
 import List from '../common/List';
 import { t } from 'i18next';
 import dayjs from 'dayjs';
 import { ListItem } from '../common/ListItem';
 import { FaRegMessage, FaRegRectangleList } from 'react-icons/fa6';
+import { ChatInfo } from '@/main/chat';
 
 // import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 export interface ChatListRef {
@@ -35,7 +36,7 @@ export interface ChatListProps {
 const ChatList = React.forwardRef((props: ChatListProps, ref) => {
   const { onNewChat } = props;
   const location = useLocation();
-  const [chats, setChats] = useState<Chat[]>([]);
+  const [chats, setChats] = useState<ChatInfo[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [addButtonOpen, setAddButtonOpen] = useState(false);
@@ -184,6 +185,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
                 icon={renderChatIcon(chat.mode)}
                 active={currentChatId === chat.id}
                 title={chat.title}
+                // shiny={chat.status === 'running'}
                 subTitle={
                   chat.mode === 'agent' && <small>@{chat.agentName}</small>
                 }

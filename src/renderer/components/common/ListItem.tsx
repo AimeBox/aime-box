@@ -2,7 +2,7 @@ import { Button, Popover } from 'antd';
 import { forwardRef, Key, ReactNode, useState } from 'react';
 import { FaEllipsisH, FaTrashAlt } from 'react-icons/fa';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import ShinyText from '../ui/ShinyText';
+import ShinyText from '../ui/ShinyText/ShinyText';
 
 export interface ListItemProps {
   children?: ReactNode;
@@ -14,6 +14,7 @@ export interface ListItemProps {
   button?: ReactNode;
   onClick?: () => void;
   icon?: ReactNode;
+  shiny?: boolean;
   // openMenu?: boolean;
   // setOpenMenu?: (open: boolean) => void;
 }
@@ -29,6 +30,7 @@ export const ListItem = forwardRef((props: ListItemProps) => {
     button,
     onClick,
     icon,
+    shiny = false,
     // openMenu,
     // setOpenMenu,
   } = props;
@@ -47,14 +49,19 @@ export const ListItem = forwardRef((props: ListItemProps) => {
             <div className="flex flex-col">
               <div className="flex flex-row items-center">
                 {icon && <div className="mr-1">{icon}</div>}
-                {/* <ShinyText
-                  text={title as string}
-                  speed={3}
-                  className="font-bold whitespace-normal line-clamp-1 break-all"
-                /> */}
-                <div className="font-bold whitespace-normal line-clamp-1 break-all">
-                  {title}
-                </div>
+                {shiny && (
+                  <ShinyText
+                    text={title as string}
+                    speed={2}
+                    disabled={!shiny}
+                    className="font-bold whitespace-normal line-clamp-1 break-all"
+                  />
+                )}
+                {!shiny && (
+                  <div className="font-bold whitespace-normal line-clamp-1 break-all">
+                    {title}
+                  </div>
+                )}
               </div>
               <small
                 className="text-gray-500 whitespace-normal line-clamp-1"

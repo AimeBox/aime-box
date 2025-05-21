@@ -7,7 +7,12 @@ import {
   isToolMessage,
   ToolMessage,
 } from '@langchain/core/messages';
-import { Command, CompiledStateGraph, StateGraph, StateSnapshot } from '@langchain/langgraph';
+import {
+  Command,
+  CompiledStateGraph,
+  StateGraph,
+  StateSnapshot,
+} from '@langchain/langgraph';
 import { v4 as uuidv4 } from 'uuid';
 import { notificationManager } from '../app/NotificationManager';
 import { isArray } from '../utils/is';
@@ -39,26 +44,22 @@ export const runAgent = async (
       const files: any[] = x.content.filter((x) => x.type == 'file');
       if (x.content.find((x) => x.type == 'text')) {
         (x.content.find((x) => x.type == 'text') as any).text +=
-          `\n${files.map((z) => `<file>[${z.name}](${z.path})</file>`).join('\n')}`;
+          `\n${files.map((z) => `<file>${z.path}</file>`).join('\n')}`;
       } else {
         x.content.push({
           type: 'text',
-          text: files
-            .map((z) => `<file>[${z.name}](${z.path})</file>`)
-            .join('\n'),
+          text: files.map((z) => `<file>${z.path}</file>`).join('\n'),
         });
       }
       x.content = x.content.filter((x) => x.type != 'file');
       const folders: any[] = x.content.filter((x) => x.type == 'folder');
       if (x.content.find((x) => x.type == 'text')) {
         (x.content.find((x) => x.type == 'text') as any).text +=
-          `\n${folders.map((z) => `<folder>[${z.name}](${z.path})</folder>`).join('\n')}`;
+          `\n${folders.map((z) => `<folder>${z.path}</folder>`).join('\n')}`;
       } else {
         x.content.push({
           type: 'text',
-          text: folders
-            .map((z) => `<folder>[${z.name}](${z.path})</folder>`)
-            .join('\n'),
+          text: folders.map((z) => `<folder>${z.path}</folder>`).join('\n'),
         });
       }
       x.content = x.content.filter((x) => x.type != 'folder');

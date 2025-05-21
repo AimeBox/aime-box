@@ -192,12 +192,16 @@ export class AppManager {
     if (defaultTTS) {
       const model = defaultTTS.split('@')[0];
       this.textToSpeech = new TextToSpeech({ model: defaultTTS });
-      const config = this.textToSpeech.getConfig(model);
-      if (!this.offlineTts) {
-        if (config) {
-          this.offlineTts = await this.textToSpeech.createTts(config);
-          console.log(`tts引擎已初始化 model = ${model}`);
+      try {
+        const config = this.textToSpeech.getConfig(model);
+        if (!this.offlineTts) {
+          if (config) {
+            this.offlineTts = await this.textToSpeech.createTts(config);
+            console.log(`tts引擎已初始化 model = ${model}`);
+          }
         }
+      } catch (err) {
+        console.error(err);
       }
     }
   }

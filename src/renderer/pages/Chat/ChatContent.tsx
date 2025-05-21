@@ -60,7 +60,7 @@ import ChatAttachment from '@/renderer/components/chat/ChatAttachment';
 import domtoimage from 'dom-to-image';
 import { ChatInfo } from '@/main/chat';
 import FileDropZone from '@/renderer/components/common/FileDropZone';
-import ChatCanvasView from './ChatCanvasView';
+import ChatToolView from '@/renderer/components/chat/ChatToolView';
 
 export default function ChatContent() {
   const location = useLocation();
@@ -381,6 +381,7 @@ export default function ChatContent() {
   const openCanvas = (value: any) => {
     setOpenCanvasView(true);
     setCanvasViewValue(value);
+    console.log(value);
     setCanvasSize(400);
   };
 
@@ -423,7 +424,9 @@ export default function ChatContent() {
                             onBlur={handleChangedTitle}
                           />
                           <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400">
-                            {currentChat.id}
+                            <a href={`/${currentChat.id}`} target="_blank">
+                              {currentChat.id}
+                            </a>
                             <span>token: {currentChat.totalToken}</span>
                             <span className="flex flex-row items-center">
                               <FaAngleUp /> {currentChat.inputToken}
@@ -539,218 +542,224 @@ export default function ChatContent() {
                   </div>
                 </Splitter.Panel>
                 <Splitter.Panel min={220} defaultSize={220}>
-                  <div className="flex flex-col gap-2 p-2 h-full">
-                    <div className="flex flex-row justify-between">
-                      <div className="flex flex-row items-center">
-                        <ProviderSelect
-                          type="llm"
-                          value={currentModel}
-                          onChange={onChangeCurrentModel}
-                          style={{ width: '200px' }}
-                          className="mr-2"
-                        />
-                        <Popconfirm
-                          icon={null}
-                          open={emojiOpen}
-                          onOpenChange={setEmojiOpen}
-                          title={
-                            <EmojiPicker
-                              className="!border-none"
-                              onEmojiClick={(v) => {
-                                editorRef.current?.insertText(v.emoji);
-                                setEmojiOpen(false);
+                  <div className="  h-full p-4">
+                    <div className="flex flex-col gap-2 p-3 h-full border border-solid border-gray-200 dark:border-none  rounded-2xl bg-gray-100 dark:bg-gray-600 ">
+                      <div className="flex flex-row justify-between ">
+                        <div className="flex flex-row items-center">
+                          <ProviderSelect
+                            type="llm"
+                            value={currentModel}
+                            onChange={onChangeCurrentModel}
+                            style={{ width: '200px' }}
+                            className="mr-2"
+                          />
+                          <Popconfirm
+                            icon={null}
+                            open={emojiOpen}
+                            onOpenChange={setEmojiOpen}
+                            title={
+                              <EmojiPicker
+                                className="!border-none"
+                                onEmojiClick={(v) => {
+                                  editorRef.current?.insertText(v.emoji);
+                                  setEmojiOpen(false);
+                                }}
+                              />
+                            }
+                            onConfirm={() => {}}
+                            okText="Yes"
+                            cancelText="No"
+                          >
+                            <Button
+                              icon={<FaRegFaceLaugh />}
+                              type="text"
+                              onClick={() => {
+                                setEmojiOpen(!emojiOpen);
                               }}
                             />
-                          }
-                          onConfirm={() => {}}
-                          okText="Yes"
-                          cancelText="No"
-                        >
+                          </Popconfirm>
+
                           <Button
-                            icon={<FaRegFaceLaugh />}
+                            icon={<FaPaperclip />}
                             type="text"
                             onClick={() => {
-                              setEmojiOpen(!emojiOpen);
+                              onSelectFile([]);
+                            }}
+                          ></Button>
+                          <ChatQuickInput
+                            onClick={(text) => {
+                              editorRef.current?.insertText(text);
+                              setChatInputMessage(text);
+                            }}
+                            className="ml-2"
+                          />
+                        </div>
+
+                        <div>
+                          <Button
+                            icon={<FaGear />}
+                            type="text"
+                            onClick={() => {
+                              setOpenChatOptionsDrawer(true);
                             }}
                           />
-                        </Popconfirm>
-
-                        <Button
-                          icon={<FaPaperclip />}
-                          type="text"
-                          onClick={() => {
-                            onSelectFile([]);
-                          }}
-                        ></Button>
-                        <ChatQuickInput
-                          onClick={(text) => {
-                            editorRef.current?.insertText(text);
-                            setChatInputMessage(text);
-                          }}
-                          className="ml-2"
-                        />
+                        </div>
                       </div>
-
-                      <div>
-                        <Button
-                          icon={<FaGear />}
-                          type="text"
-                          onClick={() => {
-                            setOpenChatOptionsDrawer(true);
-                          }}
-                        />
-                      </div>
-                    </div>
-                    {attachments.length > 0 && (
-                      <div className="flex flex-row flex-wrap gap-2 w-full">
-                        {attachments.map((attachment) => (
-                          <ChatAttachment
-                            key={attachment.path}
-                            value={attachment}
-                            onDelete={() => onDeleteAttachment(attachment)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex flex-col flex-1 gap-2 h-full bg-gray-100 dark:bg-gray-800">
-                      <div className="flex flex-col flex-1 h-full">
-                        {/* <ChatQuickInput
+                      {attachments.length > 0 && (
+                        <div className="flex flex-row flex-wrap gap-2 w-full">
+                          {attachments.map((attachment) => (
+                            <ChatAttachment
+                              key={attachment.path}
+                              value={attachment}
+                              onDelete={() => onDeleteAttachment(attachment)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex flex-col flex-1 gap-2 h-full ">
+                        <div className="flex flex-col flex-1 h-full">
+                          {/* <ChatQuickInput
                       onClick={(text) => {
                         editorRef.current?.insertText(text);
                         setChatInputMessage(text);
                       }}
                       className="mb-1"
                     /> */}
-                        <div className="flex-1 w-full h-full text-sm bg-transparent outline-none resize-none">
-                          <Input.TextArea
-                            className="w-full !h-full !outline-none !shadow-none"
-                            rows={1}
-                            value={chatInputMessage}
-                            onChange={(e) => {
-                              setChatInputMessage(e.target.value);
-                            }}
-                            onPressEnter={(e) => {
-                              if (!e.shiftKey) {
-                                e.preventDefault();
-                                onChat();
-                              }
-                            }}
-                          ></Input.TextArea>
-                          {/* <FileDropZone></FileDropZone> */}
+                          <div className="flex-1 w-full h-full text-sm bg-transparent outline-none resize-none">
+                            <Input.TextArea
+                              className="w-full !h-full !outline-none !shadow-none !bg-transparent dark:text-white"
+                              rows={1}
+                              value={chatInputMessage}
+                              variant="borderless"
+                              placeholder="Type a message"
+                              onChange={(e) => {
+                                setChatInputMessage(e.target.value);
+                              }}
+                              onPressEnter={(e) => {
+                                if (!e.shiftKey) {
+                                  e.preventDefault();
+                                  onChat();
+                                }
+                              }}
+                            ></Input.TextArea>
+                            {/* <FileDropZone></FileDropZone> */}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex flex-row justify-between items-center w-full">
-                      <div className="flex gap-2 items-center">
-                        <Tooltip
-                          placement="top"
-                          title={
-                            <div className="flex flex-col">
-                              <strong>{t('chat.tool')}</strong>
-                              {currentChat?.options?.toolNames?.join(',')}
-                            </div>
-                          }
-                        >
-                          <Button
-                            className="flex flex-row items-center rounded-full"
-                            color={
-                              currentChat?.options?.toolNames?.length > 0
-                                ? 'primary'
-                                : 'default'
+                      <div className="flex flex-row justify-between items-center w-full">
+                        <div className="flex gap-2 items-center">
+                          <Tooltip
+                            placement="top"
+                            title={
+                              <div className="flex flex-col">
+                                <strong>{t('chat.tool')}</strong>
+                                {currentChat?.options?.toolNames?.join(',')}
+                              </div>
                             }
-                            variant={
-                              currentChat?.options?.toolNames?.length > 0
-                                ? 'filled'
-                                : 'outlined'
-                            }
-                            onClick={() => {
-                              tools.open(currentChat?.options?.toolNames || []);
-                              tools.onSelect = (_tools) => {
-                                onChatOptionsChanged({
-                                  toolNames: _tools.map((x) => x.name),
-                                });
-                              };
-                            }}
                           >
-                            {t('chat.tool')}
-                            <Tag className="mr-0 rounded-full">
-                              +{' '}
-                              {currentChat?.options?.toolNames?.length > 0
-                                ? currentChat?.options?.toolNames?.length
-                                : 'add'}
-                            </Tag>
-                          </Button>
-                        </Tooltip>
-                        <Tooltip
-                          placement="top"
-                          title={
-                            <div className="flex flex-col">
-                              <strong>{t('chat.knowledgebase')}</strong>
-                              {currentChat?.options?.toolNames?.join(',')}
-                            </div>
-                          }
-                        >
-                          <Button
-                            className="flex flex-row items-center rounded-full"
-                            color={
-                              currentChat?.options?.kbList?.length > 0
-                                ? 'primary'
-                                : 'default'
+                            <Button
+                              className="flex flex-row items-center rounded-full"
+                              color={
+                                currentChat?.options?.toolNames?.length > 0
+                                  ? 'primary'
+                                  : 'default'
+                              }
+                              variant={
+                                currentChat?.options?.toolNames?.length > 0
+                                  ? 'filled'
+                                  : 'outlined'
+                              }
+                              onClick={() => {
+                                tools.open(
+                                  currentChat?.options?.toolNames || [],
+                                );
+                                tools.onSelect = (_tools) => {
+                                  onChatOptionsChanged({
+                                    toolNames: _tools.map((x) => x.name),
+                                  });
+                                };
+                              }}
+                            >
+                              {t('chat.tool')}
+                              <Tag className="mr-0 rounded-full">
+                                +{' '}
+                                {currentChat?.options?.toolNames?.length > 0
+                                  ? currentChat?.options?.toolNames?.length
+                                  : 'add'}
+                              </Tag>
+                            </Button>
+                          </Tooltip>
+                          <Tooltip
+                            placement="top"
+                            title={
+                              <div className="flex flex-col">
+                                <strong>{t('chat.knowledgebase')}</strong>
+                                {currentChat?.options?.toolNames?.join(',')}
+                              </div>
                             }
-                            variant={
-                              currentChat?.options?.kbList?.length > 0
-                                ? 'filled'
-                                : 'outlined'
-                            }
-                            onClick={() => {
-                              knowledgeBase.open(
-                                currentChat?.options?.kbList || [],
-                              );
+                          >
+                            <Button
+                              className="flex flex-row items-center rounded-full"
+                              color={
+                                currentChat?.options?.kbList?.length > 0
+                                  ? 'primary'
+                                  : 'default'
+                              }
+                              variant={
+                                currentChat?.options?.kbList?.length > 0
+                                  ? 'filled'
+                                  : 'outlined'
+                              }
+                              onClick={() => {
+                                knowledgeBase.open(
+                                  currentChat?.options?.kbList || [],
+                                );
 
-                              knowledgeBase.onSelect = (kbs) => {
-                                onChatOptionsChanged({
-                                  kbList: kbs.map((kb) => kb.id),
-                                });
-                              };
+                                knowledgeBase.onSelect = (kbs) => {
+                                  onChatOptionsChanged({
+                                    kbList: kbs.map((kb) => kb.id),
+                                  });
+                                };
+                              }}
+                            >
+                              {t('chat.knowledgebase')}
+                              <Tag className="mr-0 rounded-full">
+                                +{' '}
+                                {currentChat?.options?.kbList?.length > 0
+                                  ? currentChat?.options?.kbList?.length
+                                  : 'add'}
+                              </Tag>
+                            </Button>
+                          </Tooltip>
+                          <Tooltip placement="top" title="Clear All Message">
+                            <Popconfirm
+                              title="Delete All Message?"
+                              onConfirm={onClearChatMessages}
+                              okText="Yes"
+                              cancelText={t('cancel')}
+                            >
+                              <Button icon={<FaTrashAlt />} type="text" />
+                            </Popconfirm>
+                          </Tooltip>
+                        </div>
+                        {currentChat.status == 'running' && (
+                          <Button
+                            type="primary"
+                            icon={<FaStop />}
+                            onClick={() => {
+                              onCancel(currentChat.id);
                             }}
-                          >
-                            {t('chat.knowledgebase')}
-                            <Tag className="mr-0 rounded-full">
-                              +{' '}
-                              {currentChat?.options?.kbList?.length > 0
-                                ? currentChat?.options?.kbList?.length
-                                : 'add'}
-                            </Tag>
-                          </Button>
-                        </Tooltip>
-                        <Tooltip placement="top" title="Clear All Message">
-                          <Popconfirm
-                            title="Delete All Message?"
-                            onConfirm={onClearChatMessages}
-                            okText="Yes"
-                            cancelText={t('cancel')}
-                          >
-                            <Button icon={<FaTrashAlt />} type="text" />
-                          </Popconfirm>
-                        </Tooltip>
+                          />
+                        )}
+                        {currentChat.status != 'running' && (
+                          <Button
+                            type="primary"
+                            disabled={!chatInputMessage?.trim()}
+                            icon={<FaPaperPlane />}
+                            onClick={onChat}
+                          />
+                        )}
                       </div>
-                      {currentChat.status == 'running' && (
-                        <Button
-                          type="primary"
-                          icon={<FaStop />}
-                          onClick={() => {
-                            onCancel(currentChat.id);
-                          }}
-                        />
-                      )}
-                      {currentChat.status != 'running' && (
-                        <Button
-                          type="primary"
-                          disabled={!chatInputMessage?.trim()}
-                          icon={<FaPaperPlane />}
-                          onClick={onChat}
-                        />
-                      )}
                     </div>
                   </div>
                 </Splitter.Panel>
@@ -768,12 +777,14 @@ export default function ChatContent() {
               defaultSize={400}
               collapsible
             >
-              <div>
-                <ChatCanvasView
-                  className={`flex-1 w-full`}
+              <div className="h-full">
+                <ChatToolView
+                  className="flex-1 w-full"
                   open={openCanvasView}
                   onClose={() => closeCanvas()}
                   value={canvasViewValue}
+                  toolName={canvasViewValue?.toolCall?.name}
+                  toolCall={canvasViewValue?.toolCall}
                 />
               </div>
             </Splitter.Panel>

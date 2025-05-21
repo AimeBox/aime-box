@@ -95,6 +95,7 @@ export interface ChatInfo extends Chat {
   inputToken?: number;
   outputToken?: number;
   status: string;
+  agentName?: string;
 }
 
 export class ChatManager {

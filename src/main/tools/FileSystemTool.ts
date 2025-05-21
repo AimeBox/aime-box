@@ -15,6 +15,11 @@ export class FileWrite extends BaseTool {
   schema = z.object({
     path: z.string().describe('local file path'),
     data: z.string().describe('file data'),
+    mode: z
+      .enum(['append', 'overwrite'])
+      .optional()
+      .default('overwrite')
+      .nullable(),
   });
 
   //output = und;
@@ -32,8 +37,18 @@ export class FileWrite extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    fs.writeFileSync(input.path, input.data);
-    return 'file write is success';
+    const { workspace } = config.configurable;
+    let filePath = input.path;
+    if (workspace) {
+      filePath = path.join(workspace, input.path);
+    }
+    const { mode = 'overwrite' } = input;
+    if (mode === 'append') {
+      await fs.promises.appendFile(filePath, input.data);
+    } else {
+      await fs.promises.writeFile(filePath, input.data);
+    }
+    return `The file was successfully written and saved in:\n<file>${filePath.replaceAll('\\', '/')}</file>`;
   }
 }
 
@@ -116,8 +131,14 @@ export class CreateDirectory extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    if (input.paths && input.paths.length > 0) {
-      for (const path of input.paths) {
+    const { workspace } = config.configurable;
+    let filePaths = input.paths;
+    if (workspace) {
+      filePaths = input.paths.map((x) => path.join(workspace, x));
+    }
+
+    if (filePaths && filePaths.length > 0) {
+      for (const path of filePaths) {
         fs.mkdirSync(path, { recursive: true });
       }
       return 'Directory created successfully';

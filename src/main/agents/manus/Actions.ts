@@ -21,7 +21,7 @@ const PlanAction: BaseAction = {
 const HumanFeedbackAction: BaseAction = {
   name: 'human_feedback',
   description:
-    '任务的详细总结,若有文件则在全文最后使用<file>[文件名](文件路径)</file>输出文件',
+    '任务的详细总结,若有文件则在全文最后使用<file>文件路径</file>输出文件',
   schema: z.object({
     question: z.string(),
   }),

@@ -1,16 +1,20 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type { ChatInputAttachment } from '../../../types/chat';
 import {
+  FaEllipsisH,
+  FaEllipsisV,
   FaFile,
   FaFileExcel,
   FaFilePdf,
   FaFilePowerpoint,
   FaFileWord,
   FaFolder,
+  FaFolderOpen,
   FaImage,
   FaReadme,
   FaTrashAlt,
 } from 'react-icons/fa';
+import { Button, Popover } from 'antd';
 
 export interface ChatAttachmentProps {
   value: ChatInputAttachment;
@@ -26,6 +30,8 @@ export default function ChatAttachment({
     e.stopPropagation();
     window.electron.app.startDrag(value.path);
   };
+
+  const [openMenu, setOpenMenu] = useState(false);
 
   const renderIcon = useCallback(() => {
     if (value.type == 'folder') {
@@ -78,15 +84,47 @@ export default function ChatAttachment({
         </div>
       </div>
 
-      {onDelete && (
-        <div className="w-4 h-4">
-          {/* <button className="border border-white" type="button"></button> */}
-          <FaTrashAlt
-            className="opacity-0 transition-all duration-300 group-hover:opacity-100"
-            onClick={() => onDelete()}
-          />
-        </div>
-      )}
+      <div>
+        <Popover
+          placement="bottomLeft"
+          trigger="click"
+          open={openMenu}
+          onOpenChange={setOpenMenu}
+          content={
+            <div
+              className="flex flex-col items-start"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setOpenMenu(false);
+              }}
+            >
+              <Button
+                type="text"
+                className="w-full"
+                icon={<FaFolderOpen />}
+                onClick={() => {
+                  window.electron.app.showItemInFolder(value.path);
+                }}
+              >
+                Open Folder
+              </Button>
+              {onDelete && (
+                <Button
+                  type="text"
+                  className="w-full"
+                  icon={<FaTrashAlt />}
+                  onClick={() => onDelete()}
+                >
+                  Delete
+                </Button>
+              )}
+            </div>
+          }
+        >
+          <FaEllipsisH />
+        </Popover>
+      </div>
     </div>
   );
 }

@@ -256,7 +256,7 @@ const ChatMessageBox = React.forwardRef(
                       {/* <ReactMarkdown>{textContent}</ReactMarkdown> */}
                       <div
                         className={`flex flex-col flex-wrap gap-2 ${
-                          value.role == 'user' ? 'justify-end' : ''
+                          value.role == 'user' ? 'items-end' : ''
                         } w-full`}
                       >
                         {value?.content?.map((x) => {

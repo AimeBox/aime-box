@@ -68,6 +68,9 @@ import fs from 'fs';
 import { isArray } from '@/main/utils/is';
 import { PlannerAnnotation, PlannerNode } from '../nodes/PlannerNode';
 import { JsonOutputParser } from '@langchain/core/output_parsers';
+import { Memory, MemoryItem } from './Memory';
+import { MemoryVectorStore } from 'langchain/vectorstores/memory';
+import { getDefaultEmbeddingModel } from '@/main/embeddings';
 
 export class ManusAgent extends BaseAgent {
   name: string = 'aime_manus';
@@ -124,6 +127,8 @@ export class ManusAgent extends BaseAgent {
   config: any = {};
 
   messageManager?: MessageManager;
+
+  memoryManager?: Memory;
 
   maxFailTimes: number;
 
@@ -186,69 +191,6 @@ export class ManusAgent extends BaseAgent {
     return stream;
   }
 
-  browserAgent = async (store: BaseStore) => {
-    const tools = await toolsManager.buildTools(['browser_use', 'terminate']);
-    return createReactAgent({
-      llm: this.model,
-      tools: tools,
-      name: 'browser',
-      store: new InMemoryStore(),
-      prompt: 'A browser agent that can control a browser to accomplish tasks',
-    });
-  };
-
-  coderAgent = async (store: BaseStore) => {
-    const tools = await toolsManager.buildTools([
-      'python_interpreter',
-      'terminate',
-      'list_directory',
-      'search_files',
-      'move_file',
-      'read_file',
-      'write_file',
-      'create_directory',
-    ]);
-    return createReactAgent({
-      llm: this.model,
-      tools: tools,
-      name: 'coder',
-      store: new InMemoryStore(),
-      prompt:
-        'You are a ai coder, you can use the tools to help you complete the task.',
-    });
-  };
-
-  reporterAgent = async (store: BaseStore) => {
-    const tools = await toolsManager.buildTools([
-      'python_interpreter',
-      'terminate',
-    ]);
-    return createReactAgent({
-      llm: this.model,
-      tools: tools,
-      name: 'reporter',
-      store: new InMemoryStore(),
-      prompt: ReporterPrompt,
-    });
-  };
-
-  researcherAgent = async (store: BaseStore) => {
-    const tools = await toolsManager.buildTools([
-      'web_search',
-      'web_loader',
-      'terminate',
-      'write_file',
-    ]);
-
-    return createReactAgent({
-      llm: this.model,
-      tools: tools,
-      name: 'researcher',
-      store: new InMemoryStore(),
-      prompt: ResearcherPrompt,
-    });
-  };
-
   initMessage = async (state?: any) => {
     this.messageManager = new MessageManager({
       llm: this.model,
@@ -296,6 +238,7 @@ export class ManusAgent extends BaseAgent {
                   },
                 },
               },
+
               type: 'tool_call',
             },
           ],
@@ -310,6 +253,10 @@ export class ManusAgent extends BaseAgent {
     // await this.messageManager?.addMessage(
     //   new HumanMessage('[Your task history memory starts here]'),
     // );
+  };
+
+  initMemory = async (state?: any) => {
+    this.memoryManager = new Memory(state?.memory);
   };
 
   async createAgent(params: {
@@ -349,7 +296,7 @@ export class ManusAgent extends BaseAgent {
         current_state: Annotation<typeof this.current_state>,
         action: Annotation<any>,
         actionName: Annotation<string>,
-        memory: Annotation<string>,
+        memory: Annotation<MemoryItem[]>,
         messages: Annotation<BaseMessage[]>,
         history: Annotation<MessageHistory>,
         failTimes: Annotation<number>,
@@ -419,11 +366,17 @@ export class ManusAgent extends BaseAgent {
           summary: z
             .string()
             .describe(
-              '任务的详细总结,若有文件则在全文最后使用<file>[文件名](文件路径)</file>输出文件',
+              '任务的详细总结,若有文件则在全文最后使用<file>文件路径</file>输出文件',
             ),
-          fail_reason: z.string().describe('任务失败的原因').nullable(),
+          fail_reason: z.string().nullable(),
+          attachments: z
+            .array(z.string())
+            .optional()
+            .nullable()
+            .describe('文件附件列表'),
         }),
       });
+      agent.id = agentName;
       agentDescription += `- \`${_agent.name}\`: ${_agent.description}\n`;
       agents.push(agent);
     }
@@ -445,6 +398,7 @@ export class ManusAgent extends BaseAgent {
       })
     ).text;
     await this.initMessage(state);
+    await this.initMemory(state);
 
     console.log(
       `当前可使用的动作: [${agentActionList.map((x) => x.name).join(', ')}]`,
@@ -468,6 +422,7 @@ export class ManusAgent extends BaseAgent {
     };
 
     const lockedTaskNode = async (state: typeof StateAnnotation.State) => {
+      const userInput = state.messages[state.messages.length - 1].content;
       const task =
         state.action.locked_task.task == '<copy_user_input>'
           ? state.messages[state.messages.length - 1].content
@@ -543,10 +498,62 @@ export class ManusAgent extends BaseAgent {
     };
 
     const createAgentNode = async (agent: any) => {
+      const memoryTool = tool(
+        async (input) => {
+          const { qurey } = input;
+          let memory = that.messageManager.getMessagesWithMetadata();
+          memory = memory.filter((x) => x.metadata.type == 'agent');
+
+          const contents = memory.map((x) => x.message?.text?.trim());
+
+          const vectorStore = await MemoryVectorStore.fromDocuments(
+            contents
+              .filter((x) => x)
+              .map(
+                (x) =>
+                  ({
+                    pageContent: x,
+                  }) as Document,
+              ),
+            await getDefaultEmbeddingModel(),
+          );
+
+          const results = await vectorStore.similaritySearch(qurey, 5);
+          return `[Here is memory start]\n${results.map((x) => x.pageContent).join('\n')}\n[Here is memory end]`;
+        },
+        {
+          name: 'memory',
+          description: 'query by keyword from memory',
+          schema: z.object({
+            qurey: z.string(),
+          }),
+        },
+      );
+
       const agentNode = async (
         state: typeof StateAnnotation.State,
         config: RunnableConfig,
       ) => {
+        const _agent = await agentManager.getAgent(agent.id);
+        const newAgent = await agentManager.buildAgent({
+          agent: _agent,
+          store: store,
+          signal: signal,
+          tools: [memoryTool],
+          responseFormat: z.object({
+            summary: z
+              .string()
+              .describe(
+                '任务的详细总结,若有文件则在全文最后使用<file>文件路径</file>输出文件',
+              ),
+            fail_reason: z.string().nullable(),
+            attachments: z
+              .array(z.string())
+              .optional()
+              .nullable()
+              .describe('output files'),
+          }),
+        });
         const { messages, task, todo, action } = state;
         const handoffTask = action.handoff.task;
         const handoffAgent = action.handoff.agent_name;
@@ -561,25 +568,45 @@ export class ManusAgent extends BaseAgent {
         const inputMessage = new HumanMessage('');
         inputMessage.id = uuidv4();
         inputMessage.name = that.name;
-        inputMessage.content = `@${handoffAgent} Help me complete the following tasks: \n${handoffTask}`;
+        inputMessage.content = `@${handoffAgent} Help me complete the following tasks, you must focus on this task: \n${handoffTask}`;
         await that.messageManager?.addMessage(
           inputMessage,
           undefined,
           'handoff',
         );
+        const inputMessages = this.messageManager.getMessages([
+          'init',
+          'agent',
+        ]);
+
+        inputMessages.splice(
+          inputMessages.length - 1,
+          0,
+          new HumanMessage(`[Here is todo start]\n${todo}\n[Here is todo end]`),
+        );
+        // if (that.memoryManager?.get().length > 0) {
+        //   inputMessages.splice(
+        //     inputMessages.length - 1,
+        //     0,
+        //     new HumanMessage(
+        //       `[Here is memory you can use]\n${that.memoryManager?.print()}\n[Here is memory end]`,
+        //     ),
+        //   );
+        // }
+
+        // inputMessages.push(inputMessage);
+
         // if (!isToolMessage(lastMessage)) {
         //   throw new Error('last message is not a tool message');
         // }
-        const result = await agent.stream(
+        const result = await newAgent.stream(
           {
-            messages: [inputMessage],
-            // task: task,
-            // todoList: todoList,
-            // logList: logList,
+            messages: inputMessages,
           },
           {
             configurable: {
               signal: signal,
+              workspace: config.configurable.workspace,
               thread_id: uuidv4(),
             },
             tags: ['ignore'],
@@ -599,6 +626,9 @@ export class ManusAgent extends BaseAgent {
                 handoffAgent,
               );
               await sendMessage(message);
+              console.log(
+                `🪙 花费: ${message.usage_metadata?.total_tokens} 输入: ${message.usage_metadata?.input_tokens} 输出: ${message.usage_metadata?.output_tokens}`,
+              );
             }
             result_messages.push(...agent_messages);
           } else if (chunk.tools) {
@@ -643,6 +673,8 @@ export class ManusAgent extends BaseAgent {
           const lastResultMessage: AIMessage = new AIMessage({
             content: `@${that.name} task completed!\nTask Summary: \n${structuredResponse.summary}`,
             name: handoffAgent,
+            usage_metadata:
+              result_messages[result_messages.length - 1].usage_metadata,
           });
           await that.messageManager?.addMessage(
             lastResultMessage,
@@ -652,10 +684,15 @@ export class ManusAgent extends BaseAgent {
           );
           await sendMessage(lastResultMessage);
 
+          that.memoryManager?.add(
+            structuredResponse.summary,
+            result_messages.map((x) => x.content).join('\n'),
+          );
           return new Command({
             update: {
               messages: that.messageManager.getMessages(),
               history: that.messageManager.history,
+              memory: that.memoryManager.get(),
             },
             goto: 'plan',
           });
@@ -680,7 +717,11 @@ export class ManusAgent extends BaseAgent {
       });
       const res = await structured_llm.invoke(inputMessages, {
         tags: ['ignore'],
+        configurable: {
+          signal: signal,
+        },
       });
+
       if (!res.parsed) {
         if (res.raw.text) {
           const content = removeThinkTags(res.raw.text);
@@ -700,7 +741,6 @@ export class ManusAgent extends BaseAgent {
             debugger;
           } catch (err) {
             console.error(tool_call);
-            console.error(err);
           }
 
           debugger;
@@ -742,7 +782,7 @@ export class ManusAgent extends BaseAgent {
         'agent',
       ]);
 
-      const limit = 3;
+      const limit = 6;
       const typeIndices: number[] = [];
       _inputMessages.forEach((item, index) => {
         if (item.metadata.type === 'action') {
