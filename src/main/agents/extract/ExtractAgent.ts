@@ -77,7 +77,7 @@ const fieldZod = z
           'field name to display,be consistent with user input language',
         ),
       field: z.string().describe('field name must english lower case'),
-      description: z.optional(z.string()).describe('field description'),
+      description: z.string().optional().describe('field description'),
       type: z
         .enum([
           'string',
@@ -92,9 +92,10 @@ const fieldZod = z
           'array',
         ])
         .describe('field type'),
-      enumValues: z.optional(
-        z.array(z.string()).describe('field type is enum value'),
-      ),
+      enumValues: z
+        .array(z.string())
+        .optional()
+        .describe('field type is enum value'),
     }),
   )
   .describe('field information');
@@ -105,7 +106,10 @@ export class ExtractTool extends BaseTool {
       .string()
       .describe('file or directory path or website url to extract'),
     fields: fieldZod,
-    savePath: z.optional(z.string()).describe('save path'),
+    savePath: z
+      .string()
+      .optional()
+      .describe('File Save Path(.xlsx), Empty if not mentioned by the user'),
   });
 
   name: string = 'extract_tool';
@@ -565,31 +569,45 @@ export class ExtractTool extends BaseTool {
       let extractionDataSchema;
       if (field.type == 'number') {
         zodObject[field.field] = z
-          .optional(z.number())
+          .number()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'boolean') {
         zodObject[field.field] = z
-          .optional(z.boolean())
+          .boolean()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'bigint') {
         zodObject[field.field] = z
-          .optional(z.bigint())
+          .bigint()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'date') {
         zodObject[field.field] = z
-          .optional(z.string())
+          .string()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'enum' && field.enumValues) {
         zodObject[field.field] = z
-          .optional(z.enum(field.enumValues as [string, ...string[]]))
+          .enum(field.enumValues as [string, ...string[]])
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'array') {
         zodObject[field.field] = z
-          .optional(z.array(z.string()))
+          .array(z.string())
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else {
         zodObject[field.field] = z
-          .optional(z.string())
+          .string()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       }
     }
@@ -646,8 +664,8 @@ export class ExtractAgent extends BaseAgent {
       field: 'systemPrompt',
       component: 'InputTextArea',
       defaultValue: ExtractAgentSystemPrompt,
-      required: true
-    }
+      required: true,
+    },
   ];
 
   // config: any = {
@@ -712,10 +730,7 @@ export class ExtractAgent extends BaseAgent {
     this.embedding = await getDefaultEmbeddingModel();
     async function callCheck(state: typeof MessagesAnnotation.State) {
       const promptTemplate = ChatPromptTemplate.fromMessages([
-        [
-          'system',
-          that.systemPrompt
-        ],
+        ['system', that.systemPrompt],
         new MessagesPlaceholder('messages'),
       ]);
       const fieldsTool = tool(async ({ pathOrUrl, fields }) => {}, {
@@ -725,7 +740,11 @@ export class ExtractAgent extends BaseAgent {
             .string()
             .describe('file or directory or web url path to extract'),
           fields: fieldZod,
-          savePath: z.string().optional().describe('save path'),
+          savePath: z
+            .string()
+            .optional()
+            .nullable()
+            .describe('save path, Empty if not mentioned by the user'),
         }),
       });
       //const prompt = await promptTemplate.invoke({ messages: state.messages });
@@ -762,7 +781,7 @@ export class ExtractAgent extends BaseAgent {
         model: extractModel,
         allFieldInLLM: config.allFieldInLLM,
         allDocInLLM: config.allDocInLLM,
-        embedding: this.embedding,
+        embedding: that.embedding,
       });
       const toolNode = new ToolNode([extractTool]);
       const result = await toolNode.streamEvents(
