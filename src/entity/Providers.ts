@@ -43,4 +43,8 @@ export class Providers {
 
   @Column('json', { nullable: true })
   config?: any;
+
+   @Column({ nullable: true })
+  icon?: string;
+
 }

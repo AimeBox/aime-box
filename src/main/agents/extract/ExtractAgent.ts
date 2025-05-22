@@ -12,6 +12,7 @@ import {
   START,
   StateGraph,
   MessagesAnnotation,
+  BaseStore,
 } from '@langchain/langgraph';
 import { ChatOptions } from '../../../entity/Chat';
 import { getChatModel } from '../../llm';
@@ -37,7 +38,7 @@ import {
 } from '@langchain/core/prompts';
 import { LLMGraphTransformer } from '@langchain/community/experimental/graph_transformers/llm';
 import { ChatResponse } from '@/main/chat/ChatResponse';
-import { BaseAgent } from '../BaseAgent';
+import { AgentMessageEvent, BaseAgent } from '../BaseAgent';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import {
@@ -65,6 +66,7 @@ import { notificationManager } from '@/main/app/NotificationManager';
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationMessage } from '@/types/notification';
 import ExcelJS from 'exceljs';
+import { ExtractAgentSystemPrompt } from './prompt';
 
 const fieldZod = z
   .array(
@@ -106,14 +108,10 @@ export class ExtractTool extends BaseTool {
     savePath: z.optional(z.string()).describe('save path'),
   });
 
-  static lc_name() {
-    return 'extract_tool';
-  }
-
   name: string = 'extract_tool';
 
   description: string =
-    'translation expert, help you translate text to target language';
+    'Extract structured content from the given fields and files';
 
   model: BaseChatModel;
 
@@ -643,14 +641,21 @@ export class ExtractAgent extends BaseAgent {
       component: 'Switch',
       defaultValue: false,
     },
+    {
+      label: t('agents.prompt'),
+      field: 'systemPrompt',
+      component: 'InputTextArea',
+      defaultValue: ExtractAgentSystemPrompt,
+      required: true
+    }
   ];
 
-  config: any = {
-    fieldModel: '',
-    extractModel: '',
-    allDocInLLM: false,
-    allFieldInLLM: false,
-  };
+  // config: any = {
+  //   fieldModel: '',
+  //   extractModel: '',
+  //   allDocInLLM: false,
+  //   allFieldInLLM: false,
+  // };
 
   textSplitter: TextSplitter;
 
@@ -661,6 +666,8 @@ export class ExtractAgent extends BaseAgent {
   extractLLM: BaseChatModel;
 
   embedding: Embeddings;
+
+  systemPrompt: string;
 
   constructor(options: {
     provider: string;
@@ -678,8 +685,16 @@ export class ExtractAgent extends BaseAgent {
     }),
   });
 
-  async createAgent() {
+  async createAgent(params: {
+    store?: BaseStore;
+    model?: BaseChatModel;
+    messageEvent?: AgentMessageEvent;
+    chatOptions?: ChatOptions;
+    signal?: AbortSignal;
+    configurable?: Record<string, any>;
+  }) {
     const config = await this.getConfig();
+    this.systemPrompt = config.systemPrompt;
     const { provider, modelName } = getProviderModel(config.fieldModel);
     const { provider: extractProvider, modelName: extractModelName } =
       getProviderModel(config.extractModel);
@@ -699,14 +714,7 @@ export class ExtractAgent extends BaseAgent {
       const promptTemplate = ChatPromptTemplate.fromMessages([
         [
           'system',
-          [
-            '因为你的任务是提取用户给定的文件/文件夹路径中文件的抽取字段信息',
-            'step1:判断用户是否输入了路径信息,如果没有请先询问用户处理的文件/文件夹路径',
-            'step2:判断用户输入的信息是否给出了需要抽取的字段描述',
-            '- 如果没有描述抽取的字段请先询问用户需要抽取的字段(不提供建议)',
-            '- 如果抽取的描述很模糊你应该给出一些字段建议供用户参考',
-            'step3:如果用户给出了需要提取的字段描述和路径,请使用工具`extract_tool`提取字段信息,只用一次',
-          ].join('\n'),
+          that.systemPrompt
         ],
         new MessagesPlaceholder('messages'),
       ]);
@@ -717,7 +725,7 @@ export class ExtractAgent extends BaseAgent {
             .string()
             .describe('file or directory or web url path to extract'),
           fields: fieldZod,
-          savePath: z.optional(z.string()).describe('save path'),
+          savePath: z.string().optional().describe('save path'),
         }),
       });
       //const prompt = await promptTemplate.invoke({ messages: state.messages });
@@ -763,6 +771,7 @@ export class ExtractAgent extends BaseAgent {
         },
         {
           version: 'v2',
+          // tags: ['ignore'],
         },
       );
 

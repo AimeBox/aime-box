@@ -61,12 +61,13 @@ export class AgentManager {
 
   async init() {
     this.agentRepository = dbManager.dataSource.getRepository(Agent);
-    this.registerAgent(ExtractAgent);
-    this.registerAgent(ScriptAssistant);
-    //this.registerAgent(TranslateAgent);
-    this.registerAgent(PlannerAgent);
 
-    this.registerAgent(ManusAgent);
+    await this.registerAgent(ExtractAgent);
+    await this.registerAgent(ScriptAssistant);
+    //this.registerAgent(TranslateAgent);
+    await this.registerAgent(PlannerAgent);
+
+    await this.registerAgent(ManusAgent);
     if (!ipcMain) return;
     ipcMain.on('agent:getList', async (event, filter?: string) => {
       event.returnValue = await this.getList(filter);
@@ -200,7 +201,7 @@ export class AgentManager {
       let configSchema;
       let config;
       if (agent.type == 'built-in') {
-        if (!this.agents.find((x) => x.info.name == agent.name)) {
+        if (!this.agents.find((x) => x.info.name == agent.name.toLocaleLowerCase())) {
           continue;
         }
         config = await this.agents
@@ -227,10 +228,10 @@ export class AgentManager {
   private async registerAgent(ClassType) {
     try {
       const agent = Reflect.construct(ClassType, []) as BaseAgent;
-      const agentRepository = dbManager.dataSource.getRepository(Agent);
-      let ts = await agentRepository.findOne({
+      let ts = await this.agentRepository.findOne({
         where: { id: agent.name.toLowerCase() },
       });
+
       if (!ts) {
         ts = new Agent(
           agent.name.toLowerCase(),
@@ -245,10 +246,11 @@ export class AgentManager {
           {},
         );
 
-        await agentRepository.save(ts);
+        await this.agentRepository.save(ts);
       }
       this.agents = this.agents.filter((x) => x.info.name != agent.name);
       const config = await agent.getConfig();
+
 
       this.agents.push({
         info: {
@@ -264,6 +266,7 @@ export class AgentManager {
         },
         agent,
       });
+      console.log(`registered '${ClassType.name}'`,this.agents)
     } catch (err) {
       console.error(`register '${ClassType.name}' agent fail, ${err.message}`);
     }

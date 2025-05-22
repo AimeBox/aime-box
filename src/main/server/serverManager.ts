@@ -112,7 +112,7 @@ class ServerManager {
         return {
           name: x.name,
           description: x.description,
-          inputSchema: x.schema,
+          inputSchema:  x.schema,
         };
       });
       return {
