@@ -229,6 +229,7 @@
     "motion": "^12.11.3",
     "postcss": "^8.5.1",
     "postcss-loader": "^8.1.1",
+    "pptxgenjs": "^4.0.0",
     "prettier": "^3.0.3",
     "raw-loader": "^4.0.2",
     "react-dropzone": "^14.3.8",
