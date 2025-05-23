@@ -8,8 +8,11 @@ export type BaseAction = {
 
 const DoneAction: BaseAction = {
   name: 'done',
-  description: '任务完成',
-  schema: z.object({}),
+  description:
+    'Call this tool when you are done with the task, and supply your answer or summary.',
+  schema: z.object({
+    question: z.string(),
+  }),
 };
 
 const PlanAction: BaseAction = {

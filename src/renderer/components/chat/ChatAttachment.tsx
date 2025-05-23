@@ -113,6 +113,7 @@ export default function ChatAttachment({
                 <Button
                   type="text"
                   className="w-full"
+                  style={{ justifyContent: 'flex-start' }}
                   icon={<FaTrashAlt />}
                   onClick={() => onDelete()}
                 >

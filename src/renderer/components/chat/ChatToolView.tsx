@@ -15,6 +15,7 @@ import { t } from 'i18next';
 import CodeSandboxView from './tool-views/CodeSandboxView';
 import FileView from './tool-views/FileView';
 import WebSearchView from './tool-views/WebSearchView';
+import CodeView from './tool-views/CodeView';
 
 export interface ChatToolViewProps {
   open: boolean;
@@ -38,6 +39,8 @@ export default function ChatToolView(props: ChatToolViewProps) {
         return <FileView toolCall={toolCall} />;
       case 'web_search':
         return <WebSearchView toolCall={toolCall} content={value?.content} />;
+      case 'python_interpreter':
+        return <CodeView toolCall={toolCall} content={value?.content} />;
       default:
         return (
           <>

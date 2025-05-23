@@ -12,7 +12,6 @@ import path, { resolve } from 'path';
 import { app } from 'electron';
 import fs from 'fs';
 
-// import sherpa_onnx from 'sherpa-onnx-node';
 import Speaker from 'speaker';
 import { getModelsPath, getTmpPath } from '../utils/path';
 import { v4 as uuidv4 } from 'uuid';

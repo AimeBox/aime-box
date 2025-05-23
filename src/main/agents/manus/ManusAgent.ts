@@ -208,9 +208,9 @@ export class ManusAgent extends BaseAgent {
           `Your new ultimate task is: "${state.task}" . Take the previous context into account and finish your new ultimate task. `,
         );
       } else {
-        await this.messageManager?.addTaskMessage(
-          `Currently, you do not have any ultimate task.`,
-        );
+        // await this.messageManager?.addTaskMessage(
+        //   `Currently, you do not have any ultimate task.`,
+        // );
       }
       await this.messageManager?.addMessage(
         new HumanMessage('Example Output:'),
@@ -579,11 +579,16 @@ export class ManusAgent extends BaseAgent {
           'agent',
         ]);
 
-        inputMessages.splice(
-          inputMessages.length - 1,
-          0,
-          new HumanMessage(`[Here is todo start]\n${todo}\n[Here is todo end]`),
-        );
+        if (todo) {
+          inputMessages.splice(
+            inputMessages.length - 1,
+            0,
+            new HumanMessage(
+              `[Here is todo start]\n${todo}\n[Here is todo end]`,
+            ),
+          );
+        }
+
         // if (that.memoryManager?.get().length > 0) {
         //   inputMessages.splice(
         //     inputMessages.length - 1,
@@ -625,6 +630,10 @@ export class ManusAgent extends BaseAgent {
                 'agent',
                 handoffAgent,
               );
+              message.additional_kwargs.history = [
+                ...inputMessages,
+                ...result_messages,
+              ].map((x) => x.toJSON());
               await sendMessage(message);
               console.log(
                 `🪙 花费: ${message.usage_metadata?.total_tokens} 输入: ${message.usage_metadata?.input_tokens} 输出: ${message.usage_metadata?.output_tokens}`,
@@ -667,11 +676,11 @@ export class ManusAgent extends BaseAgent {
               messages: that.messageManager.getMessages(),
               history: that.messageManager.history,
             },
-            goto: 'plan',
+            goto: todo ? 'plan' : 'manus',
           });
         } else {
           const lastResultMessage: AIMessage = new AIMessage({
-            content: `@${that.name} task completed!\nTask Summary: \n${structuredResponse.summary}`,
+            content: `@${that.name} task completed!\nTask Summary: \n${structuredResponse.summary}\n\n${structuredResponse?.attachments?.map((x) => `<file>${x}</file>`).join('\n') || ''}`,
             name: handoffAgent,
             usage_metadata:
               result_messages[result_messages.length - 1].usage_metadata,
@@ -694,7 +703,7 @@ export class ManusAgent extends BaseAgent {
               history: that.messageManager.history,
               memory: that.memoryManager.get(),
             },
-            goto: 'plan',
+            goto: todo ? 'plan' : 'manus',
           });
         }
       };
@@ -816,6 +825,7 @@ export class ManusAgent extends BaseAgent {
         state?.actionName != 'human_feedback'
       ) {
         inputMessages.push(lastMessage);
+        await this.messageManager?.addMessage(lastMessage, undefined, 'user');
       }
 
       if (task) {
@@ -891,6 +901,9 @@ action: {
           const askMessage = new AIMessage(`${action.human_feedback.question}`);
           askMessage.name = this.name;
           askMessage.additional_kwargs.model = 'human_feedback';
+          askMessage.additional_kwargs.history = [...inputMessages].map((x) =>
+            x.toJSON(),
+          );
           await sendMessage(askMessage);
           await this.messageManager?.addMessage(askMessage);
         } else if (actionName == 'locked_task') {

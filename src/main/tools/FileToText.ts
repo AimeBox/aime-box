@@ -24,7 +24,7 @@ export interface FileToTextParameters extends ToolParams {}
 export class FileToText extends BaseTool {
   name: string = 'file_to_text';
 
-  description: string = 'file convert to text';
+  description: string = 'file convert to text (pdf, docx, doc, pptx, txt, md)';
 
   constructor(params?: FileToTextParameters) {
     super(params);
@@ -42,6 +42,9 @@ export class FileToText extends BaseTool {
     try {
       if (!isString(input.filePath)) {
         return 'input value is not filePath';
+      }
+      if (!fs.existsSync(input.filePath)) {
+        return 'file not found';
       }
       const ext = path.extname(input.filePath).toLowerCase();
       if (ext.toLowerCase() == '.pdf') {
@@ -64,6 +67,11 @@ export class FileToText extends BaseTool {
         const loader = new PPTXLoader(input.filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
+      } else if (ext.toLowerCase() == '.md' || ext.toLowerCase() == '.txt') {
+        const content = fs.readFileSync(input.filePath, 'utf-8');
+        return content;
+      } else {
+        throw new Error(`Unsupported file type: ${ext}`);
       }
     } catch (err) {
       return JSON.stringify(err);

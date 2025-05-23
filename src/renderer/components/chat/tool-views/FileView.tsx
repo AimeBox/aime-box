@@ -8,6 +8,7 @@ import {
 import { Button } from 'antd';
 import { useMemo } from 'react';
 import { FaDownload } from 'react-icons/fa';
+import { Markdown } from '../../common/Markdown';
 
 export interface FileViewProps {
   className?: string;
@@ -29,12 +30,12 @@ export default function FileView(props: FileViewProps) {
   }, [toolCall.args.data, extension]);
 
   return (
-    <div>
-      <Button type="link" icon={<FaDownload />}>
+    <div className="flex flex-col gap-2 items-start">
+      <a href={toolCall.args.path} target="_blank" rel="noreferrer">
         {toolCall.args.path}
-      </Button>
+      </a>
       {extension == 'html' && (
-        <div className="h-full ">
+        <div className="h-full w-full">
           <iframe
             srcDoc={content}
             className="w-full h-[600px]"
@@ -53,7 +54,8 @@ export default function FileView(props: FileViewProps) {
           </SandpackProvider>  */}
         </div>
       )}
-      {extension != 'html' && toolCall.args.data}
+      {extension == 'md' && <Markdown value={content} />}
+      {!extension && toolCall.args.data}
       {/* <pre className="text-xs break-all whitespace-pre-wrap mt-2 bg-gray-100 p-2 rounded-md"></pre> */}
     </div>
   );

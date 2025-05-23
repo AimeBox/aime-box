@@ -56,6 +56,7 @@ export function Markdown(props: MarkdownProps) {
     let match: RegExpExecArray | null;
 
     // 提取所有 <file>xxx</file> 内容
+
     while ((match = fileRegex.exec(input)) !== null) {
       const attachment = parseMarkdownFileLink(match[1], 'file');
       if (attachment) {
@@ -82,6 +83,7 @@ export function Markdown(props: MarkdownProps) {
     type: 'file' | 'folder',
   ): ChatInputAttachment | undefined {
     const name = md.split(/[/\\]/).pop();
+
     const path = md;
     const ext = `.${name.split('.').pop()}`;
     return {
