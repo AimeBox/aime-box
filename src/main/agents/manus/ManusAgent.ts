@@ -406,7 +406,7 @@ export class ManusAgent extends BaseAgent {
 
     const humanNode = async (state: typeof StateAnnotation.State) => {
       const value = interrupt({
-        text_to_revise: state.action.human_feedback.question,
+        text_to_revise: state.action.human_feedback.question || state.current_state.reply,
       });
       const humanMessage = value;
       await that.messageManager?.addMessage(humanMessage);
@@ -723,6 +723,7 @@ export class ManusAgent extends BaseAgent {
       });
 
       if (!res.parsed) {
+        await that.messageManager.addMessage(res.raw, undefined, 'action', that.name, false);
         if (res.raw.text) {
           const content = removeThinkTags(res.raw.text);
           const parser = new JsonOutputParser<typeof agentOutput>();
@@ -841,7 +842,7 @@ export class ManusAgent extends BaseAgent {
         if (failTimes < this.maxFailTimes) {
           await that.messageManager?.addMessage(
             new HumanMessage(
-              `🚨 Action error: ${err.message}\nYou must output json format like this:\n
+              `🚨 Action error: ${err.message}\nYou must response json format like this:\n
 {
  current_state: {
   thought: '',

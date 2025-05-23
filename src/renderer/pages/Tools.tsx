@@ -367,6 +367,9 @@ export default function Tools() {
           } as FormSchema);
         }
       }
+      else if(!tool.schema.properties[x].type && tool.schema.properties[x].anyOf){
+
+      }
 
       // c.properties[x] = {
       //   type: tool.schema[x].type,

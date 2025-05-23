@@ -77,7 +77,7 @@ const fieldZod = z
           'field name to display,be consistent with user input language',
         ),
       field: z.string().describe('field name must english lower case'),
-      description: z.string().optional().describe('field description'),
+      description: z.string().optional().nullable().describe('field description'),
       type: z
         .enum([
           'string',
@@ -94,7 +94,7 @@ const fieldZod = z
         .describe('field type'),
       enumValues: z
         .array(z.string())
-        .optional()
+        .optional().nullable()
         .describe('field type is enum value'),
     }),
   )
@@ -108,7 +108,7 @@ export class ExtractTool extends BaseTool {
     fields: fieldZod,
     savePath: z
       .string()
-      .optional()
+      .optional().nullable()
       .describe('File Save Path(.xlsx), Empty if not mentioned by the user'),
   });
 
@@ -235,10 +235,7 @@ export class ExtractTool extends BaseTool {
     const allDocInLLM = this.allDocInLLM ?? false;
     const checkExtractResult = false;
     const splits = await this.textSplitter.splitDocuments(doc);
-    const vectorStore = await MemoryVectorStore.fromDocuments(
-      splits,
-      this.embedding,
-    );
+    
     const extractFieldsResult = {};
     for (const field of fields) {
       extractFieldsResult[field.field] = undefined;
@@ -250,6 +247,10 @@ export class ExtractTool extends BaseTool {
         const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
         return ex;
       } else {
+        const vectorStore = await MemoryVectorStore.fromDocuments(
+        splits,
+        this.embedding,
+      );
         let pageContent = [];
         if (splits.length == 1) {
           pageContent = [splits[0].pageContent];
@@ -267,6 +268,10 @@ export class ExtractTool extends BaseTool {
         return ex;
       }
     } else {
+      const vectorStore = await MemoryVectorStore.fromDocuments(
+        splits,
+        this.embedding,
+      );
       let canStructured = true;
 
       for (let index = 0; index < fields.length; index++) {
@@ -407,7 +412,10 @@ export class ExtractTool extends BaseTool {
       chunkSize: 1000,
       chunkOverlap: 200,
     });
-    this.embedding = await getDefaultEmbeddingModel();
+    if(!this.embedding){
+      this.embedding = await getDefaultEmbeddingModel();
+    }
+    
     const { pathOrUrl, fields } = input;
     let type: 'url' | 'file' | 'directory';
     if (isUrl(pathOrUrl)) {
@@ -648,6 +656,14 @@ export class ExtractAgent extends BaseAgent {
       },
     },
     {
+      label: t('embedding'),
+      field: 'embedding',
+      component: 'ProviderSelect',
+      componentProps: {
+        type: 'embedding',
+      },
+    },
+    {
       label: t('一次性全字段提取'),
       field: 'allFieldInLLM',
       component: 'Switch',
@@ -727,7 +743,13 @@ export class ExtractAgent extends BaseAgent {
     const extractModel = await getChatModel(extractProvider, extractModelName, {
       temperature: 0,
     });
-    this.embedding = await getDefaultEmbeddingModel();
+    if(config.embedding){
+      const { provider :embeddingProvider, modelName: embeddingModelName } = getProviderModel(config.embedding);
+      this.embedding = await getEmbeddingModel(embeddingProvider, embeddingModelName)
+    }else{
+      this.embedding = await getDefaultEmbeddingModel();
+    }
+    
     async function callCheck(state: typeof MessagesAnnotation.State) {
       const promptTemplate = ChatPromptTemplate.fromMessages([
         ['system', that.systemPrompt],

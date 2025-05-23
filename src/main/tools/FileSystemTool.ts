@@ -5,6 +5,11 @@ import fs from 'fs';
 import path from 'path';
 import tree from 'tree-node-cli';
 import { BaseTool } from './BaseTool';
+import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
+import { TextLoader } from 'langchain/document_loaders/fs/text';
+import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
+import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
+import { ImageLoader } from '../loaders/ImageLoader';
 
 export interface FileWriteParameters extends ToolParams {}
 export interface FileReadParameters extends ToolParams {}
@@ -154,8 +159,9 @@ export class SearchFiles extends BaseTool {
   schema = z.object({
     path: z.string(),
     pattern: z.string(),
-    recursive: z
-      .optional(z.boolean())
+    content:z.string().optional().describe('搜索的文字内容, 空格分割关键字'),
+    recursive: z.boolean()
+      .optional()
       .default(true)
       .describe('是否递归搜索子目录'),
   });
@@ -211,6 +217,76 @@ export class SearchFiles extends BaseTool {
 
     if (results.length === 0) {
       return '未找到匹配的文件';
+    }
+
+    if(input.content){
+      // 搜索关键字
+      const list = [];
+      for (let index = 0; index < results.length; index++) {
+        const filePath = results[index];
+        let content = ''
+        const ext = path.extname(filePath).toLowerCase();
+        if (ext.toLowerCase() == '.pdf') {
+          const loader = new PDFLoader(filePath);
+          const docs = await loader.load();
+          content = docs.map((x) => x.pageContent).join('\n\n');
+        } else if (ext.toLowerCase() == '.txt') {
+          const loader = new TextLoader(filePath);
+          const docs = await loader.load();
+          content = docs.map((x) => x.pageContent).join('\n\n');
+        } else if (ext.toLowerCase() == '.docx') {
+          const loader = new DocxLoader(filePath, { type: 'docx' });
+          const docs = await loader.load();
+          content = docs.map((x) => x.pageContent).join('\n\n');
+        } else if (ext.toLowerCase() == '.doc') {
+          const loader = new DocxLoader(filePath, { type: 'doc' });
+          const docs = await loader.load();
+          content = docs.map((x) => x.pageContent).join('\n\n');
+        } else if (ext.toLowerCase() == '.pptx') {
+          const loader = new PPTXLoader(filePath);
+          const docs = await loader.load();
+          content = docs.map((x) => x.pageContent).join('\n\n');
+        }  else if (
+          ext.toLowerCase() == '.jpg' ||
+          ext.toLowerCase() == '.png'||
+          ext.toLowerCase() == '.bmp'||
+          ext.toLowerCase() == '.jpeg' ||
+          ext.toLowerCase() == '.webp'
+          ) {
+          const loader = new ImageLoader(filePath);
+          const docs = await loader.load();
+          content = docs.map((x) => x.pageContent).join('\n\n');
+        } else{
+          continue;
+        }
+
+
+        const keywords = [...new Set(input.content.split(' '))];
+        for(const keyword of keywords){
+          let startIndex = content.indexOf(keyword);
+          if(startIndex >= 0){
+            startIndex = startIndex - 100;
+            if(startIndex < 0) startIndex = 0;
+            let endIndex = content.indexOf(keyword) + keyword.length + 100;
+            if(endIndex> content.length)endIndex = content.length;
+
+            const item = list.find(x=>x.path == filePath);
+            const match = (startIndex > 0 ? '...':'') + content.substring(startIndex, endIndex) + ( endIndex < content.length  ? '...':'')
+            if(item){
+
+              item.match.push(match);
+            }else{
+              list.push({
+                path: filePath,
+                match: [match]
+              });
+            }
+            
+          }
+        }
+      }
+      return JSON.stringify(list);
+      
     }
 
     return results.join('\n');
