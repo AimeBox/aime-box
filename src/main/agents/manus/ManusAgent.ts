@@ -339,15 +339,18 @@ export class ManusAgent extends BaseAgent {
     const tools: BaseTool[] = [];
 
     const commonTools = await toolsManager.buildTools([
-      'terminal',
-      'python_interpreter',
-      'file_to_text',
-      'move_file',
-      'read_file',
-      'write_file',
-      'create_directory',
-      'search_files',
-      'list_directory',
+      ...new Set([
+        'terminal',
+        'python_interpreter',
+        'file_to_text',
+        'move_file',
+        'read_file',
+        'write_file',
+        'create_directory',
+        'search_files',
+        'list_directory',
+        ...(chatOptions?.toolNames || []),
+      ]),
     ]);
 
     tools.push(...commonTools);
@@ -406,7 +409,8 @@ export class ManusAgent extends BaseAgent {
 
     const humanNode = async (state: typeof StateAnnotation.State) => {
       const value = interrupt({
-        text_to_revise: state.action.human_feedback.question || state.current_state.reply,
+        text_to_revise:
+          state.action.human_feedback.question || state.current_state.reply,
       });
       const humanMessage = value;
       await that.messageManager?.addMessage(humanMessage);
@@ -482,6 +486,45 @@ export class ManusAgent extends BaseAgent {
               return tool_message;
             }),
           );
+          return new Command({
+            update: {
+              messages: this.messageManager.getMessages(),
+              history: this.messageManager.history,
+            },
+            goto: 'manus',
+          });
+        } else if (isToolMessage(lastMessage)) {
+          const tool_message = new ToolMessage('', lastMessage.tool_call_id);
+          tool_message.id = uuidv4();
+          tool_message.additional_kwargs = {};
+          tool_message.additional_kwargs['model'] = state.actionName;
+          await messageEvent.created([tool_message]);
+          const tool = tools.find((x) => x.name == state.actionName);
+          if (tool) {
+            try {
+              const res = await tool?.invoke(state.action[state.actionName]);
+              tool_message.content = res;
+              tool_message.status = ChatStatus.SUCCESS;
+            } catch (err) {
+              tool_message.content = err.message;
+              tool_message.status = ChatStatus.ERROR;
+            }
+            this.messageManager.removeLastMessage();
+            await this.messageManager.addToolMessage(
+              new ToolMessage(
+                tool_message.content.toString(),
+                lastMessage.tool_call_id,
+              ),
+
+              'tool',
+            );
+            await messageEvent.finished([tool_message]);
+          } else {
+            tool_message.content = `${state.actionName} tool not find`;
+            tool_message.status = ChatStatus.ERROR;
+            await messageEvent.finished([tool_message]);
+            throw new Error(`${state.actionName} tool not find`);
+          }
           return new Command({
             update: {
               messages: this.messageManager.getMessages(),
@@ -732,7 +775,33 @@ export class ManusAgent extends BaseAgent {
       });
 
       if (!res.parsed) {
-        await that.messageManager.addMessage(res.raw, undefined, 'action', that.name, false);
+        await that.messageManager.addMessage(
+          res.raw,
+          undefined,
+          'action',
+          that.name,
+        );
+        await that.messageManager?.addToolMessage(
+          new ToolMessage(
+            `🚨 Action output error: \nYou must response json format like this:\n
+{
+ current_state: {
+  thought: '',
+  evaluation_previous_goal: '',
+  memory: '',
+  next_goal: '',
+  reply: '',
+},
+action: {
+  human_feedback: {
+    question: '',
+  },
+}`,
+            (res.raw as AIMessage).tool_calls[0].id,
+            that.name,
+          ),
+          'action',
+        );
         if (res.raw.text) {
           const content = removeThinkTags(res.raw.text);
           const parser = new JsonOutputParser<typeof agentOutput>();
@@ -850,27 +919,6 @@ export class ManusAgent extends BaseAgent {
           `🚨 失败[${failTimes} / ${this.maxFailTimes}]: ${err.message}`,
         );
         if (failTimes < this.maxFailTimes) {
-          await that.messageManager?.addMessage(
-            new HumanMessage(
-              `🚨 Action error: ${err.message}\nYou must response json format like this:\n
-{
- current_state: {
-  thought: '',
-  evaluation_previous_goal: '',
-  memory: '',
-  next_goal: '',
-  reply: '',
-},
-action: {
-  human_feedback: {
-    question: '',
-  },
-}`,
-            ),
-            undefined,
-            'action',
-          );
-
           failTimes += 1;
 
           return new Command({

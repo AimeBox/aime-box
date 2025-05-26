@@ -40,6 +40,10 @@ interface XHSNoteItem {
   id: string;
   model_type: string;
   note_card: {
+    corner_tag_info?: {
+      type?: string;
+      text?: string;
+    }[];
     user: {
       avatar: string;
       user_id: string;
@@ -47,8 +51,11 @@ interface XHSNoteItem {
       nick_name: string;
     };
     interact_info: {
-      liked: boolean;
-      liked_count: string;
+      collected_count?: string;
+      comment_count?: string;
+      liked?: boolean;
+      liked_count?: string;
+      shared_count?: string;
     };
     cover: {
       height: number;
@@ -65,7 +72,7 @@ interface XHSNoteItem {
       }>;
     }>;
     type: string;
-    display_title: string;
+    display_title?: string;
   };
   xsec_token: string;
 }
@@ -110,21 +117,19 @@ export class SocialMediaSearch extends BaseTool {
   }
 
   async getBrowserContext(): Promise<BrowserContext> {
-    // const browser_context = await chromium.launchPersistentContext(
-    //   this.userDataDir,
-    //   {
-    //     channel: 'msedge',
-    //     headless: false,
-    //     devtools: true,
-    //     proxy: this.httpProxy
-    //       ? {
-    //           server: `${this.httpProxy}`,
-    //         }
-    //       : undefined,
-    //     args: ['--disable-blink-features=AutomationControlled'],
-    //   },
-    // ); // Or 'firefox' or 'webkit'.
-
+    const browser_context = await chromium.launchPersistentContext(
+      this.userDataDir,
+      {
+        channel: 'msedge',
+        headless: false,
+        devtools: true,
+        proxy: {
+          server: this.httpProxy,
+        },
+        args: ['--disable-blink-features=AutomationControlled'],
+      },
+    ); // Or 'firefox' or 'webkit'.
+    return browser_context;
     // chromium.launchPersistentContext()
     const msbrowser = await chromium.connectOverCDP('http://localhost:9222');
     const defaultContext = msbrowser.contexts()[0];
@@ -163,7 +168,8 @@ export class SocialMediaSearch extends BaseTool {
           await this.xhs_try_login();
         }
         const browser_context = await this.getBrowserContext();
-        await this.xhs_search(browser_context, input.keyword);
+        const res = await this.xhs_search(browser_context, input.keyword);
+        return this.xhs_search_item_to_markdown(res);
       }
     } else if (input.platform === 'bilibili') {
       const browser_context = await chromium.launchPersistentContext(
@@ -224,6 +230,25 @@ export class SocialMediaSearch extends BaseTool {
     return text;
   }
 
+  async xhs_search_item_to_markdown(data: XHSNoteItem[]) {
+    let text = '';
+
+    for (const item of data) {
+      // text += `<note>\n`;
+
+      text += `### Url: \nhttps://www.xiaohongshu.com/explore/${item.id}?xsec_token=${item.xsec_token}\n`;
+      // text += `### Author: \n${item.note_card.user.nickname}\n`;
+      text += item?.note_card?.display_title
+        ? `### Title:\n${item.note_card.display_title}\n`
+        : '';
+      text += `### Image\n![](${item.note_card.cover.url_pre})\n`;
+      text += `### Interact: ${item.note_card.interact_info.liked_count} likes, ${item.note_card.interact_info.comment_count} comments,${item.note_card.interact_info.collected_count} collected, ${item.note_card.interact_info.shared_count} shares\n`;
+      text += `\n\n---\n`;
+    }
+
+    return text;
+  }
+
   async xhs_check_login() {
     // const browser_context = await chromium.launchPersistentContext(
     //   this.userDataDir,
@@ -271,7 +296,10 @@ export class SocialMediaSearch extends BaseTool {
     await browser_context.close();
   }
 
-  async xhs_search(browser_context: BrowserContext, keyword: string) {
+  async xhs_search(
+    browser_context: BrowserContext,
+    keyword: string,
+  ): Promise<XHSNoteItem[]> {
     const page = await browser_context.newPage();
     await page.goto('https://www.xiaohongshu.com/explore');
 
@@ -279,8 +307,8 @@ export class SocialMediaSearch extends BaseTool {
     await search_input.focus();
     await search_input.fill(keyword);
     await page.keyboard.press('Enter');
-    const notes_list = [];
-    const calwer = async () => {
+    const notes_list: XHSNoteItem[] = [];
+    const calwer = async (): Promise<XHSNoteItem[]> => {
       return new Promise((resovle, reject) => {
         page.on('response', async (response: Response) => {
           const url = new URL(response.url());
@@ -293,7 +321,7 @@ export class SocialMediaSearch extends BaseTool {
             const headers = response.headers();
             if (headers['content-type'].includes('/json')) {
               const data = await response.json();
-
+              console.log(data);
               if (data.success && data.data && data.data.items) {
                 for (let index = 0; index < data.data.items.length; index++) {
                   const item: XHSNoteItem = data.data.items[index];
@@ -308,10 +336,16 @@ export class SocialMediaSearch extends BaseTool {
         });
       });
     };
-    const list = await calwer();
-    console.log(list);
-    await browser_context.close();
-    return '';
+    try {
+      const list = await calwer();
+      console.log(list);
+      await browser_context.close();
+      return list;
+    } catch (err) {
+      console.log(err);
+      await browser_context.close();
+      return [];
+    }
   }
 
   async xhs_post_detail(browser_context: BrowserContext, url: string) {

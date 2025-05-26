@@ -471,7 +471,9 @@ export class ChatManager {
             video_path: attachment.path,
           });
         } else if (attachment.type == 'file' || attachment.type == 'folder') {
-          res.content.push(attachment);
+          res.content.find((x) => x.type == 'text')!.text +=
+            `\n\n<${attachment.type}>${attachment.path}</${attachment.type}>`;
+          // res.content.push(attachment);
         }
       }
     }

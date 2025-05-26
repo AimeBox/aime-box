@@ -463,8 +463,8 @@ export class ProvidersManager {
     });
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
-      try{
-          if (connection?.type === ProviderType.OLLAMA) {
+      try {
+        if (connection?.type === ProviderType.OLLAMA) {
           try {
             const localOllama = new Ollama();
             const list = await localOllama.list();
@@ -573,10 +573,9 @@ export class ProvidersManager {
             });
           } catch {}
         }
-      }catch{
+      } catch {
         continue;
       }
-      
     }
     return emb_list;
   };
@@ -593,7 +592,7 @@ export class ProvidersManager {
     });
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
-      try{
+      try {
         if (connection?.type === ProviderType.SILICONFLOW) {
           const options = {
             method: 'GET',
@@ -612,10 +611,9 @@ export class ProvidersManager {
             models: models.data?.map((x) => x.id)?.sort() ?? [],
           });
         }
-      }catch{
+      } catch {
         continue;
       }
-      
     }
     return emb_list;
   };
@@ -633,7 +631,7 @@ export class ProvidersManager {
     });
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
-      try{
+      try {
         if (connection?.type === ProviderType.SILICONFLOW) {
           const options = {
             method: 'GET',
@@ -652,12 +650,9 @@ export class ProvidersManager {
             models: models.data?.map((x) => x.id)?.sort() ?? [],
           });
         }
-
-      }catch{
+      } catch {
         continue;
       }
-
-      x
     }
     return emb_list;
   };
@@ -684,18 +679,16 @@ export class ProvidersManager {
 
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
-      try{
-
+      try {
         if (connection.type == ProviderType.OPENAI) {
           emb_list.push({
             name: connection.name,
             models: ['whisper-1'],
           });
         }
-      }catch{
+      } catch {
         continue;
       }
-      
     }
     return emb_list;
   };

@@ -201,6 +201,8 @@ export class PythonInterpreterTool extends BaseTool {
         console.log(`"${this.pythonPath}" "${pythonScriptFilePath}"`);
         const res = await runCommand(
           `"${this.pythonPath}" "${pythonScriptFilePath}"`,
+          undefined,
+          tempDir,
         );
         if (res.toString().trim() == '') {
           return 'you should use print() in script!';

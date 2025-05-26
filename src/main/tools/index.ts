@@ -132,6 +132,8 @@ export class ToolsManager {
 
         await this.toolRepository.save(ts);
       } else {
+        ts.description = tool.description;
+        await this.toolRepository.save(ts);
         const vj = ts.config ?? {};
         if (params) {
           Object.keys(params).forEach((key) => {

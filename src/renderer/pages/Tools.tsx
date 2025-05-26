@@ -317,6 +317,7 @@ export default function Tools() {
               label: x,
               required: required.includes(x),
               subLabel: tool.schema.properties[x].description,
+              defaultValue: tool.schema.properties[x].default,
               component: 'InputTextArea',
             } as FormSchema);
           }
@@ -366,9 +367,10 @@ export default function Tools() {
             component: 'JsonEditor',
           } as FormSchema);
         }
-      }
-      else if(!tool.schema.properties[x].type && tool.schema.properties[x].anyOf){
-
+      } else if (
+        !tool.schema.properties[x].type &&
+        tool.schema.properties[x].anyOf
+      ) {
       }
 
       // c.properties[x] = {

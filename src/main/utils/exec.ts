@@ -15,6 +15,7 @@ export const runCommandSync = (command: string) => {
 export const runCommand = async (
   command: string,
   file?: string,
+  cwd?: string,
 ): Promise<string> => {
   let _file = file;
   if (!_file) {
@@ -63,6 +64,7 @@ export const runCommand = async (
       {
         encoding: 'buffer',
         windowsHide: false,
+        cwd: cwd,
       },
       (error, stdout, stderr) => {
         const res_out = iconv.decode(

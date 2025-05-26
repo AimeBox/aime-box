@@ -87,7 +87,8 @@ export class ListDirectory extends BaseTool {
   schema = z.object({
     path: z.string().describe('local dir path'),
     recursive: z
-      .optional(z.boolean())
+      .boolean()
+      .optional()
       .default(false)
       .describe('local file path'),
   });
@@ -108,7 +109,15 @@ export class ListDirectory extends BaseTool {
     runManager,
     config,
   ): Promise<string[] | string> {
-    const treeOutput = tree(input.path, {
+    const { workspace } = config.configurable;
+    let filePath = input.path;
+    if (workspace) {
+      filePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(workspace, filePath);
+    }
+
+    const treeOutput = tree(filePath, {
       maxDepth: input.recursive ? Number.POSITIVE_INFINITY : 1,
     });
     return treeOutput;
@@ -139,7 +148,9 @@ export class CreateDirectory extends BaseTool {
     const { workspace } = config.configurable;
     let filePaths = input.paths;
     if (workspace) {
-      filePaths = input.paths.map((x) => path.join(workspace, x));
+      filePaths = input.paths.map((x) =>
+        path.isAbsolute(x) ? x : path.join(workspace, x),
+      );
     }
 
     if (filePaths && filePaths.length > 0) {
@@ -157,19 +168,21 @@ export class SearchFiles extends BaseTool {
   toolKitName?: string = 'file-system';
 
   schema = z.object({
-    path: z.string(),
-    pattern: z.string(),
-    content:z.string().optional().describe('搜索的文字内容, 空格分割关键字'),
-    recursive: z.boolean()
+    path: z.string().describe('folder path'),
+    pattern: z.string().default('*.*'),
+    content: z
+      .string()
       .optional()
-      .default(true)
-      .describe('是否递归搜索子目录'),
+      .describe(
+        'Search file contents by keyword (separated by spaces), supporting pdf, txt, docx, doc, pptx, jpg, png, bmp, jpeg, webp formats.',
+      ),
+    recursive: z.boolean().optional().default(true),
   });
 
   name: string = 'search_files';
 
   description: string =
-    'Finds files by name using a case-insensitive matching. Supports wildcard patterns like *.md and ? for single character matching. Searches through all subdirectories from the starting path when recursive is true (default). Has a default timeout of 30 seconds which can be customized using the timeoutMs parameter. Only searches within allowed directories.';
+    'Finds files by name using a case-insensitive matching. Supports wildcard patterns like *.md and ? for single character matching. Searches through all subdirectories from the starting path when recursive is true (default). ';
 
   constructor(params?: FileWriteParameters) {
     super(params);
@@ -219,77 +232,81 @@ export class SearchFiles extends BaseTool {
       return '未找到匹配的文件';
     }
 
-    if(input.content){
+    if (input.content) {
       // 搜索关键字
       const list = [];
       for (let index = 0; index < results.length; index++) {
         const filePath = results[index];
-        let content = ''
+        let content = '';
         const ext = path.extname(filePath).toLowerCase();
-        if (ext.toLowerCase() == '.pdf') {
-          const loader = new PDFLoader(filePath);
-          const docs = await loader.load();
-          content = docs.map((x) => x.pageContent).join('\n\n');
-        } else if (ext.toLowerCase() == '.txt') {
-          const loader = new TextLoader(filePath);
-          const docs = await loader.load();
-          content = docs.map((x) => x.pageContent).join('\n\n');
-        } else if (ext.toLowerCase() == '.docx') {
-          const loader = new DocxLoader(filePath, { type: 'docx' });
-          const docs = await loader.load();
-          content = docs.map((x) => x.pageContent).join('\n\n');
-        } else if (ext.toLowerCase() == '.doc') {
-          const loader = new DocxLoader(filePath, { type: 'doc' });
-          const docs = await loader.load();
-          content = docs.map((x) => x.pageContent).join('\n\n');
-        } else if (ext.toLowerCase() == '.pptx') {
-          const loader = new PPTXLoader(filePath);
-          const docs = await loader.load();
-          content = docs.map((x) => x.pageContent).join('\n\n');
-        }  else if (
-          ext.toLowerCase() == '.jpg' ||
-          ext.toLowerCase() == '.png'||
-          ext.toLowerCase() == '.bmp'||
-          ext.toLowerCase() == '.jpeg' ||
-          ext.toLowerCase() == '.webp'
+        try {
+          if (ext.toLowerCase() == '.pdf') {
+            const loader = new PDFLoader(filePath);
+            const docs = await loader.load();
+            content = docs.map((x) => x.pageContent).join('\n\n');
+          } else if (ext.toLowerCase() == '.txt') {
+            const loader = new TextLoader(filePath);
+            const docs = await loader.load();
+            content = docs.map((x) => x.pageContent).join('\n\n');
+          } else if (ext.toLowerCase() == '.docx') {
+            const loader = new DocxLoader(filePath, { type: 'docx' });
+            const docs = await loader.load();
+            content = docs.map((x) => x.pageContent).join('\n\n');
+          } else if (ext.toLowerCase() == '.doc') {
+            const loader = new DocxLoader(filePath, { type: 'doc' });
+            const docs = await loader.load();
+            content = docs.map((x) => x.pageContent).join('\n\n');
+          } else if (ext.toLowerCase() == '.pptx') {
+            const loader = new PPTXLoader(filePath);
+            const docs = await loader.load();
+            content = docs.map((x) => x.pageContent).join('\n\n');
+          } else if (
+            ext.toLowerCase() == '.jpg' ||
+            ext.toLowerCase() == '.png' ||
+            ext.toLowerCase() == '.bmp' ||
+            ext.toLowerCase() == '.jpeg' ||
+            ext.toLowerCase() == '.webp'
           ) {
-          const loader = new ImageLoader(filePath);
-          const docs = await loader.load();
-          content = docs.map((x) => x.pageContent).join('\n\n');
-        } else{
+            const loader = new ImageLoader(filePath);
+            const docs = await loader.load();
+            content = docs.map((x) => x.pageContent).join('\n\n');
+          } else {
+            continue;
+          }
+        } catch (err) {
+          console.error(err);
           continue;
         }
 
-
         const keywords = [...new Set(input.content.split(' '))];
-        for(const keyword of keywords){
+        for (const keyword of keywords) {
           let startIndex = content.indexOf(keyword);
-          if(startIndex >= 0){
-            startIndex = startIndex - 100;
-            if(startIndex < 0) startIndex = 0;
+          if (startIndex >= 0) {
+            startIndex -= 100;
+            if (startIndex < 0) startIndex = 0;
             let endIndex = content.indexOf(keyword) + keyword.length + 100;
-            if(endIndex> content.length)endIndex = content.length;
+            if (endIndex > content.length) endIndex = content.length;
 
-            const item = list.find(x=>x.path == filePath);
-            const match = (startIndex > 0 ? '...':'') + content.substring(startIndex, endIndex) + ( endIndex < content.length  ? '...':'')
-            if(item){
-
+            const item = list.find((x) => x.path == filePath);
+            const match =
+              (startIndex > 0 ? '...' : '') +
+              content.substring(startIndex, endIndex) +
+              (endIndex < content.length ? '...' : '');
+            if (item) {
               item.match.push(match);
-            }else{
+            } else {
               list.push({
                 path: filePath,
-                match: [match]
+                match: [match],
               });
             }
-            
           }
         }
       }
       return JSON.stringify(list);
-      
     }
 
-    return results.join('\n');
+    return JSON.stringify(results);
   }
 }
 

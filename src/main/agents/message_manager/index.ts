@@ -45,8 +45,13 @@ export class MessageHistory {
   }
 
   removeMessage(position: number = -1) {
-    this.totalTokens -= this.messages[position].metadata.tokens;
-    this.messages.splice(position, 1);
+    let index = position;
+    if (index < 0) {
+      index = this.messages.length + index;
+    }
+    if (this.messages[index].metadata?.tokens)
+      this.totalTokens -= this.messages[index].metadata.tokens;
+    this.messages.splice(index, 1);
   }
 
   removeAllFromTypeMessage(messageType: MessageType) {
@@ -82,6 +87,16 @@ export class MessageManager {
     task?: string;
     maxInputTokens?: number;
     history?: MessageHistory;
+    config?: {
+      messagesKeepConfig: Record<
+        MessageType,
+        {
+          maxCount?: number;
+          cutMode?: 'remove' | 'summary';
+          inMemory?: boolean;
+        }
+      >;
+    };
   }) {
     const { llm, task, maxInputTokens = 128000, history } = props;
     this.history = new MessageHistory();
@@ -172,15 +187,19 @@ export class MessageManager {
   }
 
   async addToolMessage(
-    content: string,
+    content: string | ToolMessage,
     messageType?: MessageType,
   ): Promise<void> {
-    await this.addMessage(
-      new ToolMessage(content, this.toolId.toString()),
-      undefined,
-      messageType,
-    );
-    this.toolId = (parseInt(this.toolId, 10) + 1).toString();
+    if (typeof content === 'string') {
+      await this.addMessage(
+        new ToolMessage(content, this.toolId.toString()),
+        undefined,
+        messageType,
+      );
+      this.toolId = (parseInt(this.toolId, 10) + 1).toString();
+    } else if (content instanceof ToolMessage) {
+      await this.addMessage(content, undefined, messageType);
+    }
   }
 
   lastMessage(): BaseMessage {

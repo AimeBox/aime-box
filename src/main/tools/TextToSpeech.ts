@@ -39,11 +39,7 @@ export class TextToSpeech extends BaseTool {
     },
   ];
 
-  static lc_name() {
-    return 'TextToSpeech';
-  }
-
-  name: string = 'text-to-speech';
+  name: string = 'text_to_speech';
 
   description: string = 'text to speech';
 
