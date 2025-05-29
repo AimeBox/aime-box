@@ -575,7 +575,9 @@ export default function Tools() {
                     //   navigate(`/tools?id=${item.name}`);
                     // }}
                     button={
-                      (item.parameters || item?.configSchema?.length > 0) && (
+                      ((item.parameters &&
+                        Object.keys(item.parameters).length > 0) ||
+                        item?.configSchema?.length > 0) && (
                         <Button
                           type="text"
                           icon={<FaEdit />}

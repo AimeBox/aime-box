@@ -753,6 +753,14 @@ export class ChatManager {
               chatId,
             },
           });
+        } else if (agent.type == 'anp' || agent.type == 'a2a') {
+          await this.chatRemoteAgent(agent, messages, {
+            providerModel: chat.model,
+            options: chat.options,
+            callbacks,
+            signal: controller.signal,
+            configurable: { workspace: this.getChatPath(chatId), chatId },
+          });
         }
       } else if (chat.mode == 'planner' && chat.agent) {
         const agent = await agentManager.getAgent(chat.agent);
@@ -1144,6 +1152,75 @@ export class ChatManager {
     chatPlanner.plans = state.values.plans;
     await this.chatPlannerRepository.save(chatPlanner);
     console.log(state);
+  }
+
+  public async chatRemoteAgent(
+    agent: Agent,
+    messages: BaseMessage[],
+    config: {
+      providerModel: string;
+      options?: ChatOptions | undefined;
+      callbacks?: any | undefined;
+      signal?: AbortSignal | undefined;
+      configurable?: Record<string, any> | undefined;
+    },
+  ) {
+    const handlerMessageCreated = config?.callbacks?.['handleMessageCreated'];
+    const handlerMessageUpdate = config?.callbacks?.['handleMessageUpdate'];
+    const handlerMessageFinished = config?.callbacks?.['handleMessageFinished'];
+    const handlerMessageStream = config?.callbacks?.['handleMessageStream'];
+    const handlerMessageError = config?.callbacks?.['handleMessageError'];
+
+    const { provider, modelName } = getProviderModel(
+      config?.providerModel || agent.model,
+    );
+    const providerInfo = await providersManager.getProviders();
+    const providerType = providerInfo.find((x) => x.name == provider)?.type;
+    // const tools = await toolsManager.buildTools(agent?.tools);
+
+    const model = await getChatModel(provider, modelName, config?.options);
+    const reactAgent = await agentManager.buildAgent({
+      agent,
+      store: new InMemoryStore(),
+      model: config?.providerModel,
+      messageEvent: {
+        created: async (msg) => {
+          await Promise.all(
+            msg.map(async (x) => {
+              await handlerMessageCreated?.(x);
+            }),
+          );
+        },
+        updated: async (msg) => {
+          await Promise.all(
+            msg.map(async (x) => {
+              await handlerMessageUpdate?.(x);
+            }),
+          );
+        },
+        finished: async (msg) => {
+          await Promise.all(
+            msg.map(async (x) => {
+              await handlerMessageFinished?.(x);
+            }),
+          );
+        },
+      },
+    });
+
+    await runAgent(reactAgent, messages, {
+      signal: config?.signal,
+      configurable: config?.configurable,
+      modelName,
+      providerType,
+      recursionLimit: agent.recursionLimit,
+      callbacks: {
+        handlerMessageCreated,
+        handlerMessageFinished,
+        handlerMessageStream,
+        handlerMessageError,
+      },
+    });
   }
 
   public async cancelChat(chatId: string) {

@@ -26,6 +26,7 @@ import { Markdown } from '@/renderer/components/common/Markdown';
 import {
   FaCheckCircle,
   FaPlus,
+  FaSearch,
   FaSpinner,
   FaTimes,
   FaTrashAlt,
@@ -471,6 +472,8 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
           <Input
             width={200}
             value={searchText}
+            prefix={<FaSearch></FaSearch>}
+            placeholder={t('common.search')}
             onChange={(e) => {
               setSearchText(e.target.value);
               // onChange(pagination, { filter: e.target.value }, undefined);

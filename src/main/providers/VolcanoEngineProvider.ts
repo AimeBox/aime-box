@@ -7,16 +7,18 @@ export class VolcanoEngineProvider extends BaseProvider {
 
   description: string;
 
+  defaultApiBase: string = 'https://ark.cn-beijing.volces.com/api/v3';
+
   async getModelList(
-    connection: Providers,
+    provider: Providers,
   ): Promise<{ name: string; enable: boolean }[]> {
     const httpProxy = settingsManager.getHttpAgent();
     const options = {
       method: 'GET',
       agent: httpProxy,
-      Authorization: `Bearer ${connection.api_key}`,
+      Authorization: `Bearer ${provider.api_key}`,
     };
-    const url = `${connection.api_base}/ListFoundationModels`;
+    const url = `${provider.api_base || this.defaultApiBase}/ListFoundationModels`;
     const res = await fetch(url, options);
     const data = await res.json();
     return data.models
@@ -24,10 +26,14 @@ export class VolcanoEngineProvider extends BaseProvider {
         return {
           name: x.name.split('/')[1],
           enable:
-            connection.models?.find((z) => z.name == x.name.split('/')[1])
+            provider.models?.find((z) => z.name == x.name.split('/')[1])
               ?.enable || false,
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  getEmbeddingModels(provider: Providers) {
+    return [];
   }
 }

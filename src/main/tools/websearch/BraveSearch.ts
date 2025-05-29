@@ -2,7 +2,7 @@ import { Tool, ToolParams } from '@langchain/core/tools';
 import { z } from 'zod';
 import iconv from 'iconv-lite';
 import { BraveSearch } from '@langchain/community/tools/brave_search';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 import { getEnvironmentVariable } from '@langchain/core/utils/env';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
@@ -28,6 +28,7 @@ export class BraveSearchTool extends BaseTool {
       label: 'Api Key',
       field: 'apiKey',
       component: 'InputPassword',
+      required: true,
     },
     // {
     //   label: 'Max Results',
@@ -64,7 +65,7 @@ export class BraveSearchTool extends BaseTool {
     runManager,
     config,
   ): Promise<any> {
-    const proxy = settingsManager.getPorxy();
+    //const proxy = settingsManager.getPorxy();
 
     const headers = {
       'X-Subscription-Token': this.apiKey,
@@ -75,7 +76,7 @@ export class BraveSearchTool extends BaseTool {
     );
     const response = await fetch(searchUrl, {
       headers,
-      agent: proxy ? new HttpsProxyAgent(proxy) : false,
+      //agent: proxy ? new HttpsProxyAgent(proxy) : false,
     });
     if (!response.ok) {
       throw new Error(`HTTP error ${response.status}`);
@@ -95,29 +96,5 @@ export class BraveSearchTool extends BaseTool {
         }))
       : [];
     return JSON.stringify(finalResults);
-
-    // const body = {
-    //   query: input.query,
-    //   max_results: this.maxResults,
-    //   api_key: this.apiKey,
-    // };
-    // const response = await fetch('https://api.tavily.com/search', {
-    //   method: 'POST',
-    //   headers: {
-    //     'content-type': 'application/json',
-    //   },
-    //   agent: proxy ? new HttpsProxyAgent(proxy) : false,
-    //   body: JSON.stringify({ ...body, ...this.kwargs }),
-    // });
-    // const json = await response.json();
-    // if (!response.ok) {
-    //   throw new Error(
-    //     `Request failed with status code ${response.status}: ${json.error || json.detail}`,
-    //   );
-    // }
-    // if (!Array.isArray(json.results)) {
-    //   throw new Error(`Could not parse Tavily results. Please try again.`);
-    // }
-    // return JSON.stringify(json.results);
   }
 }

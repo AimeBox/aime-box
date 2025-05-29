@@ -185,7 +185,8 @@ export class SocialMediaSearch extends BaseTool {
           args: ['--disable-blink-features=AutomationControlled'],
         },
       );
-      await this.bilibili(browser_context, input.keyword);
+      const res = await this.bilibili(browser_context, input.keyword);
+      return JSON.stringify(res);
     } else if (input.platform === 'twitter') {
       const browser_context = await chromium.launchPersistentContext(
         this.userDataDir,
@@ -201,8 +202,8 @@ export class SocialMediaSearch extends BaseTool {
           args: ['--disable-blink-features=AutomationControlled'],
         },
       );
-      await this.twitter(browser_context, input.keyword);
-      await browser_context.close();
+      res = await this.twitter(browser_context, input.keyword);
+      //await browser_context.close();
     }
 
     return res;
@@ -406,24 +407,123 @@ export class SocialMediaSearch extends BaseTool {
   }
 
   async bilibili(browser_context: BrowserContext, keyword: string) {
-    const page = await browser_context.newPage();
+    let page = await browser_context.newPage();
     await page.goto('https://www.bilibili.com/');
     const search_input = page.locator('.nav-search-input');
     await search_input.focus();
     await search_input.fill(keyword);
+    let list;
+
     await page.keyboard.press('Enter');
-    const pagePromise = browser_context.waitForEvent('page');
-    // await page.getByRole('button').click();
-    const page_2 = await pagePromise;
-    const title = await page_2.title();
+    page = await browser_context.waitForEvent('page');
+    await page.waitForLoadState('networkidle');
+    const content = await page.content();
+    const $ = cheerio.load(content);
+
+    $('script').each((index, element) => {
+      const scriptContent = $(element).html();
+      const myVarMatch = scriptContent.match(/window.__pinia/);
+      if (myVarMatch) {
+        const text = scriptContent.substring(scriptContent.indexOf('=') + 1);
+        let sandbox = { info: undefined };
+        vm.createContext(sandbox); // 创建隔离的沙箱环境
+        vm.runInContext('var info = ' + text, sandbox);
+        const result = sandbox.info?.searchResponse?.searchAllResponse?.result;
+        const data = result.find((x) => x.result_type == 'video')?.data;
+        list = data.map((x) => {
+          return {
+            arcurl: x.arcurl,
+            bvid: x.bvid,
+            title: x.title,
+            description: x.description,
+            duration: x.duration,
+            favorites: x.favorites,
+            like: x.like,
+            play: x.play,
+            review: x.review,
+            pubdate: x.pubdate,
+            tag: x.tag,
+          };
+        });
+      }
+    });
     //const pages = browser_context.pages();
-    return '';
+    return list;
   }
 
   async twitter(browser_context: BrowserContext, keyword: string) {
     const page = await browser_context.newPage();
-    await page.goto('https://twitter.com/login');
+    await page.goto('https://x.com/explore');
+    await page.waitForLoadState();
+    console.log(page.url());
+    if (!page.url().startsWith('https://x.com/explore')) {
+      await page.waitForURL('https://x.com/explore');
+    }
+    await page.locator("//input[@enterkeyhint='search']").fill(keyword);
+    let data;
+    page.on('response', async (response: Response) => {
+      //console.log(response.url());
+      const url = response.url();
+      const status = response.status();
+      const regx = /^https:\/\/x\.com\/i\/api\/graphql\/.*\/SearchTimeline\?.*/;
+      const match = url.match(regx);
+      if (match) {
+        data = await response.json();
+        console.log(data);
+      }
+    });
+    await page.keyboard.press('Enter');
+    await page.waitForResponse(async (response) => {
+      if (data?.data && !data?.errors) {
+        // const data = await response.json();
+        // //console.log(data.data.comments);
+        // comments = data.data.comments;
+        return true;
+      } else {
+        return false;
+      }
+    });
+    const instructions =
+      data.data.search_by_raw_query.search_timeline.timeline.instructions;
+    const entries = instructions[0].entries;
+    const list = entries
+      .filter((x) => x?.content?.itemContent && x?.entryId.startsWith('tweet-'))
+      .map((x) => {
+        const media: any[] | undefined =
+          x?.content?.itemContent?.tweet_results?.result?.legacy?.entities
+            ?.media;
 
-    return '';
+        const photo_urls =
+          media
+            ?.filter((x) => x.type == 'photo')
+            .map((x) => x.media_url_https) || [];
+        const video_urls =
+          media
+            ?.filter((x) => x.type == 'video' && x?.video_info?.variants)
+            .map(
+              (x) =>
+                x?.video_info?.variants.find(
+                  (z) => z.content_type == 'video/mp4',
+                )?.url,
+            ) || [];
+
+        return {
+          text: x.content.itemContent.tweet_results?.result?.legacy?.full_text,
+          favorite_count:
+            x.content.itemContent.tweet_results.result.legacy?.favorite_count,
+          quote_count:
+            x.content.itemContent.tweet_results.result.legacy?.quote_count,
+          reply_count:
+            x.content.itemContent.tweet_results.result.legacy?.reply_count,
+          bookmark_count:
+            x.content.itemContent.tweet_results.result.legacy?.bookmark_count,
+          view_count: x.content.itemContent.tweet_results.result?.views?.count,
+          video_urls,
+          photo_urls,
+        };
+      });
+    console.log(list);
+    await browser_context.close();
+    return JSON.stringify(list);
   }
 }

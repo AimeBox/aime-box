@@ -1,9 +1,97 @@
+import { FormSchema } from '@/types/form';
 import { SearxngSearch } from '@langchain/community/tools/searxng_search';
+import { BaseTool } from './BaseTool';
+import { getEnvironmentVariable } from '@langchain/core/utils/env';
+import { ToolSchemaBase } from '@langchain/core/tools';
+import { z } from 'zod';
 
-export class SearxngSearchTool extends SearxngSearch {
-  async _call(input) {
+interface SearxngSearchParams {
+  /**
+   * @default 10
+   * Number of results included in results
+   */
+  numResults?: number;
+  /** Comma separated list, specifies the active search categories
+   * https://docs.searxng.org/user/configured_engines.html#configured-engines
+   */
+  categories?: string;
+  /** Comma separated list, specifies the active search engines
+   * https://docs.searxng.org/user/configured_engines.html#configured-engines
+   */
+  engines?: string;
+  /** Code of the language. */
+  language?: string;
+  /** Search page number. */
+  pageNumber?: number;
+  /**
+   * day / month / year
+   *
+   * Time range of search for engines which support it. See if an engine supports time range search in the preferences page of an instance.
+   */
+  timeRange?: number;
+  /**
+   * Throws Error if format is set anything other than "json"
+   * Output format of results. Format needs to be activated in search:
+   */
+  format?: 'json';
+  /** Open search results on new tab. */
+  resultsOnNewTab?: 0 | 1;
+  /** Proxy image results through SearXNG. */
+  imageProxy?: boolean;
+  autocomplete?: string;
+  /**
+   * Filter search results of engines which support safe search. See if an engine supports safe search in the preferences page of an instance.
+   */
+  safesearch?: 0 | 1 | 2;
+}
+
+export class SearxngSearchTool extends BaseTool {
+  schema = z.object({
+    query: z.string().describe('The search query to perform'),
+  });
+
+  name: string = 'searxng_search';
+
+  description: string =
+    'A meta search engine. Useful for when you need to answer questions about current events. Input should be a search query. Output is a JSON array of the query results';
+
+  configSchema: FormSchema[] = [
+    {
+      label: 'API Base',
+      field: 'apiBase',
+      component: 'Input',
+      required: true,
+      defaultValue: 'https://searxng.org',
+    },
+  ];
+
+  apiBase?: string;
+
+  params: SearxngSearchParams;
+
+  constructor(params: any) {
+    super(params);
+    this.apiBase =
+      params?.apiBase ||
+      getEnvironmentVariable('SEARXNG_API_BASE') ||
+      'https://searxng.org';
+    this.params = {
+      numResults: 10,
+      format: 'json',
+    };
+  }
+
+  buildUrl(path: string, parameters: any, baseUrl: string) {
+    const nonUndefinedParams = Object.entries(parameters)
+      .filter(([_, value]) => value !== undefined)
+      .map(([key, value]) => [key, value.toString()]); // Avoid string conversion
+    const searchParams = new URLSearchParams(nonUndefinedParams);
+    return `${baseUrl}/${path}?${searchParams}`;
+  }
+
+  async _call(input: z.infer<typeof this.schema>, runManager, config) {
     const queryParams = {
-      q: input,
+      q: input.query,
       ...this.params,
     };
     const url = this.buildUrl('search', queryParams, this.apiBase);
@@ -24,7 +112,7 @@ export class SearxngSearchTool extends SearxngSearch {
   async search(url: string) {
     const resp = await fetch(url, {
       method: 'POST',
-      headers: this.headers,
+      // headers: this.headers,
       signal: AbortSignal.timeout(10 * 1000), // 5 seconds
     });
     if (!resp.ok) {

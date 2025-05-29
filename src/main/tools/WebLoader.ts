@@ -35,28 +35,8 @@ export class WebLoader extends Tool {
 
   constructor(params?: WebLoaderParameters) {
     super(params);
-    Object.defineProperty(this, 'headless', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: true,
-    });
-    Object.defineProperty(this, 'useJina', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: false,
-    });
     this.headless = params?.headless;
     this.useJina = params?.useJina;
-    // Object.defineProperty(this, 'headless', {
-    //   enumerable: true,
-    //   configurable: true,
-    //   writable: true,
-    //   value: z.object({
-    //     input: z.string().brand<'FileInfo'>(),
-    //   }),
-    // });
   }
 
   async _call(url: string, runManager, config): Promise<any> {
@@ -93,6 +73,7 @@ export class WebLoader extends Tool {
       const page = await browser_context.newPage();
       try {
         await page.goto(url, { timeout: 5000 });
+        await page.waitForLoadState('networkidle');
       } catch {}
 
       //await page.waitForLoadState('domcontentloaded', { timeout: 3000 });
@@ -110,6 +91,7 @@ export class WebLoader extends Tool {
       //   path: pdfPath,
       //   printBackground: false,
       // });
+
       const pdfBuffer = await page.pdf({
         displayHeaderFooter: false,
         printBackground: false,
@@ -123,9 +105,6 @@ export class WebLoader extends Tool {
       const loader = new PDFLoader(blob);
       const docs = await loader.load();
       const text = docs.map((x) => x.pageContent).join('\n\n');
-
-      // 删除pdf文件
-      await fs.promises.unlink(pdfPath);
 
       const title = await page.title();
       await page.close();

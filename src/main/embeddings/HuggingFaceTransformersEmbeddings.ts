@@ -124,18 +124,23 @@ export class HuggingFaceTransformersEmbeddings
     let pipe = null;
     if (this.pipelinePromise === undefined) {
       pipe = await pipeline('feature-extraction', this.modelName, {
-        dtype: 'fp16',
+        // dtype: 'fp16',
       });
       this.pipelinePromise = pipe;
     }
 
     return this.caller.call(async () => {
-      const output = await this.pipelinePromise(texts, {
-        pooling: 'cls',
-        normalize: true,
-      });
-      const res = output.tolist();
-      return res;
+      try {
+        const output = await this.pipelinePromise(texts, {
+          pooling: 'cls',
+          normalize: true,
+        });
+        const res = output.tolist();
+        return res;
+      } catch (err) {
+        console.error(err);
+        return [];
+      }
     });
   }
 }

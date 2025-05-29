@@ -1,4 +1,3 @@
-import '@mendable/firecrawl-js';
 import { FireCrawlLoader } from '@langchain/community/document_loaders/web/firecrawl';
 import { BaseTool } from './BaseTool';
 import { ToolParams } from '@langchain/core/tools';
@@ -27,6 +26,7 @@ export class FireCrawl extends BaseTool {
       label: 'Api Key',
       field: 'apiKey',
       component: 'InputPassword',
+      required: true,
     },
   ];
 

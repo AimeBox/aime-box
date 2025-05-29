@@ -27,6 +27,9 @@ import { Transformers } from '../utils/transformers';
 import { notificationManager } from '../app/NotificationManager';
 import { ChatBaiduQianfan } from '@langchain/baidu-qianfan';
 import { ChatCompletion } from '@baiducloud/qianfan';
+import { VolcanoEngineProvider } from './VolcanoEngineProvider';
+import { OllamaProvider } from './OllamaProvider';
+import { MinimaxProvider } from './MinimaxProvider';
 
 export class ProvidersManager {
   repository: Repository<Providers>;
@@ -91,20 +94,9 @@ export class ProvidersManager {
     const httpProxy = settingsManager.getHttpAgent();
     try {
       if (connection.type === ProviderType.OLLAMA) {
-        const ollama = new Ollama({ host: connection.api_base });
-        const list = await ollama.list();
-        return list.models.map((x) => {
-          return {
-            name: x.name,
-            enable:
-              connection.models.find((z) => z.name == x.name)?.enable || false,
-            input_token:
-              connection.models.find((z) => z.name == x.name)?.input_token || 0,
-            output_token:
-              connection.models.find((z) => z.name == x.name)?.output_token ||
-              0,
-          };
-        });
+        const ollama = new OllamaProvider();
+        const list = await ollama.getModelList(connection);
+        return list;
       } else if (
         connection.type === ProviderType.OPENAI ||
         connection.type === ProviderType.LMSTUDIO
@@ -345,6 +337,9 @@ export class ProvidersManager {
         const res = await fetch(url, options);
         const models = await res.json();
         return models.data
+          .filter(
+            (x) => x.capabilities.chat_completion && x.status == 'succeeded',
+          )
           .map((x) => {
             return {
               name: x.id,
@@ -353,6 +348,14 @@ export class ProvidersManager {
             };
           })
           .sort((a, b) => a.name.localeCompare(b.name));
+      } else if (connection?.type === ProviderType.VOLCANOENGINE) {
+        const volcanoEngine = new VolcanoEngineProvider();
+        const list = await volcanoEngine.getModelList(connection);
+        return list;
+      } else if (connection?.type === ProviderType.MINIMAX) {
+        const minimax = new MinimaxProvider();
+        const list = await minimax.getModelList(connection);
+        return list;
       }
     } catch (e) {
       console.log(e);
@@ -570,6 +573,32 @@ export class ProvidersManager {
                 models.data
                   ?.filter((x) => x.id.includes('embedding'))
                   .map((x) => x.id) ?? [],
+            });
+          } catch {}
+        } else if (connection?.type === ProviderType.AZURE_OPENAI) {
+          const endpoint = connection.api_base;
+          const apiVersion = connection.config?.apiVersion || '2024-10-21';
+          const options = {
+            method: 'GET',
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/json',
+              Authorization: `Bearer ${connection.api_key}`,
+            },
+          };
+          const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
+          try {
+            const res = await fetch(url, options);
+            const models = await res.json();
+
+            const emb_models = models.data
+              .filter(
+                (x) => x.capabilities.embeddings && x.status == 'succeeded',
+              )
+              .sort((a, b) => a.id.localeCompare(b.id));
+            emb_list.push({
+              name: connection.name,
+              models: [...new Set(emb_models.map((x) => x.id))],
             });
           } catch {}
         }

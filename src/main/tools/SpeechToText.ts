@@ -69,8 +69,10 @@ export class SpeechToText extends BaseTool {
     this.model = params?.model;
 
     this.apiKey = params?.apiKey;
+    const platform = os.platform();
+    const arch = os.arch();
 
-    Function('return import("sherpa-onnx-node")')()
+    Function(`return import("sherpa-onnx-node")`)()
       .then((mod: any) => {
         this.sherpa_onnx = mod.default;
         return null;

@@ -23,7 +23,7 @@ import {
   ClientOptions,
 } from '@langchain/openai';
 import settingsManager from '../settings';
-import { BaseTool } from './BaseTool';
+import { BaseTool, ToolTag } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import { base64ToFile, downloadFile } from '../utils/common';
 import { getTmpPath } from '../utils/path';
@@ -36,6 +36,8 @@ export interface DallEParameters extends ToolParams {
 }
 
 export class DallE extends BaseTool {
+  tags: string[] = [ToolTag.IMAGE];
+
   schema = z.object({
     prompt: z.string().describe('image prompt'),
     quality: z
@@ -99,9 +101,9 @@ export class DallE extends BaseTool {
   client: OpenAIClient;
 
   constructor(params?: DallEParameters) {
-    super();
+    super(params);
     this.model = params?.model || 'dall-e-3';
-    this.apiKey = params?.apiKey;
+    this.apiKey = params?.apiKey || 'NULL';
     this.apiBase = params?.apiBase || 'https://api.openai.com/v1';
     const clientConfig = {
       apiKey: this.apiKey,

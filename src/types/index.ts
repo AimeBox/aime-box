@@ -80,48 +80,96 @@ export interface ColEx {
   xxl?: { span: ColSpanType; offset: ColSpanType } | ColSpanType;
 }
 
-export type ComponentType =
-  | 'Input'
-  | 'InputGroup'
-  | 'InputPassword'
-  | 'InputSearch'
-  | 'InputTextArea'
-  | 'InputNumber'
-  | 'InputCountDown'
-  | 'Select'
-  | 'ApiSelect'
-  | 'TreeSelect'
-  | 'ApiTree'
-  | 'ApiTreeSelect'
-  | 'ApiRadioGroup'
-  | 'RadioButtonGroup'
-  | 'RadioGroup'
-  | 'Checkbox'
-  | 'CheckboxGroup'
-  | 'AutoComplete'
-  | 'ApiCascader'
-  | 'Cascader'
-  | 'DatePicker'
-  | 'MonthPicker'
-  | 'RangePicker'
-  | 'WeekPicker'
-  | 'TimePicker'
-  | 'TimeRangePicker'
-  | 'Switch'
-  | 'StrengthMeter'
-  | 'Upload'
-  | 'IconPicker'
-  | 'Render'
-  | 'Slider'
-  | 'Rate'
-  | 'Divider'
-  | 'File'
-  | 'Folder'
-  | 'ApiTransfer'
-  | 'ColorPicker'
-  | 'Tinymce'
-  | 'MarkDown'
-  | 'ProviderSelect'
-  | 'AgentSelect'
-  | 'ToolSelect'
-  | 'JsonEditor';
+export const ComponentTypes = [
+  'Input',
+  'InputGroup',
+  'InputPassword',
+  'InputSearch',
+  'InputTextArea',
+  'InputNumber',
+  'InputCountDown',
+  'Select',
+  'ApiSelect',
+  'TreeSelect',
+  'ApiTree',
+  'ApiTreeSelect',
+  'ApiRadioGroup',
+  'RadioButtonGroup',
+  'RadioGroup',
+  'Checkbox',
+  'CheckboxGroup',
+  'AutoComplete',
+  'ApiCascader',
+  'Cascader',
+  'DatePicker',
+  'MonthPicker',
+  'RangePicker',
+  'WeekPicker',
+  'TimePicker',
+  'TimeRangePicker',
+  'Switch',
+  'StrengthMeter',
+  'Upload',
+  'IconPicker',
+  'Render',
+  'Slider',
+  'Rate',
+  'Divider',
+  'File',
+  'Folder',
+  'ApiTransfer',
+  'ColorPicker',
+  'Tinymce',
+  'MarkDown',
+  'ProviderSelect',
+  'AgentSelect',
+  'ToolSelect',
+  'JsonEditor',
+] as const;
+
+export type ComponentType = (typeof ComponentTypes)[number];
+// export type ComponentType =
+//   | 'Input'
+//   | 'InputGroup'
+//   | 'InputPassword'
+//   | 'InputSearch'
+//   | 'InputTextArea'
+//   | 'InputNumber'
+//   | 'InputCountDown'
+//   | 'Select'
+//   | 'ApiSelect'
+//   | 'TreeSelect'
+//   | 'ApiTree'
+//   | 'ApiTreeSelect'
+//   | 'ApiRadioGroup'
+//   | 'RadioButtonGroup'
+//   | 'RadioGroup'
+//   | 'Checkbox'
+//   | 'CheckboxGroup'
+//   | 'AutoComplete'
+//   | 'ApiCascader'
+//   | 'Cascader'
+//   | 'DatePicker'
+//   | 'MonthPicker'
+//   | 'RangePicker'
+//   | 'WeekPicker'
+//   | 'TimePicker'
+//   | 'TimeRangePicker'
+//   | 'Switch'
+//   | 'StrengthMeter'
+//   | 'Upload'
+//   | 'IconPicker'
+//   | 'Render'
+//   | 'Slider'
+//   | 'Rate'
+//   | 'Divider'
+//   | 'File'
+//   | 'Folder'
+//   | 'ApiTransfer'
+//   | 'ColorPicker'
+//   | 'Tinymce'
+//   | 'MarkDown'
+//   | 'ProviderSelect'
+//   | 'AgentSelect'
+//   | 'ToolSelect'
+//   | 'JsonEditor';

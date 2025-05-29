@@ -16,6 +16,7 @@ export enum ProviderType {
   LMSTUDIO = 'lmstudio',
   AZURE_OPENAI = 'azure_openai',
   VOLCANOENGINE = 'volcanoengine',
+  MINIMAX = 'minimax',
 }
 
 @Entity('providers')
@@ -44,7 +45,6 @@ export class Providers {
   @Column('json', { nullable: true })
   config?: any;
 
-   @Column({ nullable: true })
+  @Column({ nullable: true })
   icon?: string;
-
 }

@@ -1,3 +1,4 @@
+import { ComponentTypes } from '@/types';
 import { z } from 'zod';
 
 export type BaseAction = {
@@ -27,6 +28,19 @@ const HumanFeedbackAction: BaseAction = {
     '任务的详细总结,若有文件则在全文最后使用<file>文件路径</file>输出文件',
   schema: z.object({
     question: z.string(),
+    form: z.array(
+      z
+        .object({
+          component: z.enum(ComponentTypes),
+          componentProps: z.any().optional(),
+          subLabel: z.string().optional(),
+          label: z.string(),
+          field: z.string(),
+          required: z.boolean().default(false).optional(),
+        })
+        .describe('表单项')
+        .optional(),
+    ),
   }),
 };
 

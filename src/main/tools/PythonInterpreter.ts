@@ -99,15 +99,17 @@ export class PythonInterpreterTool extends BaseTool {
         return 'not found python';
       }
       console.log(`Python Path: ${this.pythonPath}`);
-
+      let cwd;
       if (config?.configurable?.workspace) {
         tempDir = path.join(config?.configurable?.workspace, 'sandbox');
         fs.mkdirSync(tempDir, { recursive: true });
+        cwd = config?.configurable?.workspace;
       } else {
         fs.mkdirSync(path.join(getTmpPath(), 'sandbox'), { recursive: true });
         tempDir = fs.mkdtempSync(
           path.join(getTmpPath(), 'sandbox', `sandbox-`),
         );
+        cwd = tempDir;
       }
       if (this.useVenv) {
         if (!fs.existsSync(path.join(tempDir, '.venv'))) {
@@ -202,7 +204,7 @@ export class PythonInterpreterTool extends BaseTool {
         const res = await runCommand(
           `"${this.pythonPath}" "${pythonScriptFilePath}"`,
           undefined,
-          tempDir,
+          cwd,
         );
         if (res.toString().trim() == '') {
           return 'you should use print() in script!';
@@ -231,7 +233,6 @@ export class PythonInterpreterTool extends BaseTool {
         console.log(`remove temp dir: ${tempDir}`);
       }
     }
-    return null;
   }
 
   async createVenv(path: string) {

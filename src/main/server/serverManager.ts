@@ -80,9 +80,9 @@ class ServerManager {
     this.app.post(`/tools/:tool_name`, async (req, res) => {
       const toolName = req.params.tool_name;
       const methodName = req.body.method;
-      let tool = toolsManager.getTools().find((t) => t.name === toolName);
-
-      if (!tool) {
+      const toolInfo = toolsManager.tools.find((t) => t.name === toolName);
+      let tool;
+      if (!toolInfo) {
         const agent = agentManager.agents.find(
           (a) => a.agent.name === toolName,
         );
@@ -90,6 +90,8 @@ class ServerManager {
           return res.status(404).json({ error: 'Tool or agent not found' });
         }
         tool = agent.agent;
+      } else {
+        tool = await toolsManager.buildTools([toolName]);
       }
       try {
         const result = await tool.invoke(req.body);
@@ -112,7 +114,7 @@ class ServerManager {
         return {
           name: x.name,
           description: x.description,
-          inputSchema:  x.schema,
+          inputSchema: x.schema,
         };
       });
       return {

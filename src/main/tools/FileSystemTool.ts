@@ -4,7 +4,7 @@ import { z } from 'zod';
 import fs from 'fs';
 import path from 'path';
 import tree from 'tree-node-cli';
-import { BaseTool } from './BaseTool';
+import { BaseTool, BaseToolKit } from './BaseTool';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { TextLoader } from 'langchain/document_loaders/fs/text';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
@@ -62,7 +62,7 @@ export class FileRead extends BaseTool {
 
   name: string = 'file_read';
 
-  description: string = 'read file';
+  description: string = 'read file plain text';
 
   schema = z.object({
     path: z.string().describe('local file path'),
@@ -77,7 +77,14 @@ export class FileRead extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    return fs.readFileSync(input.path).toString();
+    const { workspace } = config.configurable;
+    let filePath = input.path;
+    if (workspace) {
+      filePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(workspace, filePath);
+    }
+    return fs.readFileSync(filePath).toString();
   }
 }
 
@@ -362,4 +369,18 @@ export class DeleteFile extends BaseTool {
     await fs.promises.rm(input.path);
     return 'file has been deleted.';
   }
+}
+
+export class FileSystemToolKit extends BaseToolKit {
+  name: string = 'file-system';
+
+  tools = [
+    new FileWrite(),
+    new FileRead(),
+    new ListDirectory(),
+    new CreateDirectory(),
+    new SearchFiles(),
+    new MoveFile(),
+    new DeleteFile(),
+  ];
 }

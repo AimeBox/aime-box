@@ -13,7 +13,7 @@ import { ExtractAgent } from './extract/ExtractAgent';
 import { AgentMessageEvent, BaseAgent } from './BaseAgent';
 import { dbManager } from '../db';
 import { Agent } from '@/entity/Agent';
-import { Tool } from '@langchain/core/tools';
+import { tool, Tool } from '@langchain/core/tools';
 import {
   Runnable,
   RunnableLambda,
@@ -46,6 +46,13 @@ import {
   SystemMessagePromptTemplate,
 } from '@langchain/core/prompts';
 import dayjs from 'dayjs';
+import { parse as parseYaml } from 'yaml';
+import SwaggerParser from '@apidevtools/swagger-parser';
+import OpenAPIClientAxios from 'openapi-client-axios';
+import { A2ACardResolver, A2AClient } from 'a2a-js';
+import { createA2A } from './a2a/Agent2Agent';
+import { jsonSchemaToZod } from '../utils/jsonSchemaToZod';
+import { WatsonxToolkit } from '@langchain/community/agents/toolkits/ibm';
 
 export interface AgentInfo extends Agent {
   static: boolean;
@@ -94,6 +101,10 @@ export class AgentManager {
         event.sender.send('agent:invokeAsync', res);
         event.returnValue = res;
       },
+    );
+    ipcMain.handle(
+      'agent:addRemoteAgent',
+      async (event, data: any) => await this.addRemoteAgent(data),
     );
     // ipcMain.on('agent:getList', async (event, filter?: string) => {
     //   event.returnValue = this.agents;
@@ -201,7 +212,11 @@ export class AgentManager {
       let configSchema;
       let config;
       if (agent.type == 'built-in') {
-        if (!this.agents.find((x) => x.info.name == agent.name.toLocaleLowerCase())) {
+        if (
+          !this.agents.find(
+            (x) => x.info.name == agent.name.toLocaleLowerCase(),
+          )
+        ) {
           continue;
         }
         config = await this.agents
@@ -251,7 +266,6 @@ export class AgentManager {
       this.agents = this.agents.filter((x) => x.info.name != agent.name);
       const config = await agent.getConfig();
 
-
       this.agents.push({
         info: {
           id: ts.id,
@@ -266,7 +280,7 @@ export class AgentManager {
         },
         agent,
       });
-      console.log(`registered '${ClassType.name}'`,this.agents)
+      console.log(`registered '${ClassType.name}'`, this.agents);
     } catch (err) {
       console.error(`register '${ClassType.name}' agent fail, ${err.message}`);
     }
@@ -470,6 +484,122 @@ export class AgentManager {
         signal,
         configurable,
       });
+    } else if (agent.type == 'anp') {
+      const res = await fetch(`${agent.remote_url}/ad.json`, {
+        method: 'GET',
+      });
+      const json = await res.json();
+      const { name, description, version, did } = json;
+      const interfaces: any[] = json['ad:interfaces'];
+      const tools = [];
+      for (const _interface of interfaces) {
+        const { url, description } = _interface;
+        const res = await fetch(url, {
+          method: 'GET',
+        });
+        const text = await res.text();
+        const openapiDocument = parseYaml(text);
+        const api = new OpenAPIClientAxios({ definition: openapiDocument });
+        const client = await api.init();
+
+        const baseUrl = openapiDocument.servers[0].url;
+        const { paths }: { paths: Record<string, any> } = openapiDocument;
+        console.log(openapiDocument);
+        for (const key of Object.keys(paths)) {
+          const method = paths[key];
+          const toolName = key.split('/').pop();
+          const methodKeys = Object.keys(method);
+          for (const methodKey of methodKeys) {
+            const methodSchema = method[methodKey];
+            if (methodKey == 'post') {
+              const _schema = jsonSchemaToZod(
+                methodSchema.requestBody['content']['application/json'][
+                  'schema'
+                ],
+              );
+              const _tool = tool(
+                async (input: any) => {
+                  const res = await fetch(`${baseUrl}${key}`, {
+                    method: methodKey.toUpperCase(),
+                    body: input ? JSON.stringify(input) : undefined,
+                  });
+                  if (res.ok) {
+                    return res.json();
+                  } else {
+                    return 'error';
+                  }
+                },
+                {
+                  name: toolName,
+                  description: openapiDocument.info.description,
+                  schema: _schema,
+                },
+              );
+              tools.push(_tool);
+            } else if (methodKey == 'get') {
+              const _parameters = methodSchema?.parameters;
+              let _schema;
+              if (_parameters) {
+                _schema = {};
+                for (const item of _parameters) {
+                  _schema[item.name] = z.any();
+                  if (item.schema.type == 'string')
+                    _schema[item.name] = z.string();
+                  if (item.description) {
+                    _schema[item.name] = _schema[item.name].describe(
+                      item.description,
+                    );
+                  }
+                  if (!item?.required) {
+                    _schema[item.name] = _schema[item.name].optional();
+                  }
+                }
+                _schema = z.object(_schema);
+              }
+              const _tool = tool(
+                async (input: any) => {
+                  const q = Object.entries(input).map((x) => `${x[0]}=${x[1]}`);
+                  const res = await fetch(`${baseUrl}${key}?${q}`, {
+                    method: 'GET',
+                  });
+                  if (res.ok) {
+                    return res.json();
+                  } else {
+                    return 'error';
+                  }
+                },
+                {
+                  name: toolName,
+                  description: openapiDocument.info.description,
+                  schema: _schema,
+                },
+              );
+              tools.push(_tool);
+            }
+          }
+        }
+      }
+
+      const reactAgent = createReactAgent({
+        llm: model,
+        tools: tools,
+        name: agent.name,
+        store: store,
+        checkpointSaver: dbManager.langgraphSaver,
+        responseFormat: config.responseFormat,
+      });
+
+      return reactAgent;
+    } else if (agent.type == 'a2a') {
+      const a2a = await createA2A(agent, {
+        store,
+        model,
+        messageEvent,
+        chatOptions,
+        signal,
+        configurable,
+      });
+      return a2a;
     }
     return null;
   }
@@ -489,6 +619,67 @@ export class AgentManager {
     const modelName = _llmProvider.split('@')[0];
     const agent = await a.build(connectionName, modelName);
     return await agent.invoke(input);
+  }
+
+  public async addRemoteAgent(data: any) {
+    if (data.type == 'anp') {
+      await this.addAnp(data);
+    } else if (data.type == 'a2a') {
+      await this.addA2A(data);
+    } else {
+      throw new Error('不支持的agent类型');
+    }
+  }
+
+  public async addA2A(data: any) {
+    const client = new A2ACardResolver(data.baseUrl);
+    const agentCard = await client.getAgentCard();
+    console.log(agentCard);
+    const agent = new Agent(
+      agentCard.url,
+      agentCard.name,
+      agentCard.description,
+      undefined,
+      'a2a',
+      [],
+      [],
+      undefined,
+      undefined,
+    );
+    agent.remote_url = data.baseUrl;
+    agent.tags = [...new Set(agentCard.skills.map((x) => x.tags).flat())];
+    await this.agentRepository.save(agent);
+  }
+
+  public async addAnp(data: any) {
+    const res = await fetch(`${data.baseUrl}/ad.json`, {
+      method: 'GET',
+    });
+    const json = await res.json();
+    const { name, description, version, did } = json;
+
+    const interfaces: any[] = json['ad:interfaces'];
+    for (const _interface of interfaces) {
+      const { url, description } = _interface;
+      const res = await fetch(url, {
+        method: 'GET',
+      });
+      const text = await res.text();
+      console.log(text);
+    }
+    const agent = new Agent(
+      did,
+      name,
+      description,
+      undefined,
+      'anp',
+      [],
+      [],
+      undefined,
+      undefined,
+    );
+    agent.remote_url = data.baseUrl;
+    await this.agentRepository.save(agent);
   }
 }
 

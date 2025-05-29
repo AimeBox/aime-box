@@ -2,13 +2,13 @@ import { Tool, ToolParams } from '@langchain/core/tools';
 import { z } from 'zod';
 import iconv from 'iconv-lite';
 import { BraveSearch } from '@langchain/community/tools/brave_search';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 import { getEnvironmentVariable } from '@langchain/core/utils/env';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
 import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
-import settingsManager from '@/main/settings';
+// import settingsManager from '@/main/settings';
 import { parseStringPromise } from 'xml2js';
 import { isArray } from '../utils/is';
 
@@ -47,7 +47,7 @@ export class ArxivTool extends BaseTool {
     runManager,
     config,
   ): Promise<any> {
-    const proxy = settingsManager.getPorxy();
+    // const proxy = settingsManager.getPorxy();
     const limit = input.limit ?? 10;
     const headers = {
       // 'X-Subscription-Token': this.apiKey,
@@ -65,7 +65,7 @@ export class ArxivTool extends BaseTool {
     const response = await fetch(searchUrl, {
       method: 'GET',
       headers,
-      agent: proxy ? new HttpsProxyAgent(proxy) : false,
+      // agent: proxy ? new HttpsProxyAgent(proxy) : false,
     });
     if (!response.ok) {
       throw new Error(`HTTP error ${response.status}`);

@@ -19,7 +19,10 @@
   "save": "保存",
   "translation": {
     "Copy": "复制",
-    "settings": "设置"
+    "settings": "设置",
+    "common": {
+      "search": "搜索"
+    }
   },
   "Save": "保存",
   "DefaultTitleLLM": "默认标题生成LLM",
@@ -61,7 +64,8 @@
     "name": "名称",
     "description": "描述",
     "tags": "标签",
-    "restart": "失败重试"
+    "restart": "失败重试",
+    "localKB": "本地知识库"
   },
   "enable": "是否启用",
   "prompts": {
@@ -165,7 +169,8 @@
     "mode": "模式",
     "agents": "AI助手",
     "parameters": "参数",
-    "quit": "退出"
+    "quit": "退出",
+    "search": "搜索"
   },
   "agents": {
     "name": "名称",

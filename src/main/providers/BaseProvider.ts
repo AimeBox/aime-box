@@ -5,7 +5,13 @@ export abstract class BaseProvider {
 
   abstract description: string;
 
+  abstract defaultApiBase?: string;
+
   abstract getModelList(
-    connection: Providers,
+    provider: Providers,
   ): Promise<{ name: string; enable: boolean }[]>;
+
+  getEmbeddingModels(provider: Providers) {
+    return [];
+  }
 }

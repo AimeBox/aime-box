@@ -17,7 +17,7 @@ export class Agent {
     name: string,
     description?: string,
     prompt?: string,
-    type?: string | 'react' | 'supervisor' | 'built-in',
+    type?: string | 'react' | 'supervisor' | 'built-in' | 'a2a' | 'anp',
     tools?: any[],
     agents?: any[],
     model?: string,
@@ -54,7 +54,7 @@ export class Agent {
   tags?: string[];
 
   @Column({ nullable: true })
-  type?: string | 'react' | 'supervisor';
+  type?: string | 'react' | 'supervisor' | 'built-in' | 'a2a' | 'anp';
 
   @Column({ type: 'json', nullable: true })
   tools?: any[];
@@ -79,4 +79,7 @@ export class Agent {
 
   @Column({ nullable: true })
   recursionLimit?: number;
+
+  @Column({ nullable: true })
+  remote_url?: string;
 }

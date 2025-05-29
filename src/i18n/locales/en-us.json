@@ -45,7 +45,8 @@
     "delete": "Delete",
     "description": "Description",
     "tags": "Tags",
-    "restart": "Restart"
+    "restart": "Restart",
+    "localKB": "Local Knowledge Base"
   },
   "prompts": {
     "create_prompt": "Create Prompt"
@@ -106,7 +107,8 @@
     "mode": "Mode",
     "agents": "Agents",
     "parameters": "Parameters",
-    "quit": "Quit"
+    "quit": "Quit",
+    "search": "Search"
   },
   "agents": {
     "name": "Name",

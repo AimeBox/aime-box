@@ -354,6 +354,8 @@ const electronHandler = {
     create: (data: any) => ipcRenderer.invoke('agent:create', data),
     update: (data: any) => ipcRenderer.invoke('agent:update', data),
     delete: (id: string) => ipcRenderer.invoke('agent:delete', id),
+    addRemoteAgent: (data: any) =>
+      ipcRenderer.invoke('agent:addRemoteAgent', data),
     invoke(llmProvider: string, name: string, input: any) {
       const res = ipcRenderer.sendSync(
         'agent:invoke',

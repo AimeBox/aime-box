@@ -18,6 +18,7 @@ import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
 import { BaseTool } from './BaseTool';
+import { ExcelLoader } from '../loaders/ExcelLoader';
 
 export interface FileToTextParameters extends ToolParams {}
 
@@ -68,10 +69,17 @@ export class FileToText extends BaseTool {
         const loader = new PPTXLoader(input.filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
+      } else if (ext == '.xlsx' || ext == '.xls') {
+        const loader = new ExcelLoader(input.filePath);
+        const docs = await loader.load();
+        return docs.map((x) => x.pageContent).join('\n\n');
       } else {
         throw new Error(`Unsupported file type: ${ext}`);
       }
     } catch (err) {
+      if (err.message) {
+        return err.message;
+      }
       return JSON.stringify(err);
     }
     return null;
