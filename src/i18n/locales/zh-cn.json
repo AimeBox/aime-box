@@ -185,7 +185,10 @@
     "supervisorOutputMode": "输出消息模式",
     "supervisorOutputMode_full_history": "所有历史消息",
     "supervisorOutputMode_last_message": "最后的消息",
-    "recursionLimit": "递归限制"
+    "recursionLimit": "递归限制",
+    "type_a2a": "A2A",
+    "type_anp": "ANP",
+    "baseUrl": "Base Url"
   },
   "sidebar": {
     "settings": "设置",

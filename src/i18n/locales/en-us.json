@@ -123,7 +123,10 @@
     "supervisorOutputMode": "Output Mode",
     "supervisorOutputMode_full_history": "Full History",
     "supervisorOutputMode_last_message": "Last Message",
-    "recursionLimit": "Recursion Limit"
+    "recursionLimit": "Recursion Limit",
+    "type_a2a": "A2A",
+    "type_anp": "ANP",
+    "baseUrl": "Base Url"
   },
   "sidebar": {
     "settings": "Settings",
