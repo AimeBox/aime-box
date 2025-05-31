@@ -13,9 +13,7 @@ import { runCommand } from '../utils/exec';
 import { BaseTool } from './BaseTool';
 import { platform } from 'process';
 
-export interface SleepToolParameters extends ToolParams {
-  ask_human_input: boolean;
-}
+export interface SleepToolParameters extends ToolParams {}
 
 export class SleepTool extends BaseTool {
   schema = z.object({

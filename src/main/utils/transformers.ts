@@ -300,4 +300,15 @@ export class Transformers {
     //     });
     // });
   }
+
+  async ocr(fileOrUrl: string): Promise<string> {
+    env.localModelPath = path.join(getModelsPath(), 'ocr');
+    env.allowRemoteModels = false;
+    const captioner = await pipeline(
+      'image-to-text',
+      'Xenova/trocr-small-handwritten',
+    );
+    const output = await captioner(fileOrUrl);
+    return output[0].toString();
+  }
 }

@@ -1,9 +1,11 @@
 import {
   FaAngleDown,
   FaAngleUp,
+  FaCheckCircle,
   FaClipboard,
   FaClock,
   FaEdit,
+  FaExclamationCircle,
   FaHistory,
   FaLightbulb,
   FaMedapps,
@@ -25,6 +27,7 @@ import hljs from 'highlight.js';
 import 'highlight.js/styles/atom-one-dark.css';
 import { LoadingOutlined } from '@ant-design/icons';
 import ReactJsonView from '@microlink/react-json-view';
+import { motion } from 'motion/react';
 
 // import MarkdownIt from 'markdown-it';
 import {
@@ -77,6 +80,9 @@ export interface ChatMessageProps {
   editEnabled?: boolean;
   hideHead?: boolean;
   hideIcon?: boolean;
+  hideActionBar?: boolean;
+  size?: 'small' | 'medium';
+  onToolClick?: (toolCall: any, toolMessageContent: any) => void;
 }
 
 const ChatMessageBox = React.forwardRef(
@@ -92,6 +98,9 @@ const ChatMessageBox = React.forwardRef(
       toolMessages,
       hideHead = value.role == 'user',
       hideIcon = value.role == 'user',
+      hideActionBar = false,
+      size = 'small',
+      onToolClick,
     }: ChatMessageProps,
     ref: React.ForwardedRef<any>,
   ) => {
@@ -219,7 +228,9 @@ const ChatMessageBox = React.forwardRef(
                   <div className="self-center font-bold mb-0.5 capitalize line-clamp-1 h-10 flex items-center text-gray-700 dark:text-gray-300">
                     {value.role != 'tool' && (
                       <span className="mr-2 text-lg">
-                        {value.role === 'user' ? 'You' : value.model}{' '}
+                        {value.role === 'user'
+                          ? 'You'
+                          : value.name || value.model}{' '}
                       </span>
                     )}
                     {/* {value.role == 'tool' && (
@@ -244,11 +255,11 @@ const ChatMessageBox = React.forwardRef(
                     <>
                       {/* <ReactMarkdown>{textContent}</ReactMarkdown> */}
                       <div
-                        className={`flex flex-row flex-wrap gap-2 ${
-                          value.role == 'user' ? 'justify-end' : ''
+                        className={`flex flex-col flex-wrap gap-2 ${
+                          value.role == 'user' ? 'items-end' : ''
                         } w-full`}
                       >
-                        {value?.content.map((x) => {
+                        {value?.content?.map((x) => {
                           return (
                             <>
                               {x.type == 'text' && (
@@ -364,15 +375,106 @@ const ChatMessageBox = React.forwardRef(
 
                   {value.tool_calls && value.tool_calls.length > 0 && (
                     <>
-                      {/* <div className="mb-2 text-sm font-medium">
-                        {t('tool_calls')}
-                      </div> */}
-                      <div className="flex flex-row flex-wrap gap-2">
-                        <Collapse
-                          className="w-full dark:border-gray-700"
-                          items={value.tool_calls.map((toolCall, index) => {
-                            let toolMessageContent;
+                      {size == 'medium' && (
+                        <div className="flex flex-row flex-wrap gap-2">
+                          <Collapse
+                            className="w-full dark:border-gray-700"
+                            items={value.tool_calls.map((toolCall, index) => {
+                              let toolMessageContent;
 
+                              const toolMessage = toolMessages?.find((t) =>
+                                t.content?.some(
+                                  (c) =>
+                                    c.type == 'tool_call' &&
+                                    c.tool_call_id == toolCall.id,
+                                ),
+                              );
+                              if (toolMessage) {
+                                toolMessageContent = toolMessage.content?.find(
+                                  (c) =>
+                                    c.type == 'tool_call' &&
+                                    c.tool_call_id == toolCall.id,
+                                );
+                              }
+
+                              return {
+                                key: toolCall.id,
+                                label: (
+                                  <div className="flex flex-row gap-3 items-center text-gray-700 dark:text-gray-300">
+                                    {' '}
+                                    <strong>{toolCall.name}</strong>
+                                    {toolMessage &&
+                                      toolMessage.status == 'success' && (
+                                        <Tag color="green">
+                                          {toolMessage.status}
+                                        </Tag>
+                                      )}
+                                    {toolMessage &&
+                                      toolMessage.status == 'error' && (
+                                        <Tag color="red">
+                                          {toolMessage.status}
+                                        </Tag>
+                                      )}
+                                    {toolMessage &&
+                                      toolMessage.status == 'running' && (
+                                        <Spin
+                                          indicator={
+                                            <LoadingOutlined
+                                              style={{ fontSize: 16 }}
+                                              spin
+                                            />
+                                          }
+                                        />
+                                      )}
+                                  </div>
+                                ),
+                                children: (
+                                  <>
+                                    <div className="mb-2">
+                                      {t('common.parameters')} :{' '}
+                                      <Radio.Group
+                                        size="small"
+                                        value={toolCallInputView}
+                                        onChange={(e) =>
+                                          setToolCallInputView(e.target.value)
+                                        }
+                                      >
+                                        <Radio.Button value="json">
+                                          JSON
+                                        </Radio.Button>
+                                        <Radio.Button value="text">
+                                          Text
+                                        </Radio.Button>
+                                      </Radio.Group>
+                                    </div>
+                                    {toolCallInputView == 'text' && (
+                                      <ResponseCard value={toolCall.args} />
+                                    )}
+                                    {toolCallInputView == 'json' && (
+                                      <ReactJsonView src={toolCall.args} />
+                                    )}
+
+                                    {toolMessageContent && (
+                                      <>
+                                        <div className="mb-2">Output :</div>
+                                        {renderToolContent(toolMessage)}
+                                      </>
+                                    )}
+                                  </>
+
+                                  // <pre className="overflow-x-scroll w-full whitespace-pre-wrap">
+                                  //   {JSON.stringify(toolCall.args, null, 2)}
+                                  // </pre>
+                                ),
+                              };
+                            })}
+                          />
+                        </div>
+                      )}
+                      {size == 'small' && (
+                        <div className="flex flex-col flex-wrap gap-2">
+                          {value.tool_calls.map((toolCall) => {
+                            let toolMessageContent;
                             const toolMessage = toolMessages?.find((t) =>
                               t.content?.some(
                                 (c) =>
@@ -387,80 +489,48 @@ const ChatMessageBox = React.forwardRef(
                                   c.tool_call_id == toolCall.id,
                               );
                             }
-
-                            return {
-                              key: toolCall.id,
-                              label: (
-                                <div className="flex flex-row gap-3 items-center text-gray-700 dark:text-gray-300">
-                                  {' '}
-                                  <strong>{toolCall.name}</strong>
-                                  {toolMessage &&
-                                    toolMessage.status == 'success' && (
-                                      <Tag color="green">
-                                        {toolMessage.status}
-                                      </Tag>
-                                    )}
-                                  {toolMessage &&
-                                    toolMessage.status == 'error' && (
-                                      <Tag color="red">
-                                        {toolMessage.status}
-                                      </Tag>
-                                    )}
-                                  {toolMessage &&
-                                    toolMessage.status == 'running' && (
-                                      <Spin
-                                        indicator={
-                                          <LoadingOutlined
-                                            style={{ fontSize: 16 }}
-                                            spin
-                                          />
-                                        }
-                                      />
-                                    )}
-                                </div>
-                              ),
-                              children: (
-                                <>
-                                  <div className="mb-2">
-                                    {t('common.parameters')} :{' '}
-                                    <Radio.Group
-                                      size="small"
-                                      value={toolCallInputView}
-                                      onChange={(e) =>
-                                        setToolCallInputView(e.target.value)
-                                      }
-                                    >
-                                      <Radio.Button value="json">
-                                        JSON
-                                      </Radio.Button>
-                                      <Radio.Button value="text">
-                                        Text
-                                      </Radio.Button>
-                                    </Radio.Group>
-                                  </div>
-                                  {toolCallInputView == 'text' && (
-                                    <ResponseCard value={toolCall.args} />
-                                  )}
-                                  {toolCallInputView == 'json' && (
-                                    <ReactJsonView src={toolCall.args} />
-                                  )}
-
-                                  {toolMessageContent && (
-                                    <>
-                                      <div className="mb-2">Output :</div>
-                                      {renderToolContent(toolMessage)}
-                                    </>
-                                  )}
-                                </>
-
-                                // <pre className="overflow-x-scroll w-full whitespace-pre-wrap">
-                                //   {JSON.stringify(toolCall.args, null, 2)}
-                                // </pre>
-                              ),
-                            };
+                            let inputArgs = '';
+                            if (
+                              Object.keys(toolCall.args).length == 1 &&
+                              isString(
+                                toolCall.args[Object.keys(toolCall.args)[0]],
+                              )
+                            ) {
+                              inputArgs =
+                                toolCall.args[Object.keys(toolCall.args)[0]];
+                            }
+                            return (
+                              <motion.div
+                                className="flex flex-row gap-2 items-center p-0 px-2 bg-gray-100 rounded-2xl cursor-pointer w-fit"
+                                onClick={() =>
+                                  onToolClick?.(toolCall, toolMessageContent)
+                                }
+                              >
+                                {toolMessage?.status == 'success' && (
+                                  <FaCheckCircle color="green" />
+                                )}
+                                {toolMessage?.status == 'error' && (
+                                  <FaExclamationCircle color="red" />
+                                )}
+                                {toolMessage?.status == 'running' && (
+                                  <Spin
+                                    indicator={
+                                      <LoadingOutlined
+                                        style={{ fontSize: 10 }}
+                                        spin
+                                      ></LoadingOutlined>
+                                    }
+                                  />
+                                )}
+                                {toolCall.name}{' '}
+                                <small className="text-xs text-gray-500 max-w-[200px] line-clamp-1 break-all">
+                                  {inputArgs}
+                                </small>
+                              </motion.div>
+                            );
                           })}
-                        />
-                      </div>
+                        </div>
+                      )}
                     </>
                   )}
 
@@ -470,7 +540,7 @@ const ChatMessageBox = React.forwardRef(
                     </div>
                   )}
 
-                  {!edit && value.status != 'running' && (
+                  {!hideActionBar && !edit && value.status != 'running' && (
                     <div className="flex overflow-x-auto gap-2 justify-start items-center mt-5 text-gray-700 opacity-0 transition-opacity duration-300 buttons dark:text-gray-500 group-hover:opacity-100">
                       <div className="flex flex-row space-x-1">
                         {getTextContent() && (

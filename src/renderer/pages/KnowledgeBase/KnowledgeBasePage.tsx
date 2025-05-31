@@ -14,6 +14,7 @@ import {
   Form,
   Input,
   Popconfirm,
+  Popover,
   Radio,
   Select,
   Slider,
@@ -23,7 +24,7 @@ import {
   Tag,
   message,
 } from 'antd';
-import { FaEdit, FaTrashAlt } from 'react-icons/fa';
+import { FaEdit, FaPlus, FaTrashAlt } from 'react-icons/fa';
 import TextArea from 'antd/es/input/TextArea';
 import List from '@/renderer/components/common/List';
 import FormModal from '@/renderer/components/modals/FormModal';
@@ -44,9 +45,10 @@ export default function KnowledgeBasePage() {
     undefined,
   );
   const navigate = useNavigate();
+  const [addButtonOpen, setAddButtonOpen] = useState(false);
   // const [currentEditKbId, setCurrentEditKbId] = useState(undefined);
   const kbModalRef = useRef(null);
-
+  const kbDifyModalRef = useRef(null);
   const schemas = [
     {
       label: t('knowledge.name'),
@@ -105,6 +107,28 @@ export default function KnowledgeBasePage() {
       component: <ProviderSelect type="reranker" allowClear />,
     },
   ] as FormSchema[];
+
+  const schemas_dify = [
+    {
+      label: t('knowledge.name'),
+      field: 'name',
+      required: true,
+      component: 'Input',
+    },
+    {
+      label: t('knowledge.dify_api_key'),
+      field: 'apiKey',
+      required: true,
+      component: 'InputPassword',
+    },
+    {
+      label: t('knowledge.dify_api_url'),
+      field: 'apiUrl',
+      required: true,
+      component: 'Input',
+    },
+  ] as FormSchema[];
+
   const getData = async () => {
     const res = window.electron.db.getMany<KnowledgeBase>('knowledgebase', {});
     console.log(res);
@@ -137,6 +161,20 @@ export default function KnowledgeBasePage() {
     }
   };
 
+  const openAddLocalKnowledgeBase = () => {
+    setAddButtonOpen(false);
+    setCurrentKB(undefined);
+    navigate(`/knowledge-base`);
+    kbModalRef.current.openModal(true);
+  };
+
+  const openAddDifyKnowledgeBase = () => {
+    setAddButtonOpen(false);
+    setCurrentKB(undefined);
+    navigate(`/knowledge-base`);
+    kbDifyModalRef.current.openModal(true);
+  };
+
   useEffect(() => {
     getData();
   }, []);
@@ -158,11 +196,38 @@ export default function KnowledgeBasePage() {
         <List
           width={250}
           onSearch={onSearch}
-          onAdd={() => {
-            setCurrentKB(undefined);
-            navigate(`/knowledge-base`);
-            kbModalRef.current.openModal(true);
-          }}
+          addButton={
+            <Popover
+              placement="rightTop"
+              trigger="click"
+              open={addButtonOpen}
+              onOpenChange={setAddButtonOpen}
+              content={
+                <div className="flex flex-col">
+                  <Button
+                    type="text"
+                    block
+                    onClick={() => {
+                      openAddLocalKnowledgeBase();
+                    }}
+                  >
+                    {t('knowledge.localKB')}
+                  </Button>
+                  <Button
+                    type="text"
+                    block
+                    onClick={() => {
+                      openAddDifyKnowledgeBase();
+                    }}
+                  >
+                    {t('knowledge.difyKB')}
+                  </Button>
+                </div>
+              }
+            >
+              <Button icon={<FaPlus />} className=""></Button>
+            </Popover>
+          }
         >
           <div className="flex flex-col gap-1">
             {list.map((item, index) => {
@@ -232,6 +297,20 @@ export default function KnowledgeBasePage() {
         onFinish={(values) => onKBSubmit(values)}
         onCancel={() => {
           kbModalRef.current.openModal(false);
+        }}
+      />
+      <FormModal
+        title={
+          currentKB?.id
+            ? t('knowledgebase.edit_knowledgebase')
+            : t('knowledgebase.create_knowledgebase')
+        }
+        ref={kbDifyModalRef}
+        schemas={schemas_dify}
+        formProps={{ layout: 'vertical' }}
+        onFinish={(values) => onKBSubmit(values)}
+        onCancel={() => {
+          kbDifyModalRef.current.openModal(false);
         }}
       />
     </Content>

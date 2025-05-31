@@ -136,7 +136,10 @@ const electronHandler = {
       skip: number;
       pageSize: number;
       sort?: string | undefined;
-    }) => ipcRenderer.invoke('chat:getChatPage', input),
+    }): Promise<{
+      items: ChatInfo[];
+      totalCount: number;
+    }> => ipcRenderer.invoke('chat:getChatPage', input),
     create: (
       mode: ChatMode,
       providerModel?: string,
@@ -150,6 +153,7 @@ const electronHandler = {
       options,
     ): Promise<Chat> =>
       ipcRenderer.invoke('chat:update', chatId, title, model, options),
+    delete: (chatId: string) => ipcRenderer.invoke('chat:delete', chatId),
     export: async (
       type: string,
       chatId: string,
@@ -350,6 +354,8 @@ const electronHandler = {
     create: (data: any) => ipcRenderer.invoke('agent:create', data),
     update: (data: any) => ipcRenderer.invoke('agent:update', data),
     delete: (id: string) => ipcRenderer.invoke('agent:delete', id),
+    addRemoteAgent: (data: any) =>
+      ipcRenderer.invoke('agent:addRemoteAgent', data),
     invoke(llmProvider: string, name: string, input: any) {
       const res = ipcRenderer.sendSync(
         'agent:invoke',

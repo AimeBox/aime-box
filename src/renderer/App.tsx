@@ -12,7 +12,7 @@ import store from './store';
 import Home from './pages/Home';
 import Sidebar from './components/layout/Sidebar';
 import { ConfigProvider, notification, Progress } from 'antd';
-import { ThemeProvider } from './components/theme/ThemeProvider';
+import { ThemeProvider, useTheme } from './components/theme/ThemeProvider';
 import Providers from './pages/Providers';
 import i18n from '@/i18n';
 import Settings from './pages/Settings';
@@ -28,6 +28,7 @@ import Link from 'antd/es/typography/Link';
 import PromptsPage from './pages/Prompts/PromptsPage';
 import KnowledgeBasePage from './pages/KnowledgeBase/KnowledgeBasePage';
 import { GlobalContextProvider } from './context/GlobalContext';
+import { use } from 'i18next';
 
 function TemplatePage(props: { children: ReactNode }) {
   const Context = React.createContext({ name: 'Default' });
@@ -60,12 +61,20 @@ function TemplatePage(props: { children: ReactNode }) {
 }
 
 export default function App() {
+  const { theme, setTheme } = useTheme();
+
+  useEffect(() => {
+    console.log(theme);
+  }, [theme]);
   return (
     <Provider store={store}>
       <ConfigProvider
         theme={{
+          token: {},
+
           components: {
             Modal: {},
+            Input: {},
             Menu: {
               darkItemSelectedBg: '#363943',
               darkSubMenuItemBg: 'rgb(29, 32, 40) !important',

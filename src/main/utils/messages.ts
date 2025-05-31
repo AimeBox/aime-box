@@ -180,7 +180,7 @@ const convertMessagesForNonFunctionCallingModels = (
 };
 
 const removeThinkTags = (text: string): string => {
-  return text.replaceAll(/<think>(.*?)<\/think>/g, '');
+  return text.replaceAll(/<think>([\s\S]*?)<\/think>/g, '');
 };
 
 export {

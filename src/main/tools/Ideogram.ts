@@ -17,7 +17,7 @@ import { getDataPath } from '../utils/path';
 import { chromium } from 'playwright';
 
 import fetch from 'node-fetch';
-import { BaseTool } from './BaseTool';
+import { BaseTool, ToolTag } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import { t } from 'i18next';
 
@@ -30,6 +30,8 @@ export interface IdeogramParameters extends ToolParams {
 }
 
 export class Ideogram extends BaseTool {
+  tags: string[] = [ToolTag.IMAGE];
+
   schema = z.object({
     prompt: z.string().describe('The prompt to use to generate the image.'),
     negative_prompt: z
@@ -76,11 +78,13 @@ export class Ideogram extends BaseTool {
       field: 'apiBase',
       defaultValue: 'https://api.ideogram.ai',
       component: 'Input',
+      required: true,
     },
     {
       label: 'Api Key',
       field: 'apiKey',
       component: 'InputPassword',
+      required: true,
     },
 
     {

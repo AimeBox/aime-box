@@ -1,4 +1,9 @@
-import { Tool, ToolParams, StructuredTool } from '@langchain/core/tools';
+import {
+  Tool,
+  ToolParams,
+  StructuredTool,
+  ToolSchemaBase,
+} from '@langchain/core/tools';
 import {
   exec,
   execSync,
@@ -18,6 +23,8 @@ import { chromium } from 'playwright';
 import fetch from 'node-fetch';
 import axios from 'axios';
 import sharp from 'sharp';
+import { BaseTool } from './BaseTool';
+import { FormSchema } from '@/types/form';
 
 export interface MidjourneyParameters extends ToolParams {
   apiKey: string;
@@ -27,7 +34,11 @@ export interface MidjourneyParameters extends ToolParams {
   mode: string;
 }
 
-export class Midjourney extends Tool {
+export class Midjourney extends BaseTool {
+  schema = z.object({
+    prompt: z.string(),
+  });
+
   name: string = 'midjourney';
 
   description: string = 'generate image';
@@ -40,44 +51,44 @@ export class Midjourney extends Tool {
 
   mode: string;
 
+  configSchema: FormSchema[] = [
+    {
+      field: 'apiKey',
+      component: 'Input',
+      label: 'API Key',
+    },
+    {
+      field: 'apiBase',
+      component: 'Input',
+      label: 'API Base',
+      defaultValue: 'https://api.openai-hk.com',
+    },
+    {
+      field: 'mode',
+      component: 'Select',
+      label: 'Mode',
+      componentProps: {
+        options: [
+          { label: 'Relax', value: 'relax' },
+          { label: 'Fast', value: 'fast' },
+        ],
+      },
+      defaultValue: 'relax',
+    },
+  ];
+
   constructor(params?: MidjourneyParameters) {
     super(params);
-
-    Object.defineProperty(this, 'apiKey', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: '',
-    });
-    Object.defineProperty(this, 'apiBase', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'https://api.openai-hk.com',
-    });
-    Object.defineProperty(this, 'mode', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'relax',
-    });
-    // Object.defineProperty(this, 'officialLink', {
-    //   enumerable: true,
-    //   configurable: true,
-    //   writable: true,
-    //   value: 'https://ideogram.ai/manage-api',
-    // });
-
     this.apiKey = params?.apiKey;
     this.apiBase = params?.apiBase;
     this.mode = params?.mode;
   }
 
   async _call(
-    input: string,
+    input: z.infer<typeof this.schema>,
     runManager,
     config,
-  ): Promise<{ imageUrl: string; seed: string; prompt: string }> {
+  ): Promise<string> {
     const options = {
       method: 'POST',
       headers: {
@@ -90,7 +101,7 @@ export class Midjourney extends Tool {
         instanceId: '',
         modes: ['FAST'],
         notifyHook: null,
-        prompt: input,
+        prompt: input.prompt,
         remix: true,
         state: '',
       }),
@@ -118,7 +129,7 @@ export class Midjourney extends Tool {
     let ext = '';
     let prompt = '';
     while (true) {
-      const task_url = `${this.apiBase.replace(/\/+$/, '')}/mj/task/${result_id}/fetch`;
+      const task_url = `${this.apiBase.replace(/\/+$/, '')}/${this.mode}/mj/task/${result_id}/fetch`;
       const task_res = await fetch(task_url, {
         method: 'GET',
         headers: {
@@ -150,7 +161,7 @@ export class Midjourney extends Tool {
         submitTime: number;
         properties: { finalPrompt: string; finalZhPrompt: string };
       } = await task_res.json();
-      console.log(task_resJson.progress);
+      console.log(`${task_resJson.progress} ${task_resJson.description}`);
       if (task_resJson.status == 'FAILURE') {
         const { failReason } = task_resJson;
         throw new Error(`Error: ${failReason}`);
@@ -185,15 +196,11 @@ export class Midjourney extends Tool {
       await this.splitImage(fileImgPath);
     } catch (err) {}
 
-    return {
-      imageUrl: `https://wsrv.nl/?url=${encodeURIComponent(imageUrl)}`,
-      seed: seed,
-      prompt: prompt,
-    };
+    return `https://wsrv.nl/?url=${encodeURIComponent(imageUrl)}`;
   }
 
   async getSeed(id: string): Promise<string> {
-    const url = `${this.apiBase.replace(/\/+$/, '')}/mj/task/${id}/image-seed`;
+    const url = `${this.apiBase.replace(/\/+$/, '')}/${this.mode}/mj/task/${id}/image-seed`;
     try {
       const res = await fetch(url, {
         method: 'GET',

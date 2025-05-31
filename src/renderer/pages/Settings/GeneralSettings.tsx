@@ -21,10 +21,8 @@ export default function GeneralSettings() {
   const getData = () => {
     const settings = window.electron.setting.getSettings();
     dispatch(setSettings(settings));
-    if (settings.proxy == 'system' || settings.proxy == 'none')
-      setProxyMode(settings.proxy);
-    else {
-      setProxyMode('custom');
+    setProxyMode(settings.proxyMode);
+    if (settings.proxyMode == 'custom') {
       setProxy(settings.proxy);
     }
   };
@@ -35,9 +33,11 @@ export default function GeneralSettings() {
   };
   const onChangeProxy = (proxyMode) => {
     if (proxyMode == 'system' || proxyMode === 'none') {
+      window.electron.setting.set('proxyMode', proxyMode);
       window.electron.setting.set('proxy', proxyMode);
       getData();
     } else if (isUrl(proxy) || proxyMode === 'custom') {
+      window.electron.setting.set('proxyMode', 'custom');
       let _proxy = proxy;
       if (!proxy) _proxy = 'http://127.0.0.1:10809';
       window.electron.setting.set('proxy', _proxy);

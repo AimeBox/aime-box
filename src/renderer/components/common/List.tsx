@@ -64,6 +64,7 @@ const List = forwardRef((props: ListProps) => {
                   className="flex-1"
                   placeholder="Search"
                   prefix={<FaSearch />}
+                  variant="outlined"
                   onChange={(e) => onSearch(e.target.value)}
                 />
               )}

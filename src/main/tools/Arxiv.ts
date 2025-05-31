@@ -2,14 +2,15 @@ import { Tool, ToolParams } from '@langchain/core/tools';
 import { z } from 'zod';
 import iconv from 'iconv-lite';
 import { BraveSearch } from '@langchain/community/tools/brave_search';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 import { getEnvironmentVariable } from '@langchain/core/utils/env';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
 import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
-import settingsManager from '@/main/settings';
+// import settingsManager from '@/main/settings';
 import { parseStringPromise } from 'xml2js';
+import { isArray } from '../utils/is';
 
 export interface ArxivParameters extends ToolParams {}
 
@@ -46,7 +47,7 @@ export class ArxivTool extends BaseTool {
     runManager,
     config,
   ): Promise<any> {
-    const proxy = settingsManager.getPorxy();
+    // const proxy = settingsManager.getPorxy();
     const limit = input.limit ?? 10;
     const headers = {
       // 'X-Subscription-Token': this.apiKey,
@@ -64,7 +65,7 @@ export class ArxivTool extends BaseTool {
     const response = await fetch(searchUrl, {
       method: 'GET',
       headers,
-      agent: proxy ? new HttpsProxyAgent(proxy) : false,
+      // agent: proxy ? new HttpsProxyAgent(proxy) : false,
     });
     if (!response.ok) {
       throw new Error(`HTTP error ${response.status}`);
@@ -76,12 +77,20 @@ export class ArxivTool extends BaseTool {
     const result = await parseStringPromise(parsedResponse, {
       explicitArray: false,
     });
-    const finalResults = result.feed.entry.map((x) => {
+    const finalResults = result.feed?.entry?.map((x) => {
+      let author = '';
+      if (x.author) {
+        if (isArray(x.author)) {
+          author = x.author.map((a) => a.name).join(',');
+        } else {
+          author = x.author.name;
+        }
+      }
       return {
         id: x.id,
         title: x.title,
         summary: x.summary,
-        author: x.author.map((a) => a.name).join(','),
+        author: author,
 
         link: x.link
           .filter((a) => a['$'].type == 'application/pdf')
@@ -93,6 +102,6 @@ export class ArxivTool extends BaseTool {
       };
     });
 
-    return JSON.stringify(finalResults);
+    return finalResults ? JSON.stringify(finalResults) : 'empty results';
   }
 }

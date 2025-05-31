@@ -40,6 +40,10 @@ interface XHSNoteItem {
   id: string;
   model_type: string;
   note_card: {
+    corner_tag_info?: {
+      type?: string;
+      text?: string;
+    }[];
     user: {
       avatar: string;
       user_id: string;
@@ -47,8 +51,11 @@ interface XHSNoteItem {
       nick_name: string;
     };
     interact_info: {
-      liked: boolean;
-      liked_count: string;
+      collected_count?: string;
+      comment_count?: string;
+      liked?: boolean;
+      liked_count?: string;
+      shared_count?: string;
     };
     cover: {
       height: number;
@@ -65,7 +72,7 @@ interface XHSNoteItem {
       }>;
     }>;
     type: string;
-    display_title: string;
+    display_title?: string;
   };
   xsec_token: string;
 }
@@ -110,21 +117,19 @@ export class SocialMediaSearch extends BaseTool {
   }
 
   async getBrowserContext(): Promise<BrowserContext> {
-    // const browser_context = await chromium.launchPersistentContext(
-    //   this.userDataDir,
-    //   {
-    //     channel: 'msedge',
-    //     headless: false,
-    //     devtools: true,
-    //     proxy: this.httpProxy
-    //       ? {
-    //           server: `${this.httpProxy}`,
-    //         }
-    //       : undefined,
-    //     args: ['--disable-blink-features=AutomationControlled'],
-    //   },
-    // ); // Or 'firefox' or 'webkit'.
-
+    const browser_context = await chromium.launchPersistentContext(
+      this.userDataDir,
+      {
+        channel: 'msedge',
+        headless: false,
+        devtools: true,
+        proxy: {
+          server: this.httpProxy,
+        },
+        args: ['--disable-blink-features=AutomationControlled'],
+      },
+    ); // Or 'firefox' or 'webkit'.
+    return browser_context;
     // chromium.launchPersistentContext()
     const msbrowser = await chromium.connectOverCDP('http://localhost:9222');
     const defaultContext = msbrowser.contexts()[0];
@@ -163,7 +168,8 @@ export class SocialMediaSearch extends BaseTool {
           await this.xhs_try_login();
         }
         const browser_context = await this.getBrowserContext();
-        await this.xhs_search(browser_context, input.keyword);
+        const res = await this.xhs_search(browser_context, input.keyword);
+        return this.xhs_search_item_to_markdown(res);
       }
     } else if (input.platform === 'bilibili') {
       const browser_context = await chromium.launchPersistentContext(
@@ -179,7 +185,8 @@ export class SocialMediaSearch extends BaseTool {
           args: ['--disable-blink-features=AutomationControlled'],
         },
       );
-      await this.bilibili(browser_context, input.keyword);
+      const res = await this.bilibili(browser_context, input.keyword);
+      return JSON.stringify(res);
     } else if (input.platform === 'twitter') {
       const browser_context = await chromium.launchPersistentContext(
         this.userDataDir,
@@ -195,8 +202,8 @@ export class SocialMediaSearch extends BaseTool {
           args: ['--disable-blink-features=AutomationControlled'],
         },
       );
-      await this.twitter(browser_context, input.keyword);
-      await browser_context.close();
+      res = await this.twitter(browser_context, input.keyword);
+      //await browser_context.close();
     }
 
     return res;
@@ -221,6 +228,25 @@ export class SocialMediaSearch extends BaseTool {
     // text += `### 标签\n${data.note.tagList.map((x) => `#${x.name}`).join(' ')}`;
 
     text += `\n</note>`;
+    return text;
+  }
+
+  async xhs_search_item_to_markdown(data: XHSNoteItem[]) {
+    let text = '';
+
+    for (const item of data) {
+      // text += `<note>\n`;
+
+      text += `### Url: \nhttps://www.xiaohongshu.com/explore/${item.id}?xsec_token=${item.xsec_token}\n`;
+      // text += `### Author: \n${item.note_card.user.nickname}\n`;
+      text += item?.note_card?.display_title
+        ? `### Title:\n${item.note_card.display_title}\n`
+        : '';
+      text += `### Image\n![](${item.note_card.cover.url_pre})\n`;
+      text += `### Interact: ${item.note_card.interact_info.liked_count} likes, ${item.note_card.interact_info.comment_count} comments,${item.note_card.interact_info.collected_count} collected, ${item.note_card.interact_info.shared_count} shares\n`;
+      text += `\n\n---\n`;
+    }
+
     return text;
   }
 
@@ -271,7 +297,10 @@ export class SocialMediaSearch extends BaseTool {
     await browser_context.close();
   }
 
-  async xhs_search(browser_context: BrowserContext, keyword: string) {
+  async xhs_search(
+    browser_context: BrowserContext,
+    keyword: string,
+  ): Promise<XHSNoteItem[]> {
     const page = await browser_context.newPage();
     await page.goto('https://www.xiaohongshu.com/explore');
 
@@ -279,8 +308,8 @@ export class SocialMediaSearch extends BaseTool {
     await search_input.focus();
     await search_input.fill(keyword);
     await page.keyboard.press('Enter');
-    const notes_list = [];
-    const calwer = async () => {
+    const notes_list: XHSNoteItem[] = [];
+    const calwer = async (): Promise<XHSNoteItem[]> => {
       return new Promise((resovle, reject) => {
         page.on('response', async (response: Response) => {
           const url = new URL(response.url());
@@ -293,7 +322,7 @@ export class SocialMediaSearch extends BaseTool {
             const headers = response.headers();
             if (headers['content-type'].includes('/json')) {
               const data = await response.json();
-
+              console.log(data);
               if (data.success && data.data && data.data.items) {
                 for (let index = 0; index < data.data.items.length; index++) {
                   const item: XHSNoteItem = data.data.items[index];
@@ -308,10 +337,16 @@ export class SocialMediaSearch extends BaseTool {
         });
       });
     };
-    const list = await calwer();
-    console.log(list);
-    await browser_context.close();
-    return '';
+    try {
+      const list = await calwer();
+      console.log(list);
+      await browser_context.close();
+      return list;
+    } catch (err) {
+      console.log(err);
+      await browser_context.close();
+      return [];
+    }
   }
 
   async xhs_post_detail(browser_context: BrowserContext, url: string) {
@@ -372,24 +407,123 @@ export class SocialMediaSearch extends BaseTool {
   }
 
   async bilibili(browser_context: BrowserContext, keyword: string) {
-    const page = await browser_context.newPage();
+    let page = await browser_context.newPage();
     await page.goto('https://www.bilibili.com/');
     const search_input = page.locator('.nav-search-input');
     await search_input.focus();
     await search_input.fill(keyword);
+    let list;
+
     await page.keyboard.press('Enter');
-    const pagePromise = browser_context.waitForEvent('page');
-    // await page.getByRole('button').click();
-    const page_2 = await pagePromise;
-    const title = await page_2.title();
+    page = await browser_context.waitForEvent('page');
+    await page.waitForLoadState('networkidle');
+    const content = await page.content();
+    const $ = cheerio.load(content);
+
+    $('script').each((index, element) => {
+      const scriptContent = $(element).html();
+      const myVarMatch = scriptContent.match(/window.__pinia/);
+      if (myVarMatch) {
+        const text = scriptContent.substring(scriptContent.indexOf('=') + 1);
+        let sandbox = { info: undefined };
+        vm.createContext(sandbox); // 创建隔离的沙箱环境
+        vm.runInContext('var info = ' + text, sandbox);
+        const result = sandbox.info?.searchResponse?.searchAllResponse?.result;
+        const data = result.find((x) => x.result_type == 'video')?.data;
+        list = data.map((x) => {
+          return {
+            arcurl: x.arcurl,
+            bvid: x.bvid,
+            title: x.title,
+            description: x.description,
+            duration: x.duration,
+            favorites: x.favorites,
+            like: x.like,
+            play: x.play,
+            review: x.review,
+            pubdate: x.pubdate,
+            tag: x.tag,
+          };
+        });
+      }
+    });
     //const pages = browser_context.pages();
-    return '';
+    return list;
   }
 
   async twitter(browser_context: BrowserContext, keyword: string) {
     const page = await browser_context.newPage();
-    await page.goto('https://twitter.com/login');
+    await page.goto('https://x.com/explore');
+    await page.waitForLoadState();
+    console.log(page.url());
+    if (!page.url().startsWith('https://x.com/explore')) {
+      await page.waitForURL('https://x.com/explore');
+    }
+    await page.locator("//input[@enterkeyhint='search']").fill(keyword);
+    let data;
+    page.on('response', async (response: Response) => {
+      //console.log(response.url());
+      const url = response.url();
+      const status = response.status();
+      const regx = /^https:\/\/x\.com\/i\/api\/graphql\/.*\/SearchTimeline\?.*/;
+      const match = url.match(regx);
+      if (match) {
+        data = await response.json();
+        console.log(data);
+      }
+    });
+    await page.keyboard.press('Enter');
+    await page.waitForResponse(async (response) => {
+      if (data?.data && !data?.errors) {
+        // const data = await response.json();
+        // //console.log(data.data.comments);
+        // comments = data.data.comments;
+        return true;
+      } else {
+        return false;
+      }
+    });
+    const instructions =
+      data.data.search_by_raw_query.search_timeline.timeline.instructions;
+    const entries = instructions[0].entries;
+    const list = entries
+      .filter((x) => x?.content?.itemContent && x?.entryId.startsWith('tweet-'))
+      .map((x) => {
+        const media: any[] | undefined =
+          x?.content?.itemContent?.tweet_results?.result?.legacy?.entities
+            ?.media;
 
-    return '';
+        const photo_urls =
+          media
+            ?.filter((x) => x.type == 'photo')
+            .map((x) => x.media_url_https) || [];
+        const video_urls =
+          media
+            ?.filter((x) => x.type == 'video' && x?.video_info?.variants)
+            .map(
+              (x) =>
+                x?.video_info?.variants.find(
+                  (z) => z.content_type == 'video/mp4',
+                )?.url,
+            ) || [];
+
+        return {
+          text: x.content.itemContent.tweet_results?.result?.legacy?.full_text,
+          favorite_count:
+            x.content.itemContent.tweet_results.result.legacy?.favorite_count,
+          quote_count:
+            x.content.itemContent.tweet_results.result.legacy?.quote_count,
+          reply_count:
+            x.content.itemContent.tweet_results.result.legacy?.reply_count,
+          bookmark_count:
+            x.content.itemContent.tweet_results.result.legacy?.bookmark_count,
+          view_count: x.content.itemContent.tweet_results.result?.views?.count,
+          video_urls,
+          photo_urls,
+        };
+      });
+    console.log(list);
+    await browser_context.close();
+    return JSON.stringify(list);
   }
 }

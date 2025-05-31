@@ -35,7 +35,14 @@ import { getDefaultModelsPath, getModelsPath } from '../utils/path';
 import { platform } from 'process';
 import { exec } from 'child_process';
 import serverManager from '../server/serverManager';
-import { isBoolean } from '../utils/is';
+import { isBoolean, isUrl } from '../utils/is';
+import {
+  setGlobalDispatcher,
+  ProxyAgent,
+  getGlobalDispatcher,
+  Agent,
+} from 'undici';
+
 import {
   getSystemProxySettings,
   SystemProxySettings,
@@ -46,6 +53,7 @@ export interface GlobalSettings {
   theme: {
     mode: string;
   };
+  proxyMode: 'system' | 'custom' | 'none';
   proxy: string | null;
   language: string;
   defaultEmbedding: string | null;
@@ -91,6 +99,7 @@ class SettingsManager {
     theme: {
       mode: 'light',
     },
+    proxyMode: 'system',
     proxy: 'system',
     language: 'zh-CN',
     defaultEmbedding: null,
@@ -239,7 +248,7 @@ class SettingsManager {
     });
 
     i18n.changeLanguage(obj.language);
-    await this.updateProxy(obj.proxy);
+    await this.updateProxy(obj.proxyMode, obj.proxy);
     nativeTheme.themeSource = obj.theme.mode as 'system' | 'light' | 'dark';
     if (obj.serverEnable) {
       await serverManager.start();
@@ -281,21 +290,37 @@ class SettingsManager {
     return this.settingsCache;
   }
 
-  public async updateProxy(proxy: string) {
+  public async updateProxy(
+    proxyMode: 'system' | 'custom' | 'none',
+    proxy: string,
+  ) {
     const sessions = [
       session.defaultSession,
       session.fromPartition('persist:webview'),
     ];
+    this.systemProxy = await getSystemProxySettings();
     let proxyConfig: ProxyConfig;
-    if (proxy === 'system') {
+    if (proxyMode === 'system') {
       proxyConfig = { mode: 'system' };
-    } else if (proxy) {
+      setGlobalDispatcher(
+        this.systemProxy.proxyEnable
+          ? new ProxyAgent({
+              uri: this.systemProxy.proxyServer,
+            })
+          : new Agent(),
+      );
+    } else if (proxyMode == 'custom' && isUrl(proxy)) {
       proxyConfig = { proxyRules: proxy };
+      setGlobalDispatcher(
+        new ProxyAgent({
+          uri: proxy,
+        }),
+      );
     } else {
       proxyConfig = {};
+      setGlobalDispatcher(new Agent());
     }
     if (proxy === 'system') {
-      this.systemProxy = await getSystemProxySettings();
       if (this.systemProxy.proxyEnable) {
         proxyConfig.proxyRules = this.systemProxy.proxyServer;
       }
@@ -304,18 +329,18 @@ class SettingsManager {
   }
 
   public getHttpAgent(): HttpsProxyAgent | undefined {
-    if (this.settingsCache.proxy) {
+    if (this.settingsCache.proxy && this.settingsCache.proxyMode == 'custom') {
       if (
         this.settingsCache?.proxy.startsWith('https://') ||
         this.settingsCache?.proxy.startsWith('http://')
       ) {
-        //const proxy = `${this.settingsCache?.proxy.substring(this.settingsCache?.proxy.indexOf('://') + 3)}`;
         return new HttpsProxyAgent(this.settingsCache?.proxy);
-      } else if (this.settingsCache.proxy == 'system') {
-        if (this.systemProxy.proxyEnable) {
-          return new HttpsProxyAgent(this.systemProxy.proxyServer);
-        }
       }
+    } else if (
+      this.settingsCache.proxyMode == 'system' &&
+      this.systemProxy.proxyEnable
+    ) {
+      return new HttpsProxyAgent(this.systemProxy.proxyServer);
     }
     return undefined;
   }

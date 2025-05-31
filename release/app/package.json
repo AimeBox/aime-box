@@ -1,6 +1,6 @@
 {
   "name": "aime-box",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Aime Box is a tool agent box for producer.",
   "license": "Apache-2.0",
   "author": {
@@ -15,7 +15,6 @@
     "link-modules": "node -r ts-node/register ../../.erb/scripts/link-modules.ts"
   },
   "dependencies": {
-    "sharp": "^0.33.5",
     "@huggingface/transformers": "^3.5.1",
     "@lancedb/lancedb": "^0.12.0",
     "@langchain/community": "^0.3.42",
@@ -26,7 +25,8 @@
     "better-sqlite3": "^9.6.0",
     "langchain": "^0.3.24",
     "playwright": "^1.50.1",
-    "sherpa-onnx-node": "^1.10.46",
+    "sharp": "^0.34.2",
+    "sherpa-onnx-node": "^1.12.0",
     "speaker": "^0.5.5",
     "sqlite3": "^5.1.7",
     "typeorm": "^0.3.20"

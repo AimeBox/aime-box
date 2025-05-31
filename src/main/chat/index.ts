@@ -84,6 +84,7 @@ import {
   Pregel,
   StateDefinition,
   StateGraph,
+  StateSnapshot,
   StateType,
 } from '@langchain/langgraph';
 import { isArray, isString } from '../utils/is';
@@ -94,6 +95,7 @@ export interface ChatInfo extends Chat {
   inputToken?: number;
   outputToken?: number;
   status: string;
+  agentName?: string;
 }
 
 export class ChatManager {
@@ -152,6 +154,9 @@ export class ChatManager {
         model: string,
         options?: ChatOptions,
       ) => this.updateChat(event, chatId, title, model, options),
+    );
+    ipcMain.handle('chat:delete', (event, chatId: string) =>
+      this.deleteChat(event, chatId),
     );
     ipcMain.on(
       'chat:chat-resquest',
@@ -330,6 +335,17 @@ export class ChatManager {
     return undefined;
   }
 
+  public async deleteChat(event: IpcMainInvokeEvent, chatId: string) {
+    const res = await this.chatRepository.delete(chatId);
+    await dbManager.delete('langgraph_checkpoints', {
+      thread_id: chatId,
+    });
+    await dbManager.delete('langgraph_writes', {
+      thread_id: chatId,
+    });
+    return res;
+  }
+
   public async getChatPage(input: {
     filter?: string;
     skip: number;
@@ -455,7 +471,9 @@ export class ChatManager {
             video_path: attachment.path,
           });
         } else if (attachment.type == 'file' || attachment.type == 'folder') {
-          res.content.push(attachment);
+          res.content.find((x) => x.type == 'text')!.text +=
+            `\n\n<${attachment.type}>${attachment.path}</${attachment.type}>`;
+          // res.content.push(attachment);
         }
       }
     }
@@ -609,11 +627,13 @@ export class ChatManager {
             ChatStatus.RUNNING,
           );
         }
+
         msg.additional_kwargs = message.additional_kwargs;
         msg.provider_type = message.additional_kwargs[
           'provider_type'
         ] as string;
         msg.model = (message.additional_kwargs['model'] as string) || 'Unknown';
+        msg.name = message.name;
         msg = await this.chatMessageRepository.save(msg);
         lastMesssageId = msg.id;
         event(`chat:message-changed:${chatId}`, msg);
@@ -637,6 +657,7 @@ export class ChatManager {
           where: { id: message.id },
           relations: { chat: true },
         });
+
         if (isAIMessage(message)) {
           msg.content = [{ type: 'text', text: message.content }];
           msg.tool_calls = message?.tool_calls || [];
@@ -731,6 +752,14 @@ export class ChatManager {
               thread_id: agent.fixedThreadId === true ? chatId : undefined,
               chatId,
             },
+          });
+        } else if (agent.type == 'anp' || agent.type == 'a2a') {
+          await this.chatRemoteAgent(agent, messages, {
+            providerModel: chat.model,
+            options: chat.options,
+            callbacks,
+            signal: controller.signal,
+            configurable: { workspace: this.getChatPath(chatId), chatId },
           });
         }
       } else if (chat.mode == 'planner' && chat.agent) {
@@ -884,159 +913,6 @@ export class ChatManager {
         handlerMessageError,
       },
     });
-    // let _lastMessage;
-    // try {
-    //   const eventStream = await reactAgent.streamEvents(
-    //     { messages },
-    //     {
-    //       version: 'v2',
-    //       signal,
-    //       // callbacks:
-    //       // chatCallbacks(
-    //       //   modelName,
-    //       //   providerType,
-    //       //   handlerMessageCreated,
-    //       //   handlerMessageStream,
-    //       //   handlerMessageError,
-    //       //   handlerMessageFinished,
-    //       // ),
-    //       //   [
-    //       //   ...chatCallbacks(
-    //       //     modelName,
-    //       //     providerType,
-    //       //     handlerMessageCreated,
-    //       //     handlerMessageStream,
-    //       //     handlerMessageError,
-    //       //     handlerMessageFinished,
-    //       //   ),
-    //       //   {
-    //       //     handleLLMStart(llm, prompts: string[]) {
-    //       //       console.log('handleLLMStart', {
-    //       //         prompts,
-    //       //       });
-    //       //     },
-    //       //   },
-    //       // ],
-    //     },
-    //   );
-    //   const _toolCalls = [];
-    //   const _messages = [];
-    //   for await (const { event, tags, data } of eventStream) {
-    //     if (event == 'on_chat_model_start') {
-    //       console.log('on_chat_model_start', data);
-    //       _lastMessage =
-    //         data.input.messages[0][data.input.messages[0].length - 1];
-    //       if (isHumanMessage(_lastMessage)) {
-    //         await handlerMessageCreated?.(_lastMessage);
-    //         _messages.push(_lastMessage);
-    //       }
-    //       const aiMessage = new AIMessage({
-    //         id: uuidv4(),
-    //         content: '',
-    //         additional_kwargs: {
-    //           model: modelName,
-    //           provider_type: providerType,
-    //         },
-    //       });
-    //       await handlerMessageCreated?.(aiMessage);
-    //       _lastMessage = aiMessage;
-    //       _messages.push(aiMessage);
-    //     } else if (event == 'on_chat_model_stream') {
-    //       console.log('on_chat_model_start', data);
-
-    //       if (data.chunk.content && _lastMessage) {
-    //         if (isAIMessage(_lastMessage)) {
-    //           _lastMessage.content += data.chunk.content;
-    //           await handlerMessageStream?.(_lastMessage);
-    //         }
-    //       }
-    //     } else if (event == 'on_chat_model_end') {
-    //       console.log('on_chat_model_start', data);
-    //       if (data.output && _lastMessage) {
-    //         _lastMessage.content = data.output.content;
-    //         _lastMessage.tool_calls = data.output.tool_calls;
-    //         if (_lastMessage.tool_calls && _lastMessage.tool_calls.length > 0) {
-    //           _toolCalls.push(..._lastMessage.tool_calls);
-    //         }
-    //         _lastMessage.usage_metadata = data.output.usage_metadata;
-    //         await handlerMessageFinished?.(_lastMessage);
-    //       }
-    //     } else if (event == 'on_tool_start') {
-    //       console.log('on_tool_start', data);
-    //       const toolCall = _toolCalls.shift();
-    //       const toolMessage = new ToolMessage({
-    //         id: uuidv4(),
-    //         content: '',
-    //         tool_call_id: toolCall.id,
-    //         name: toolCall.name,
-    //         additional_kwargs: {
-    //           provider_type: undefined,
-    //           model: toolCall.name,
-    //         },
-    //       });
-    //       await handlerMessageCreated?.(toolMessage);
-    //       _lastMessage = toolMessage;
-    //       _messages.push(toolMessage);
-    //     } else if (event == 'on_tool_end') {
-    //       console.log('on_tool_end', data);
-    //       let _isToolMessage = false;
-    //       try {
-    //         _isToolMessage = isToolMessage(data.output);
-    //       } catch {}
-    //       if (_isToolMessage) {
-    //         const msg = _messages.find(
-    //           (x) => x.tool_call_id == data.output.tool_call_id,
-    //         );
-    //         msg.content = data.output.content;
-    //         msg.tool_call_id = data.output.tool_call_id;
-    //         msg.name = data.output.name;
-    //         msg.status = ChatStatus.SUCCESS;
-    //         msg.additional_kwargs = {
-    //           provider_type: undefined,
-    //           model: data.output.name,
-    //         };
-    //         await handlerMessageFinished?.(msg);
-    //         _lastMessage = msg;
-    //       } else {
-    //         //lastMessage.content = output.content;
-    //         _lastMessage.status = ChatStatus.SUCCESS;
-    //         _lastMessage.additional_kwargs = {
-    //           provider_type: undefined,
-    //           model: _lastMessage.name,
-    //         };
-    //         await handlerMessageFinished?.(_lastMessage);
-    //       }
-    //     } else if (
-    //       event == 'on_chain_end' ||
-    //       tags.find((x) => x.startsWith('graph:'))
-    //     ) {
-    //       if (
-    //         data?.output?.messages?.length > 0 &&
-    //         isToolMessage(data.output.messages[0])
-    //       ) {
-    //         const msg = _messages.find(
-    //           (x) => x.tool_call_id == data.output.messages[0].tool_call_id,
-    //         );
-    //         if (msg.status === undefined) {
-    //           msg.content = data.output.messages[0].content;
-    //           msg.status = data.output.messages[0].status;
-    //           await handlerMessageFinished?.(msg);
-    //         }
-    //       }
-    //     } else {
-    //       console.log(event, tags, data);
-    //     }
-    //   }
-    // } catch (err) {
-    //   if (_lastMessage) {
-    //     if (isToolMessage(_lastMessage)) {
-    //       _lastMessage.status = ChatStatus.ERROR;
-    //     }
-    //     _lastMessage.additional_kwargs['error'] = err.message || err.name;
-    //     await handlerMessageError?.(_lastMessage);
-    //   }
-    //   console.error(err);
-    // }
   }
 
   public async chatBuiltIn(
@@ -1093,10 +969,12 @@ export class ChatManager {
         },
       },
       signal: config.signal,
+      configurable: config.configurable,
     });
     let _messages = messages;
+    let state: StateSnapshot | undefined;
     if (config.fixedThreadId === true) {
-      const state = await _agent.getState({
+      state = await _agent.getState({
         configurable: { thread_id: config.chatId },
       });
       const { values } = state;
@@ -1113,6 +991,7 @@ export class ChatManager {
       configurable: config.configurable,
       modelName,
       providerType,
+      state,
       callbacks: {
         handlerMessageCreated,
         handlerMessageFinished,
@@ -1273,6 +1152,75 @@ export class ChatManager {
     chatPlanner.plans = state.values.plans;
     await this.chatPlannerRepository.save(chatPlanner);
     console.log(state);
+  }
+
+  public async chatRemoteAgent(
+    agent: Agent,
+    messages: BaseMessage[],
+    config: {
+      providerModel: string;
+      options?: ChatOptions | undefined;
+      callbacks?: any | undefined;
+      signal?: AbortSignal | undefined;
+      configurable?: Record<string, any> | undefined;
+    },
+  ) {
+    const handlerMessageCreated = config?.callbacks?.['handleMessageCreated'];
+    const handlerMessageUpdate = config?.callbacks?.['handleMessageUpdate'];
+    const handlerMessageFinished = config?.callbacks?.['handleMessageFinished'];
+    const handlerMessageStream = config?.callbacks?.['handleMessageStream'];
+    const handlerMessageError = config?.callbacks?.['handleMessageError'];
+
+    const { provider, modelName } = getProviderModel(
+      config?.providerModel || agent.model,
+    );
+    const providerInfo = await providersManager.getProviders();
+    const providerType = providerInfo.find((x) => x.name == provider)?.type;
+    // const tools = await toolsManager.buildTools(agent?.tools);
+
+    const model = await getChatModel(provider, modelName, config?.options);
+    const reactAgent = await agentManager.buildAgent({
+      agent,
+      store: new InMemoryStore(),
+      model: config?.providerModel,
+      messageEvent: {
+        created: async (msg) => {
+          await Promise.all(
+            msg.map(async (x) => {
+              await handlerMessageCreated?.(x);
+            }),
+          );
+        },
+        updated: async (msg) => {
+          await Promise.all(
+            msg.map(async (x) => {
+              await handlerMessageUpdate?.(x);
+            }),
+          );
+        },
+        finished: async (msg) => {
+          await Promise.all(
+            msg.map(async (x) => {
+              await handlerMessageFinished?.(x);
+            }),
+          );
+        },
+      },
+    });
+
+    await runAgent(reactAgent, messages, {
+      signal: config?.signal,
+      configurable: config?.configurable,
+      modelName,
+      providerType,
+      recursionLimit: agent.recursionLimit,
+      callbacks: {
+        handlerMessageCreated,
+        handlerMessageFinished,
+        handlerMessageStream,
+        handlerMessageError,
+      },
+    });
   }
 
   public async cancelChat(chatId: string) {

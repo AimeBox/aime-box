@@ -21,6 +21,7 @@ import { ChatOptions } from '../../entity/Chat';
 import { ChatDeepSeek } from '@langchain/deepseek';
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { BaseTool } from '../tools/BaseTool';
+import { MinimaxProvider } from '../providers/MinimaxProvider';
 
 export async function getChatModel(
   providerName: string,
@@ -141,15 +142,27 @@ export async function getChatModel(
       streaming: options?.streaming,
       topP: options?.top_p,
     });
-  } else if (provider?.type === ProviderType.AZURE) {
+  } else if (provider?.type === ProviderType.AZURE_OPENAI) {
     llm = new AzureChatOpenAI({
-      model: model.name,
-      apiKey: provider.api_key,
+      model: model.name.toLowerCase(),
       temperature: options?.temperature,
       maxTokens: options?.maxTokens,
+      apiKey: provider.api_key,
+      openAIApiVersion: provider.config?.apiVersion || '2024-10-21',
+      // maxRetries: 2,
+      azureOpenAIApiKey: provider.api_key, // In Node.js defaults to process.env.AZURE_OPENAI_API_KEY
+      azureOpenAIApiInstanceName: new URL(provider.api_base).host.split('.')[0], // In Node.js defaults to process.env.AZURE_OPENAI_API_INSTANCE_NAME
+      azureOpenAIApiDeploymentName: model.name.toLowerCase(),
       streaming: options?.streaming,
       topP: options?.top_p,
+      configuration: {
+        httpAgent: settingsManager.getHttpAgent(),
+      },
+      //  process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME, // In Node.js defaults to process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME
+      //azureOpenAIApiVersion: provider.extend_params.apiVersion, // In Node.js defaults to process.env.AZURE_OPENAI_API_VERSION
     });
+  } else if (provider?.type === ProviderType.MINIMAX) {
+    llm = new MinimaxProvider().getChatModel(provider, model.name, options);
   }
   if (tools.length > 0) {
     const llmWithTools = llm.bindTools(tools);

@@ -12,6 +12,7 @@ import {
   START,
   StateGraph,
   MessagesAnnotation,
+  BaseStore,
 } from '@langchain/langgraph';
 import { ChatOptions } from '../../../entity/Chat';
 import { getChatModel } from '../../llm';
@@ -37,7 +38,7 @@ import {
 } from '@langchain/core/prompts';
 import { LLMGraphTransformer } from '@langchain/community/experimental/graph_transformers/llm';
 import { ChatResponse } from '@/main/chat/ChatResponse';
-import { BaseAgent } from '../BaseAgent';
+import { AgentMessageEvent, BaseAgent } from '../BaseAgent';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import {
@@ -65,6 +66,7 @@ import { notificationManager } from '@/main/app/NotificationManager';
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationMessage } from '@/types/notification';
 import ExcelJS from 'exceljs';
+import { ExtractAgentSystemPrompt } from './prompt';
 
 const fieldZod = z
   .array(
@@ -75,7 +77,7 @@ const fieldZod = z
           'field name to display,be consistent with user input language',
         ),
       field: z.string().describe('field name must english lower case'),
-      description: z.optional(z.string()).describe('field description'),
+      description: z.string().optional().nullable().describe('field description'),
       type: z
         .enum([
           'string',
@@ -90,9 +92,10 @@ const fieldZod = z
           'array',
         ])
         .describe('field type'),
-      enumValues: z.optional(
-        z.array(z.string()).describe('field type is enum value'),
-      ),
+      enumValues: z
+        .array(z.string())
+        .optional().nullable()
+        .describe('field type is enum value'),
     }),
   )
   .describe('field information');
@@ -103,17 +106,16 @@ export class ExtractTool extends BaseTool {
       .string()
       .describe('file or directory path or website url to extract'),
     fields: fieldZod,
-    savePath: z.optional(z.string()).describe('save path'),
+    savePath: z
+      .string()
+      .optional().nullable()
+      .describe('File Save Path(.xlsx), Empty if not mentioned by the user'),
   });
-
-  static lc_name() {
-    return 'extract_tool';
-  }
 
   name: string = 'extract_tool';
 
   description: string =
-    'translation expert, help you translate text to target language';
+    'Extract structured content from the given fields and files';
 
   model: BaseChatModel;
 
@@ -233,10 +235,7 @@ export class ExtractTool extends BaseTool {
     const allDocInLLM = this.allDocInLLM ?? false;
     const checkExtractResult = false;
     const splits = await this.textSplitter.splitDocuments(doc);
-    const vectorStore = await MemoryVectorStore.fromDocuments(
-      splits,
-      this.embedding,
-    );
+    
     const extractFieldsResult = {};
     for (const field of fields) {
       extractFieldsResult[field.field] = undefined;
@@ -248,6 +247,10 @@ export class ExtractTool extends BaseTool {
         const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
         return ex;
       } else {
+        const vectorStore = await MemoryVectorStore.fromDocuments(
+        splits,
+        this.embedding,
+      );
         let pageContent = [];
         if (splits.length == 1) {
           pageContent = [splits[0].pageContent];
@@ -265,6 +268,10 @@ export class ExtractTool extends BaseTool {
         return ex;
       }
     } else {
+      const vectorStore = await MemoryVectorStore.fromDocuments(
+        splits,
+        this.embedding,
+      );
       let canStructured = true;
 
       for (let index = 0; index < fields.length; index++) {
@@ -405,7 +412,10 @@ export class ExtractTool extends BaseTool {
       chunkSize: 1000,
       chunkOverlap: 200,
     });
-    this.embedding = await getDefaultEmbeddingModel();
+    if(!this.embedding){
+      this.embedding = await getDefaultEmbeddingModel();
+    }
+    
     const { pathOrUrl, fields } = input;
     let type: 'url' | 'file' | 'directory';
     if (isUrl(pathOrUrl)) {
@@ -567,31 +577,45 @@ export class ExtractTool extends BaseTool {
       let extractionDataSchema;
       if (field.type == 'number') {
         zodObject[field.field] = z
-          .optional(z.number())
+          .number()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'boolean') {
         zodObject[field.field] = z
-          .optional(z.boolean())
+          .boolean()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'bigint') {
         zodObject[field.field] = z
-          .optional(z.bigint())
+          .bigint()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'date') {
         zodObject[field.field] = z
-          .optional(z.string())
+          .string()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'enum' && field.enumValues) {
         zodObject[field.field] = z
-          .optional(z.enum(field.enumValues as [string, ...string[]]))
+          .enum(field.enumValues as [string, ...string[]])
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else if (field.type == 'array') {
         zodObject[field.field] = z
-          .optional(z.array(z.string()))
+          .array(z.string())
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       } else {
         zodObject[field.field] = z
-          .optional(z.string())
+          .string()
+          .optional()
+          .nullable()
           .describe(field.name + field.description);
       }
     }
@@ -632,6 +656,14 @@ export class ExtractAgent extends BaseAgent {
       },
     },
     {
+      label: t('embedding'),
+      field: 'embedding',
+      component: 'ProviderSelect',
+      componentProps: {
+        type: 'embedding',
+      },
+    },
+    {
       label: t('一次性全字段提取'),
       field: 'allFieldInLLM',
       component: 'Switch',
@@ -643,14 +675,21 @@ export class ExtractAgent extends BaseAgent {
       component: 'Switch',
       defaultValue: false,
     },
+    {
+      label: t('agents.prompt'),
+      field: 'systemPrompt',
+      component: 'InputTextArea',
+      defaultValue: ExtractAgentSystemPrompt,
+      required: true,
+    },
   ];
 
-  config: any = {
-    fieldModel: '',
-    extractModel: '',
-    allDocInLLM: false,
-    allFieldInLLM: false,
-  };
+  // config: any = {
+  //   fieldModel: '',
+  //   extractModel: '',
+  //   allDocInLLM: false,
+  //   allFieldInLLM: false,
+  // };
 
   textSplitter: TextSplitter;
 
@@ -661,6 +700,8 @@ export class ExtractAgent extends BaseAgent {
   extractLLM: BaseChatModel;
 
   embedding: Embeddings;
+
+  systemPrompt: string;
 
   constructor(options: {
     provider: string;
@@ -678,8 +719,16 @@ export class ExtractAgent extends BaseAgent {
     }),
   });
 
-  async createAgent() {
+  async createAgent(params: {
+    store?: BaseStore;
+    model?: BaseChatModel;
+    messageEvent?: AgentMessageEvent;
+    chatOptions?: ChatOptions;
+    signal?: AbortSignal;
+    configurable?: Record<string, any>;
+  }) {
     const config = await this.getConfig();
+    this.systemPrompt = config.systemPrompt;
     const { provider, modelName } = getProviderModel(config.fieldModel);
     const { provider: extractProvider, modelName: extractModelName } =
       getProviderModel(config.extractModel);
@@ -694,20 +743,16 @@ export class ExtractAgent extends BaseAgent {
     const extractModel = await getChatModel(extractProvider, extractModelName, {
       temperature: 0,
     });
-    this.embedding = await getDefaultEmbeddingModel();
+    if(config.embedding){
+      const { provider :embeddingProvider, modelName: embeddingModelName } = getProviderModel(config.embedding);
+      this.embedding = await getEmbeddingModel(embeddingProvider, embeddingModelName)
+    }else{
+      this.embedding = await getDefaultEmbeddingModel();
+    }
+    
     async function callCheck(state: typeof MessagesAnnotation.State) {
       const promptTemplate = ChatPromptTemplate.fromMessages([
-        [
-          'system',
-          [
-            '因为你的任务是提取用户给定的文件/文件夹路径中文件的抽取字段信息',
-            'step1:判断用户是否输入了路径信息,如果没有请先询问用户处理的文件/文件夹路径',
-            'step2:判断用户输入的信息是否给出了需要抽取的字段描述',
-            '- 如果没有描述抽取的字段请先询问用户需要抽取的字段(不提供建议)',
-            '- 如果抽取的描述很模糊你应该给出一些字段建议供用户参考',
-            'step3:如果用户给出了需要提取的字段描述和路径,请使用工具`extract_tool`提取字段信息,只用一次',
-          ].join('\n'),
-        ],
+        ['system', that.systemPrompt],
         new MessagesPlaceholder('messages'),
       ]);
       const fieldsTool = tool(async ({ pathOrUrl, fields }) => {}, {
@@ -717,7 +762,11 @@ export class ExtractAgent extends BaseAgent {
             .string()
             .describe('file or directory or web url path to extract'),
           fields: fieldZod,
-          savePath: z.optional(z.string()).describe('save path'),
+          savePath: z
+            .string()
+            .optional()
+            .nullable()
+            .describe('save path, Empty if not mentioned by the user'),
         }),
       });
       //const prompt = await promptTemplate.invoke({ messages: state.messages });
@@ -754,7 +803,7 @@ export class ExtractAgent extends BaseAgent {
         model: extractModel,
         allFieldInLLM: config.allFieldInLLM,
         allDocInLLM: config.allDocInLLM,
-        embedding: this.embedding,
+        embedding: that.embedding,
       });
       const toolNode = new ToolNode([extractTool]);
       const result = await toolNode.streamEvents(
@@ -763,6 +812,7 @@ export class ExtractAgent extends BaseAgent {
         },
         {
           version: 'v2',
+          // tags: ['ignore'],
         },
       );
 

@@ -7,7 +7,12 @@ import {
   isToolMessage,
   ToolMessage,
 } from '@langchain/core/messages';
-import { Command, CompiledStateGraph, StateGraph } from '@langchain/langgraph';
+import {
+  Command,
+  CompiledStateGraph,
+  StateGraph,
+  StateSnapshot,
+} from '@langchain/langgraph';
 import { v4 as uuidv4 } from 'uuid';
 import { notificationManager } from '../app/NotificationManager';
 import { isArray } from '../utils/is';
@@ -22,6 +27,7 @@ export const runAgent = async (
     signal?: AbortSignal;
     configurable?: Record<string, any> | undefined;
     recursionLimit?: number;
+    state?: StateSnapshot;
     callbacks?: {
       handlerMessageCreated?: (message: BaseMessage) => Promise<void>;
       handlerMessageUpdate?: (message: BaseMessage) => Promise<void>;
@@ -38,26 +44,22 @@ export const runAgent = async (
       const files: any[] = x.content.filter((x) => x.type == 'file');
       if (x.content.find((x) => x.type == 'text')) {
         (x.content.find((x) => x.type == 'text') as any).text +=
-          `\n${files.map((z) => `<file>[${z.name}](${z.path})</file>`).join('\n')}`;
+          `\n${files.map((z) => `<file>${z.path}</file>`).join('\n')}`;
       } else {
         x.content.push({
           type: 'text',
-          text: files
-            .map((z) => `<file>[${z.name}](${z.path})</file>`)
-            .join('\n'),
+          text: files.map((z) => `<file>${z.path}</file>`).join('\n'),
         });
       }
       x.content = x.content.filter((x) => x.type != 'file');
       const folders: any[] = x.content.filter((x) => x.type == 'folder');
       if (x.content.find((x) => x.type == 'text')) {
         (x.content.find((x) => x.type == 'text') as any).text +=
-          `\n${folders.map((z) => `<folder>[${z.name}](${z.path})</folder>`).join('\n')}`;
+          `\n${folders.map((z) => `<folder>${z.path}</folder>`).join('\n')}`;
       } else {
         x.content.push({
           type: 'text',
-          text: folders
-            .map((z) => `<folder>[${z.name}](${z.path})</folder>`)
-            .join('\n'),
+          text: folders.map((z) => `<folder>${z.path}</folder>`).join('\n'),
         });
       }
       x.content = x.content.filter((x) => x.type != 'folder');
@@ -85,11 +87,12 @@ export const runAgent = async (
       ...(options?.configurable || {}),
     };
 
-    if (
-      messages.length > 1 &&
-      messages[messages.length - 2].additional_kwargs?.model == 'ask'
-    ) {
-      resume = new Command({ resume: messages[messages.length - 1] });
+    if (agent.lc_namespace?.[0] == 'langgraph' && options?.state) {
+      const values = options?.state?.values;
+
+      if (values && 'waitHumanAsk' in values && values?.waitHumanAsk == true) {
+        resume = new Command({ resume: messages[messages.length - 1] });
+      }
     }
 
     const eventStream = await agent.streamEvents(resume || { messages }, {
@@ -103,12 +106,13 @@ export const runAgent = async (
     let _toolStart = [];
     const _messages = [];
     for await (const { event, tags, data } of eventStream) {
+      console.log(event, tags, data);
       if (tags.includes('ignore')) {
         // console.log(event, tags, data);
         continue;
       }
       if (event == 'on_chat_model_start') {
-        console.log('on_chat_model_start', data, tags);
+        // console.log('on_chat_model_start', data, tags);
         _lastMessage =
           data.input.messages[0][data.input.messages[0].length - 1];
         if (isHumanMessage(_lastMessage)) {
@@ -150,7 +154,7 @@ export const runAgent = async (
           }
         }
       } else if (event == 'on_chat_model_end') {
-        console.log('on_chat_model_end', data, tags);
+        // console.log('on_chat_model_end', data, tags);
         if (data.output && _lastMessage) {
           _lastMessage.content = data.output.content;
           _lastMessage.tool_calls = data.output.tool_calls;
@@ -163,7 +167,7 @@ export const runAgent = async (
           await options?.callbacks?.handlerMessageFinished?.(_lastMessage);
         }
       } else if (event == 'on_tool_start') {
-        console.log('on_tool_start', data);
+        // console.log('on_tool_start', data);
         const toolCall = _toolCalls.shift();
         if (toolCall) {
           const toolMessage = new ToolMessage({
@@ -182,7 +186,7 @@ export const runAgent = async (
           _toolStart.push(toolMessage);
         }
       } else if (event == 'on_tool_end') {
-        console.log('on_tool_end', data);
+        // console.log('on_tool_end', data);
         let _isToolMessage = false;
         const tooStart = _toolStart.shift();
 
@@ -246,7 +250,7 @@ export const runAgent = async (
       } else if (event == 'on_custom_event') {
         console.log('on_custom_event', data);
       } else {
-        console.log(event, tags, data);
+        // console.log(event, tags, data);
       }
     }
   } catch (err) {

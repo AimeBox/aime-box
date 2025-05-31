@@ -45,6 +45,7 @@ import {
   CreateDirectory,
   DeleteFile,
   FileRead,
+  FileSystemToolKit,
   FileWrite,
   ListDirectory,
   MoveFile,
@@ -58,7 +59,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { WebSearchTool } from './WebSearchTool';
 import { ChartjsTool } from './Chartjs';
 import { z, ZodObject } from 'zod';
-import { BaseTool } from './BaseTool';
+import { BaseTool, BaseToolKit } from './BaseTool';
 import { KnowledgeBaseQuery } from './KnowledgeBaseQuery';
 import fs from 'fs';
 import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket';
@@ -84,6 +85,7 @@ import { appManager } from '../app/AppManager';
 import { BraveSearchTool } from './websearch/BraveSearch';
 import { ArxivTool } from './Arxiv';
 import { FireCrawl } from './FireCrawl';
+import { jsonSchemaToZod } from '../utils/jsonSchemaToZod';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -92,6 +94,7 @@ export interface ToolInfo extends Tools {
   parameters: object | undefined;
   officialLink?: string | undefined;
   configSchema?: FormSchema[] | undefined;
+  tags?: string[] | undefined;
 }
 
 export interface McpServerInfo extends McpServers {
@@ -114,67 +117,114 @@ export class ToolsManager {
 
   constructor() {}
 
-  public async registerTool(ClassType, params: undefined | any = undefined) {
-    let ts;
+  public async registerTool(ClassType) {
     try {
-      let tool = Reflect.construct(ClassType, params ? [params] : []);
-      this.builtInToolsClassType.push({
-        name: tool.name,
-        classType: ClassType,
-      });
-      ts = await this.toolRepository.findOne({
-        where: { name: tool.name },
-      });
-      if (!ts) {
-        ts = new Tools(tool.name, tool.description, 'built-in', params);
-        ts.enabled = false;
-        ts.toolkit_name = tool.toolKitName || tool.name;
+      const parent = Object.getPrototypeOf(ClassType);
+      if (parent?.name == BaseToolKit.name) {
+        const toolKit: BaseToolKit = Reflect.construct(ClassType, []);
 
-        await this.toolRepository.save(ts);
-      } else {
-        const vj = ts.config ?? {};
-        if (params) {
-          Object.keys(params).forEach((key) => {
-            if (Object.keys(vj).includes(key)) {
-              params[key] = vj[key];
-            }
+        for (const tool of toolKit.getTools()) {
+          this.builtInToolsClassType.push({
+            name: tool.name,
+            classType: tool.constructor,
           });
+          let ts = await this.toolRepository.findOne({
+            where: { name: tool.name },
+          });
+          if (!ts) {
+            ts = new Tools(tool.name, tool.description, 'built-in');
+            ts.enabled = false;
+            ts.toolkit_name = tool.toolKitName || tool.name;
+
+            await this.toolRepository.save(ts);
+          } else {
+            ts.description = tool.description;
+            await this.toolRepository.save(ts);
+            const vj = ts.config ?? {};
+          }
+          if (this.tools.find((x) => x.name == ts.name)) {
+            this.tools = this.tools.filter((x) => x.name != ts.name);
+          }
+          this.tools.push({
+            ...ts,
+            id: ts.name,
+            //parameters: params,
+            status: 'success',
+            toolkit_name: tool.toolKitName || tool.name,
+            schema: zodToJsonSchema(tool.schema),
+            officialLink: tool.officialLink,
+            configSchema: tool.configSchema,
+          } as ToolInfo);
+        }
+      } else {
+        let ts;
+        let tool: BaseTool = Reflect.construct(ClassType, []);
+        this.builtInToolsClassType.push({
+          name: tool.name,
+          classType: ClassType,
+        });
+        ts = await this.toolRepository.findOne({
+          where: { name: tool.name },
+        });
+        let params;
+        if (!ts) {
+          ts = new Tools(tool.name, tool.description, 'built-in');
+          ts.enabled = false;
+          ts.toolkit_name = tool.toolKitName || tool.name;
+
+          await this.toolRepository.save(ts);
+        } else {
+          ts.description = tool.description;
+          await this.toolRepository.save(ts);
+          const vj = ts.config ?? {};
+          if (tool.configSchema) {
+            params = {};
+            tool.configSchema.forEach((item) => {
+              params[item.field] = vj[item.field] || item.defaultValue;
+            });
+          }
+
+          // Object.keys(vj).forEach((key) => {
+          //   if (Object.keys(vj).includes(key)) {
+          //     params[key] = vj[key];
+          //   }
+          // });
+
+          //params = { ...params, ...JSON.parse(ts.value) };
+        }
+        if (this.tools.find((x) => x.name == ts.name)) {
+          this.tools = this.tools.filter((x) => x.name != ts.name);
         }
 
-        //params = { ...params, ...JSON.parse(ts.value) };
-      }
-      if (this.tools.find((x) => x.name == ts.name)) {
-        this.tools = this.tools.filter((x) => x.name != ts.name);
-      }
-
-      if (params) {
-        const ss = Object.entries(params);
-        tool = Reflect.construct(ClassType, params ? [params] : []);
-      }
-      if (this.tools.find((x) => x.name == tool.name)) {
-        this.tools = this.tools.filter((x) => x.name != tool.name);
-      }
-      this.tools.push({
-        ...ts,
-        id: ts.name,
-        parameters: params,
-        status: 'success',
-        toolkit_name: tool.toolKitName || tool.name,
-        schema: zodToJsonSchema(tool.schema),
-        officialLink: tool.officialLink,
-        configSchema: tool.configSchema,
-      } as ToolInfo);
-    } catch (err) {
-      if (ts) {
+        if (params) {
+          tool = Reflect.construct(ClassType, params ? [params] : []);
+        }
+        if (this.tools.find((x) => x.name == tool.name)) {
+          this.tools = this.tools.filter((x) => x.name != tool.name);
+        }
         this.tools.push({
           ...ts,
+          id: ts.name,
           parameters: params,
-          status: 'error',
-          // schema: zodToJsonSchema(tool.schema),
-          // officialLink: tool.officialLink,
-          // configSchema: tool.configSchema,
+          status: 'success',
+          toolkit_name: tool.toolKitName || tool.name,
+          schema: zodToJsonSchema(tool.schema),
+          officialLink: tool.officialLink,
+          configSchema: tool.configSchema,
+          tags: tool?.tags || [],
         } as ToolInfo);
       }
+    } catch (err) {
+      // if (ts) {
+      //   this.tools.push({
+      //     ...ts,
+      //     // parameters: params,
+      //     status: 'error',
+      //     // schema: zodToJsonSchema(tool.schema),
+      //     // officialLink: tool.officialLink,
+      //     // configSchema: tool.configSchema,
+      //   } as ToolInfo);
+      // }
       console.error(`register '${ClassType.name}' tool fail, ${err.message}`);
     }
   }
@@ -188,7 +238,7 @@ export class ToolsManager {
     filter: string = undefined,
     type: 'all' | 'built-in' | 'mcp' = 'all',
   ): ToolInfo[] {
-    let { tools } = this;
+    const { tools } = this;
     let list = [];
 
     if (type == 'all' || type == 'built-in') {
@@ -209,14 +259,6 @@ export class ToolsManager {
     return list;
   }
 
-  public getTools(): BaseTool[] {
-    return this.tools.map((x) => x.tool);
-  }
-
-  public queryTools = (text: string): Tool[] => {
-    return [];
-  };
-
   public buildTool = async (tool: Tools, config: any): Promise<BaseTool> => {
     try {
       if (tool.type == 'mcp') {
@@ -236,7 +278,7 @@ export class ToolsManager {
           (x) => x.name == tool.name.split('@')[0],
         );
         console.log(_tool.inputSchema);
-        const schema = this.jsonSchemaToZod(_tool.inputSchema);
+        const schema = jsonSchemaToZod(_tool.inputSchema);
         return LangchainTool(
           async (input): Promise<string> => {
             const result = {};
@@ -295,120 +337,6 @@ export class ToolsManager {
 
     return null;
   };
-
-  private jsonSchemaToZod(schema: any) {
-    if (!schema || typeof schema !== 'object') {
-      return z.any();
-    }
-
-    // 处理基本类型
-    if (schema.type === 'string') {
-      let validator;
-      if (schema.enum) {
-        validator = z.enum(schema.enum);
-      } else {
-        validator = z.string();
-        if (schema.pattern)
-          validator = validator.regex(new RegExp(schema.pattern));
-        if (schema.minLength !== undefined)
-          validator = validator.min(schema.minLength);
-        if (schema.maxLength !== undefined)
-          validator = validator.max(schema.maxLength);
-      }
-
-      if (schema.description)
-        validator = validator.describe(schema.description);
-      validator.default = undefined;
-
-      return z.optional(validator);
-    } else if (schema.type === 'number' || schema.type === 'integer') {
-      let validator;
-      if (schema.enum) {
-        validator = z.enum(schema.enum);
-      } else {
-        validator = schema.type === 'integer' ? z.number().int() : z.number();
-        if (schema.minimum !== undefined)
-          validator = validator.gte(schema.minimum);
-        if (schema.maximum !== undefined)
-          validator = validator.lte(schema.maximum);
-      }
-
-      if (schema.description)
-        validator = validator.describe(schema.description);
-      validator.default = undefined;
-      return z.optional(validator);
-    } else if (schema.type === 'boolean') {
-      let validator;
-      if (schema.enum) {
-        validator = z.enum(schema.enum);
-      } else {
-        validator = z.boolean();
-      }
-
-      if (schema.description)
-        validator = validator.describe(schema.description);
-      validator.default = undefined;
-      return z.optional(validator);
-    } else if (schema.type === 'null') {
-      let validator = z.null();
-      if (schema.description)
-        validator = validator.describe(schema.description);
-      validator.default = undefined;
-      return z.optional(validator);
-    } else if (schema.type === 'array') {
-      const itemValidator = schema.items
-        ? this.jsonSchemaToZod(schema.items)
-        : z.any();
-      let validator = z.array(itemValidator);
-      if (schema.minItems !== undefined)
-        validator = validator.min(schema.minItems);
-      if (schema.maxItems !== undefined)
-        validator = validator.max(schema.maxItems);
-      if (schema.description)
-        validator = validator.describe(schema.description);
-      validator.default = undefined;
-      return z.optional(validator);
-    } else if (schema.type === 'object') {
-      const shape = {};
-      let validator;
-      if (schema.properties) {
-        for (const [key, propSchema] of Object.entries(schema.properties)) {
-          shape[key] = this.jsonSchemaToZod(propSchema);
-        }
-        validator = z.object(shape);
-      } else {
-        validator = z.any();
-      }
-
-      // 处理必填字段
-      if (schema.required && Array.isArray(schema.required)) {
-        const required = {};
-        for (const key of schema.required) {
-          if (shape[key]) {
-            required[key] = shape[key];
-          }
-        }
-        validator = validator.required(required);
-      }
-      if (schema.description)
-        validator = validator.describe(schema.description);
-      return validator;
-    }
-
-    // 处理复合类型
-    if (schema.anyOf) {
-      return z.union(schema.anyOf.map((s) => this.jsonSchemaToZod(s)));
-    } else if (schema.allOf) {
-      return schema.allOf.reduce(
-        (acc, s) => acc.and(this.jsonSchemaToZod(s)),
-        z.object({}),
-      );
-    } else if (schema.oneOf) {
-      return z.union(schema.oneOf.map((s) => this.jsonSchemaToZod(s)));
-    }
-
-    return z.any();
-  }
 
   public buildTools = async (toolNames: String[]): Promise<BaseTool[]> => {
     if (isArray(toolNames)) {
@@ -547,7 +475,7 @@ export class ToolsManager {
     if (!app.isPackaged) {
       await this.registerTool(SleepTool);
       await this.registerTool(ChartjsTool);
-      await this.registerTool(NodejsVM, { sensitive: true });
+      await this.registerTool(NodejsVM);
     }
     await this.registerTool(BrowserUseTool);
     await this.registerTool(TerminalTool);
@@ -556,73 +484,30 @@ export class ToolsManager {
     await this.registerTool(Translate);
     await this.registerTool(UnixTimestampConvert);
     await this.registerTool(Vision);
-    await this.registerTool(DuckDuckGoSearchTool, {
-      maxResults: 3,
-    } as DuckDuckGoSearchParameters);
-    await this.registerTool(SearxngSearchTool, { apiBase: 'NULL' });
-    await this.registerTool(DallE, {
-      n: 1, // Default
-      modelName: 'dall-e-3', // Default
-      apiKey: 'NULL', // Default
-    });
+    await this.registerTool(DuckDuckGoSearchTool);
+    await this.registerTool(SearxngSearchTool);
+    await this.registerTool(DallE);
     await this.registerTool(RapidOcrTool);
-    await this.registerTool(PythonInterpreterTool, {
-      pythonPath: '',
-      keepVenv: false,
-    });
+    await this.registerTool(PythonInterpreterTool);
 
-    await this.registerTool(GoogleRoutesAPI, {
-      apiKey: 'NULL',
-    } as GoogleRoutesAPIParams);
-    await this.registerTool(GooglePlacesAPI, {
-      apiKey: 'NULL',
-    } as GooglePlacesAPIParams);
-    await this.registerTool(WikipediaQueryRun, {
-      topKResults: 3,
-      maxDocContentLength: 4000,
-      baseUrl: 'https://en.wikipedia.org/w/api.php',
-    } as WikipediaQueryRunParams);
+    // await this.registerTool(GoogleRoutesAPI);
+    // await this.registerTool(GooglePlacesAPI);
+    await this.registerTool(WikipediaQueryRun);
 
     await this.registerTool(SocialMediaSearch);
     await this.registerTool(FileToText);
 
-    await this.registerTool(Vectorizer, {
-      apiKeyName: '',
-      apiKey: '',
-      mode: 'test',
-    });
-    await this.registerTool(WebLoader, {
-      headless: false,
-      useJina: false,
-    });
+    await this.registerTool(Vectorizer);
+    await this.registerTool(WebLoader);
     await this.registerTool(RemoveBackground);
     await this.registerTool(SpeechToText);
-    await this.registerTool(Ideogram, {
-      apiKey: '',
-      apiBase: 'https://api.ideogram.ai',
-      model: 'V_2',
-    });
-    await this.registerTool(Midjourney, {
-      apiKey: '',
-      apiBase: '',
-      mode: 'relax',
-    });
-    await this.registerTool(ComfyuiTool, {
-      defaultApiBase: 'http://127.0.0.1:8188',
-    });
+    await this.registerTool(Ideogram);
+    await this.registerTool(Midjourney);
+    await this.registerTool(ComfyuiTool);
     // await this.registerTool(AskHuman);
+    await this.registerTool(FileSystemToolKit);
 
-    await this.registerTool(FileWrite);
-    await this.registerTool(FileRead);
-    await this.registerTool(ListDirectory);
-    await this.registerTool(CreateDirectory);
-    await this.registerTool(SearchFiles);
-    await this.registerTool(MoveFile);
-    await this.registerTool(DeleteFile);
-
-    await this.registerTool(TextToSpeech, {
-      model: 'matcha-icefall-zh-baker@local',
-    });
+    await this.registerTool(TextToSpeech);
     await this.registerTool(WebSearchTool);
     await this.registerTool(KnowledgeBaseQuery);
     await this.registerTool(TavilySearchTool);
@@ -1050,7 +935,7 @@ export class ToolsManager {
   }
 
   createMcpUrl(command: string, config: any) {
-    const url = new URL(`${command}/mcp`);
+    const url = new URL(`${command}`);
     if (config) {
       const param =
         typeof window !== 'undefined'

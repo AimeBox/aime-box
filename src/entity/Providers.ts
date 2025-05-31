@@ -14,7 +14,9 @@ export enum ProviderType {
   DEEPSEEK = 'deepseek',
   BAIDU = 'baidu',
   LMSTUDIO = 'lmstudio',
-  AZURE = 'azure',
+  AZURE_OPENAI = 'azure_openai',
+  VOLCANOENGINE = 'volcanoengine',
+  MINIMAX = 'minimax',
 }
 
 @Entity('providers')
@@ -39,4 +41,10 @@ export class Providers {
   models?: any;
 
   static: boolean;
+
+  @Column('json', { nullable: true })
+  config?: any;
+
+  @Column({ nullable: true })
+  icon?: string;
 }

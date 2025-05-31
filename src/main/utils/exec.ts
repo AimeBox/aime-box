@@ -15,6 +15,7 @@ export const runCommandSync = (command: string) => {
 export const runCommand = async (
   command: string,
   file?: string,
+  cwd?: string,
 ): Promise<string> => {
   let _file = file;
   if (!_file) {
@@ -57,14 +58,23 @@ export const runCommand = async (
     //   console.log(`子进程退出，退出码 ${code}`);
     // });
     // return;
+
     const child2 = exec(
       commands.join(' '),
       {
         encoding: 'buffer',
+        windowsHide: false,
+        cwd: cwd,
       },
       (error, stdout, stderr) => {
-        const res_out = iconv.decode(stdout, 'cp936');
-        const res_err = iconv.decode(stderr, 'cp936');
+        const res_out = iconv.decode(
+          stdout,
+          platform == 'win32' ? 'cp936' : 'utf8',
+        );
+        const res_err = iconv.decode(
+          stderr,
+          platform == 'win32' ? 'cp936' : 'utf8',
+        );
         if (error) {
           if (res_err) {
             reject(new Error(`Error:\n${res_err}`));
@@ -78,7 +88,10 @@ export const runCommand = async (
           reject(new Error(`${error.message}`));
           return;
         }
-        const out = iconv.decode(stdout, 'cp936');
+        const out = iconv.decode(
+          stdout,
+          platform == 'win32' ? 'cp936' : 'utf8',
+        );
         resolve(out);
       },
     );

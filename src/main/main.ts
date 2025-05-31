@@ -1,5 +1,5 @@
 import path, { join, normalize } from 'path';
-import {
+import Electron, {
   app,
   BrowserWindow,
   shell,
@@ -7,6 +7,8 @@ import {
   dialog,
   protocol,
   net,
+  Tray,
+  Menu,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
@@ -42,7 +44,7 @@ import {
 } from '@langchain/core/messages';
 import tokenCounter from './utils/tokenCounter';
 import { getChatModel } from './llm';
-import checkAndSummarize from './utils/messages';
+import { getAssetPath } from './utils/path';
 
 dbManager
   .init()
@@ -63,6 +65,8 @@ dbManager
   .catch((error) => {
     console.log(error);
   });
+
+let tray: Tray | null = null;
 
 process.on('uncaughtException', (error) => {
   console.error('未捕获的异常:', error);
@@ -305,11 +309,37 @@ app
   .whenReady()
   .then(() => {
     createWindow();
+    if (!tray) {
+      let icon = Electron.nativeImage.createFromPath(getAssetPath('icon.png'));
+      icon = icon.resize({ width: 16, height: 16 });
+      tray = new Tray(icon);
+      const contextMenu = Menu.buildFromTemplate([
+        {
+          label: '显示主界面',
+          click: () => {
+            mainWindow?.show();
+          },
+        },
+        {
+          label: t('common.quit'),
+          click: () => {
+            tray?.destroy();
+            app.quit();
+          },
+        },
+      ]);
+      tray.setToolTip('Aime Box');
+      tray.setContextMenu(contextMenu);
 
+      tray.on('click', () => {
+        mainWindow?.show();
+      });
+    }
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
       if (mainWindow === null) createWindow();
     });
+    return true;
   })
   .catch(console.log);

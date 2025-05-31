@@ -27,6 +27,9 @@ import { Transformers } from '../utils/transformers';
 import { notificationManager } from '../app/NotificationManager';
 import { ChatBaiduQianfan } from '@langchain/baidu-qianfan';
 import { ChatCompletion } from '@baiducloud/qianfan';
+import { VolcanoEngineProvider } from './VolcanoEngineProvider';
+import { OllamaProvider } from './OllamaProvider';
+import { MinimaxProvider } from './MinimaxProvider';
 
 export class ProvidersManager {
   repository: Repository<Providers>;
@@ -91,20 +94,9 @@ export class ProvidersManager {
     const httpProxy = settingsManager.getHttpAgent();
     try {
       if (connection.type === ProviderType.OLLAMA) {
-        const ollama = new Ollama({ host: connection.api_base });
-        const list = await ollama.list();
-        return list.models.map((x) => {
-          return {
-            name: x.name,
-            enable:
-              connection.models.find((z) => z.name == x.name)?.enable || false,
-            input_token:
-              connection.models.find((z) => z.name == x.name)?.input_token || 0,
-            output_token:
-              connection.models.find((z) => z.name == x.name)?.output_token ||
-              0,
-          };
-        });
+        const ollama = new OllamaProvider();
+        const list = await ollama.getModelList(connection);
+        return list;
       } else if (
         connection.type === ProviderType.OPENAI ||
         connection.type === ProviderType.LMSTUDIO
@@ -327,6 +319,43 @@ export class ProvidersManager {
             };
           })
           .sort((a, b) => a.name.localeCompare(b.name));
+      } else if (connection.type === ProviderType.AZURE_OPENAI) {
+        //const apiKey = new AzureKeyCredential(connection.api_key);
+        const endpoint = connection.api_base;
+        const apiVersion = connection.config?.apiVersion || '2024-10-21';
+        // const deployment =
+        //   connection.extend_params?.deployment || 'gpt-35-turbo';
+        const options = {
+          method: 'GET',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            Authorization: `Bearer ${connection.api_key}`,
+          },
+        };
+        const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
+        const res = await fetch(url, options);
+        const models = await res.json();
+        return models.data
+          .filter(
+            (x) => x.capabilities.chat_completion && x.status == 'succeeded',
+          )
+          .map((x) => {
+            return {
+              name: x.id,
+              enable:
+                connection.models?.find((z) => z.name == x.id)?.enable || false,
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
+      } else if (connection?.type === ProviderType.VOLCANOENGINE) {
+        const volcanoEngine = new VolcanoEngineProvider();
+        const list = await volcanoEngine.getModelList(connection);
+        return list;
+      } else if (connection?.type === ProviderType.MINIMAX) {
+        const minimax = new MinimaxProvider();
+        const list = await minimax.getModelList(connection);
+        return list;
       }
     } catch (e) {
       console.log(e);
@@ -391,6 +420,7 @@ export class ProvidersManager {
       provider.api_base = input.api_base;
       provider.api_key = input.api_key;
       provider.models = input.models;
+      provider.config = input.config;
       await this.repository.save(provider);
     } else {
       if (
@@ -436,115 +466,144 @@ export class ProvidersManager {
     });
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
+      try {
+        if (connection?.type === ProviderType.OLLAMA) {
+          try {
+            const localOllama = new Ollama();
+            const list = await localOllama.list();
 
-      if (connection?.type === ProviderType.OLLAMA) {
-        try {
-          const localOllama = new Ollama();
-          const list = await localOllama.list();
+            if (list.models.length > 0) {
+              emb_list.push({
+                name: connection.name,
+                type: ProviderType.OLLAMA,
+                api_base: connection.api_base,
+                api_key: connection.api_key,
+                static: true,
+                models: list.models.map((x) => x.name).sort(),
+              });
+            }
+          } catch {}
+        } else if (connection?.type === ProviderType.OPENAI) {
+          try {
+            const openai = new OpenAI({
+              baseURL: connection.api_base,
+              apiKey: connection.api_key,
+              httpAgent: httpProxy,
+            });
 
-          if (list.models.length > 0) {
+            const list = await openai.models.list();
             emb_list.push({
               name: connection.name,
-              type: ProviderType.OLLAMA,
-              api_base: connection.api_base,
-              api_key: connection.api_key,
-              static: true,
-              models: list.models.map((x) => x.name).sort(),
+              models: list.data
+                .filter((x) => x.id.startsWith('text-'))
+                .map((x) => x.id)
+                .sort(),
             });
-          }
-        } catch {}
-      } else if (connection?.type === ProviderType.OPENAI) {
-        try {
-          const openai = new OpenAI({
-            baseURL: connection.api_base,
-            apiKey: connection.api_key,
-            httpAgent: httpProxy,
-          });
-
-          const list = await openai.models.list();
+          } catch {}
+        } else if (connection?.type === ProviderType.TONGYI) {
           emb_list.push({
             name: connection.name,
-            models: list.data
-              .filter((x) => x.id.startsWith('text-'))
-              .map((x) => x.id)
-              .sort(),
+            models: ['text-embedding-v2', 'text-embedding-v1'],
           });
-        } catch {}
-      } else if (connection?.type === ProviderType.TONGYI) {
-        emb_list.push({
-          name: connection.name,
-          models: ['text-embedding-v2', 'text-embedding-v1'],
-        });
-      } else if (connection?.type === ProviderType.ZHIPU) {
-        emb_list.push({
-          name: connection.name,
-          models: ['embedding-2', 'text_embedding'],
-        });
-      } else if (connection?.type === ProviderType.SILICONFLOW) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-        const url = 'https://api.siliconflow.cn/v1/models?sub_type=embedding';
-        const res = await fetch(url, options);
-        const models = await res.json();
-
-        emb_list.push({
-          name: connection.name,
-          models: models.data?.map((x) => x.id) ?? [],
-        });
-      } else if (connection?.type === ProviderType.GOOGLE) {
-        const options = {
-          method: 'GET',
-          // headers: {
-          //   accept: 'application/json',
-          //   'content-type': 'application/json',
-          // },
-          agent: httpProxy,
-        };
-        const url = `${connection.api_base}/v1beta/models?key=${connection.api_key}`;
-        let models;
-        try {
-          const res = await fetch(url, options);
-          models = await res.json();
+        } else if (connection?.type === ProviderType.ZHIPU) {
           emb_list.push({
             name: connection.name,
-            models: models.models
-              .filter((x) => x.name.includes('embedding'))
-              .map((x) => x.name.split('/')[1]),
+            models: ['embedding-2', 'text_embedding'],
           });
-        } catch (e) {
-          emb_list.push({
-            name: connection.name,
-            models: [],
-          });
-        }
-      } else if (connection?.type === ProviderType.LMSTUDIO) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-        const url = `${connection.api_base}/models`;
-        try {
+        } else if (connection?.type === ProviderType.SILICONFLOW) {
+          const options = {
+            method: 'GET',
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/json',
+              Authorization: `Bearer ${connection.api_key}`,
+            },
+          };
+          const url = 'https://api.siliconflow.cn/v1/models?sub_type=embedding';
           const res = await fetch(url, options);
           const models = await res.json();
 
           emb_list.push({
             name: connection.name,
-            models:
-              models.data
-                ?.filter((x) => x.id.includes('embedding'))
-                .map((x) => x.id) ?? [],
+            models: models.data?.map((x) => x.id) ?? [],
           });
-        } catch {}
+        } else if (connection?.type === ProviderType.GOOGLE) {
+          const options = {
+            method: 'GET',
+            // headers: {
+            //   accept: 'application/json',
+            //   'content-type': 'application/json',
+            // },
+            agent: httpProxy,
+          };
+          const url = `${connection.api_base}/v1beta/models?key=${connection.api_key}`;
+          let models;
+          try {
+            const res = await fetch(url, options);
+            models = await res.json();
+            emb_list.push({
+              name: connection.name,
+              models: models.models
+                .filter((x) => x.name.includes('embedding'))
+                .map((x) => x.name.split('/')[1]),
+            });
+          } catch (e) {
+            emb_list.push({
+              name: connection.name,
+              models: [],
+            });
+          }
+        } else if (connection?.type === ProviderType.LMSTUDIO) {
+          const options = {
+            method: 'GET',
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/json',
+              Authorization: `Bearer ${connection.api_key}`,
+            },
+          };
+          const url = `${connection.api_base}/models`;
+          try {
+            const res = await fetch(url, options);
+            const models = await res.json();
+
+            emb_list.push({
+              name: connection.name,
+              models:
+                models.data
+                  ?.filter((x) => x.id.includes('embedding'))
+                  .map((x) => x.id) ?? [],
+            });
+          } catch {}
+        } else if (connection?.type === ProviderType.AZURE_OPENAI) {
+          const endpoint = connection.api_base;
+          const apiVersion = connection.config?.apiVersion || '2024-10-21';
+          const options = {
+            method: 'GET',
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/json',
+              Authorization: `Bearer ${connection.api_key}`,
+            },
+          };
+          const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
+          try {
+            const res = await fetch(url, options);
+            const models = await res.json();
+
+            const emb_models = models.data
+              .filter(
+                (x) => x.capabilities.embeddings && x.status == 'succeeded',
+              )
+              .sort((a, b) => a.id.localeCompare(b.id));
+            emb_list.push({
+              name: connection.name,
+              models: [...new Set(emb_models.map((x) => x.id))],
+            });
+          } catch {}
+        }
+      } catch {
+        continue;
       }
     }
     return emb_list;
@@ -562,24 +621,27 @@ export class ProvidersManager {
     });
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
+      try {
+        if (connection?.type === ProviderType.SILICONFLOW) {
+          const options = {
+            method: 'GET',
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/json',
+              Authorization: `Bearer ${connection.api_key}`,
+            },
+          };
+          const url = 'https://api.siliconflow.cn/v1/models?sub_type=reranker';
+          const res = await fetch(url, options);
+          const models = await res.json();
 
-      if (connection?.type === ProviderType.SILICONFLOW) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-        const url = 'https://api.siliconflow.cn/v1/models?sub_type=reranker';
-        const res = await fetch(url, options);
-        const models = await res.json();
-
-        emb_list.push({
-          name: connection.name,
-          models: models.data?.map((x) => x.id)?.sort() ?? [],
-        });
+          emb_list.push({
+            name: connection.name,
+            models: models.data?.map((x) => x.id)?.sort() ?? [],
+          });
+        }
+      } catch {
+        continue;
       }
     }
     return emb_list;
@@ -598,24 +660,27 @@ export class ProvidersManager {
     });
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
+      try {
+        if (connection?.type === ProviderType.SILICONFLOW) {
+          const options = {
+            method: 'GET',
+            headers: {
+              accept: 'application/json',
+              'content-type': 'application/json',
+              Authorization: `Bearer ${connection.api_key}`,
+            },
+          };
+          const url = 'https://api.siliconflow.cn/v1/models?sub_type=reranker';
+          const res = await fetch(url, options);
+          const models = await res.json();
 
-      if (connection?.type === ProviderType.SILICONFLOW) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-        const url = 'https://api.siliconflow.cn/v1/models?type=audio';
-        const res = await fetch(url, options);
-        const models = await res.json();
-
-        emb_list.push({
-          name: connection.name,
-          models: models.data?.map((x) => x.id)?.sort() ?? [],
-        });
+          emb_list.push({
+            name: connection.name,
+            models: models.data?.map((x) => x.id)?.sort() ?? [],
+          });
+        }
+      } catch {
+        continue;
       }
     }
     return emb_list;
@@ -643,11 +708,15 @@ export class ProvidersManager {
 
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
-      if (connection.type == ProviderType.OPENAI) {
-        emb_list.push({
-          name: connection.name,
-          models: ['whisper-1'],
-        });
+      try {
+        if (connection.type == ProviderType.OPENAI) {
+          emb_list.push({
+            name: connection.name,
+            models: ['whisper-1'],
+          });
+        }
+      } catch {
+        continue;
       }
     }
     return emb_list;

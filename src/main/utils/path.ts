@@ -2,6 +2,7 @@ import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import settingsManager from '../settings';
+import { isArray, isString } from './is';
 
 const getDataPath = () => {
   let userData;
@@ -22,6 +23,10 @@ const getDataPath = () => {
 const getTmpPath = () => {
   const userData = app.getPath('userData');
   return path.join(userData, 'tmp');
+};
+
+const getAssetPath = (...paths: string[]): string => {
+  return path.join(app.getAppPath(), 'assets', ...paths);
 };
 
 const rootPath = app.isPackaged ? app.getAppPath() : __dirname;
@@ -57,10 +62,30 @@ const getDefaultModelsPath = () => {
   return modelPath;
 };
 
+const getWorkspacePath = (
+  inputPath: string | string[],
+  config: any,
+): string[] | string => {
+  const { workspace } = config.configurable;
+  if (!workspace) return inputPath;
+
+  if (isArray(inputPath)) {
+    return inputPath.map((x) =>
+      path.isAbsolute(x) ? x : path.join(workspace, x),
+    );
+  } else if (isString(inputPath)) {
+    return path.isAbsolute(inputPath)
+      ? inputPath
+      : path.join(workspace, inputPath);
+  }
+  throw new Error('InputPath Error');
+};
+
 export {
   getDataPath,
   getTmpPath,
   getModelsPath,
   getDefaultModelsPath,
+  getAssetPath,
   rootPath,
 };

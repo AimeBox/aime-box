@@ -43,16 +43,24 @@ export class TerminalTool extends BaseTool {
       component: 'Select',
       label: 'Default Terminal',
       componentProps: {
-        options: [
-          {
-            label: 'Cmd',
-            value: 'cmd.exe',
-          },
-          {
-            label: 'PowerShell',
-            value: 'pwsh.exe',
-          },
-        ],
+        options:
+          platform == 'win32'
+            ? [
+                {
+                  label: 'Cmd',
+                  value: 'cmd.exe',
+                },
+                {
+                  label: 'PowerShell',
+                  value: 'pwsh.exe',
+                },
+              ]
+            : [
+                {
+                  label: 'bash',
+                  value: 'bash',
+                },
+              ],
       },
     },
   ];

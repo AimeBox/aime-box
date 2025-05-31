@@ -13,6 +13,9 @@ import deepseekIcon from '../../../../assets/model-logos/deepseek.png';
 import togetheraiIcon from '../../../../assets/model-logos/togetherai.png';
 import baiduIcon from '../../../../assets/model-logos/baidu.png';
 import lmstudioIcon from '../../../../assets/model-logos/lmstudio.png';
+import azureOpenaiIcon from '../../../../assets/model-logos/azure_openai.png';
+import volcanoEngineIcon from '../../../../assets/model-logos/volcanoengine.png';
+import minimaxIcon from '../../../../assets/model-logos/minimax.png';
 import { pathToFileURL } from 'url';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +38,9 @@ const logos = {
   deepseek: deepseekIcon,
   togetherai: togetheraiIcon,
   lmstudio: lmstudioIcon,
+  azure_openai: azureOpenaiIcon,
+  volcanoengine: volcanoEngineIcon,
+  minimax: minimaxIcon,
 };
 // eslint-disable-next-line react/function-component-definition
 const ProviderIcon: React.FC<ProviderIconProps> = ({

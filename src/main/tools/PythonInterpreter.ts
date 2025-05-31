@@ -51,10 +51,12 @@ export class PythonInterpreterTool extends BaseTool {
 
   schema = z.object({
     script: z.string().describe('python script'),
-    sensitive: z.optional(z.boolean().describe('if the script is sensitive')),
-    dependencies: z.optional(
-      z.array(z.string()).describe('python pip dependencies to install'),
-    ),
+    // sensitive: z.optional(z.boolean().optional.describe('if the script is sensitive')),
+    dependencies: z
+      .array(z.string())
+      .optional()
+      .nullable()
+      .describe('python pip dependencies to install'),
   });
 
   name: string = 'python_interpreter';
@@ -97,15 +99,17 @@ export class PythonInterpreterTool extends BaseTool {
         return 'not found python';
       }
       console.log(`Python Path: ${this.pythonPath}`);
-
+      let cwd;
       if (config?.configurable?.workspace) {
         tempDir = path.join(config?.configurable?.workspace, 'sandbox');
         fs.mkdirSync(tempDir, { recursive: true });
+        cwd = config?.configurable?.workspace;
       } else {
         fs.mkdirSync(path.join(getTmpPath(), 'sandbox'), { recursive: true });
         tempDir = fs.mkdtempSync(
           path.join(getTmpPath(), 'sandbox', `sandbox-`),
         );
+        cwd = tempDir;
       }
       if (this.useVenv) {
         if (!fs.existsSync(path.join(tempDir, '.venv'))) {
@@ -199,6 +203,8 @@ export class PythonInterpreterTool extends BaseTool {
         console.log(`"${this.pythonPath}" "${pythonScriptFilePath}"`);
         const res = await runCommand(
           `"${this.pythonPath}" "${pythonScriptFilePath}"`,
+          undefined,
+          cwd,
         );
         if (res.toString().trim() == '') {
           return 'you should use print() in script!';
@@ -227,7 +233,6 @@ export class PythonInterpreterTool extends BaseTool {
         console.log(`remove temp dir: ${tempDir}`);
       }
     }
-    return null;
   }
 
   async createVenv(path: string) {

@@ -41,7 +41,7 @@ export default function DefaultModelSettings() {
             type="llm"
             value={settings?.defaultLLM}
             allowClear
-            style={{ width: 200 }}
+            style={{ width: 300 }}
             onChange={(v) => onChangeDefaultModel('defaultLLM', v)}
           />
         </div>
@@ -51,7 +51,7 @@ export default function DefaultModelSettings() {
             type="llm"
             value={settings?.defaultTitleLLM}
             allowClear
-            style={{ width: 200 }}
+            style={{ width: 300 }}
             onChange={(v) => onChangeDefaultModel('defaultTitleLLM', v)}
           />
         </div>
@@ -61,7 +61,7 @@ export default function DefaultModelSettings() {
             type="llm"
             value={settings?.defaultVision}
             allowClear
-            style={{ width: 200 }}
+            style={{ width: 300 }}
             onChange={(v) => onChangeDefaultModel('defaultVision', v)}
           />
         </div>
@@ -71,7 +71,7 @@ export default function DefaultModelSettings() {
             type="embedding"
             value={settings?.defaultEmbedding}
             allowClear
-            style={{ width: 200 }}
+            style={{ width: 300 }}
             onChange={(v) => onChangeDefaultModel('defaultEmbedding', v)}
           />
         </div>

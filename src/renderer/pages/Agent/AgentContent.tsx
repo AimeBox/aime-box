@@ -1,9 +1,28 @@
 import { BaseAgent } from '@/main/agents/BaseAgent';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { EditOutlined } from '@ant-design/icons';
-import { Button, Card, Divider, message, Modal, Popconfirm, Tag } from 'antd';
+import {
+  Button,
+  Card,
+  Divider,
+  Dropdown,
+  Input,
+  message,
+  Modal,
+  Popconfirm,
+  Tag,
+} from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { FaEdit, FaInfo, FaTrash, FaTrashAlt } from 'react-icons/fa';
+import {
+  FaAngleDown,
+  FaEdit,
+  FaEllipsisH,
+  FaInfo,
+  FaPlus,
+  FaSearch,
+  FaTrash,
+  FaTrashAlt,
+} from 'react-icons/fa';
 import { FaRegMessage } from 'react-icons/fa6';
 import { useNavigate } from 'react-router-dom';
 import AgentConfigDrawer, { AgentConfigDrawerProps } from './AgentConfigDrawer';
@@ -22,6 +41,9 @@ export default function ChatContent() {
   const navigate = useNavigate();
   const [agentConfigDrawerOpen, setAgentConfigDrawerOpen] = useState(false);
   const [agentMermaidOpen, setAgentMermaidOpen] = useState(false);
+  const modalRef = useRef<FormModalRef>(null);
+  const remoteAgentModalRef = useRef<FormModalRef>(null);
+
   const onNewChat = async (mode: ChatMode, agentName: string) => {
     const chat = await window.electron.chat.create(mode, null, agentName);
 
@@ -48,7 +70,26 @@ export default function ChatContent() {
     console.log(agents);
   }, []);
 
-  const modalRef = useRef<FormModalRef>(null);
+  const remoteAgentSchemas = [
+    {
+      component: 'Select',
+      field: 'type',
+      label: t('agents.type'),
+      required: true,
+      componentProps: {
+        options: [
+          { label: t('agents.type_anp'), value: 'anp' },
+          { label: t('agents.type_a2a'), value: 'a2a' },
+        ],
+      },
+    },
+    {
+      component: 'Input',
+      field: 'baseUrl',
+      label: t('agents.baseUrl'),
+      required: true,
+    },
+  ] as FormSchema[];
 
   const schemas = [
     {
@@ -150,6 +191,14 @@ export default function ChatContent() {
       message.error(error.message);
     }
   };
+
+  const onSaveRemoteAgent = async (values: any) => {
+    await window.electron.agents.addRemoteAgent(values);
+    message.success('success');
+    remoteAgentModalRef.current.openModal(false);
+    setAgents(await window.electron.agents.getList());
+  };
+
   const onCreate = () => {
     setCurrentAgent(undefined);
     modalRef.current.openModal(true, undefined, t('common.create'));
@@ -173,6 +222,17 @@ export default function ChatContent() {
           modalRef.current.openModal(false);
         }}
       />
+      <FormModal
+        maskClosable={false}
+        formProps={{ layout: 'vertical' }}
+        title={t('common.add_remote_agent')}
+        ref={remoteAgentModalRef}
+        schemas={remoteAgentSchemas}
+        onFinish={(values) => onSaveRemoteAgent(values)}
+        onCancel={() => {
+          remoteAgentModalRef.current.openModal(false);
+        }}
+      />
       <Modal
         open={agentMermaidOpen}
         onCancel={() => setAgentMermaidOpen(false)}
@@ -186,12 +246,54 @@ export default function ChatContent() {
         <div className="flex flex-col gap-4">
           <div className="mb-6">
             <div className="flex justify-between items-center">
-              <div className="self-center text-2xl font-semibold">
+              <div className="self-center text-xl font-semibold">
                 {t('common.agents')}
               </div>
-              <Button onClick={() => onCreate()} shape="round">
-                {t('common.create')}
-              </Button>
+              <div className="flex-1 max-w-[300px] mx-8">
+                <Input
+                  prefix={<FaSearch></FaSearch>}
+                  placeholder={t('common.search')}
+                ></Input>
+              </div>
+              <div>
+                <Dropdown.Button
+                  icon={<FaAngleDown />}
+                  menu={{
+                    items: [
+                      {
+                        label: 'Add Remote Agent',
+                        key: 'remoteAgent',
+                        onClick: () => {
+                          remoteAgentModalRef.current.openModal(true);
+                        },
+                      },
+                      {
+                        label: 'Add Coze Agent',
+                        key: 'coze',
+                      },
+                      {
+                        label: 'Add Dify Agent',
+                        key: 'dify',
+                      },
+                      {
+                        label: 'Import',
+                        key: 'import',
+                      },
+                    ],
+                  }}
+                  onClick={() => onCreate()}
+                >
+                  <FaPlus></FaPlus>
+                  {t('common.create')}
+                </Dropdown.Button>
+              </div>
+
+              {/* <Button
+                onClick={() => onCreate()}
+                shape="round"
+                variant="filled"
+                type="primary"
+              ></Button> */}
             </div>
           </div>
           {/* <Card

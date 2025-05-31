@@ -168,10 +168,7 @@ export default function Sidebar() {
       /> */}
       {/* <AboutModel open={showAboutModel} onOk={() => setShowAboutModel(false)} />
       <LoginModal open={showLoginModal} onOk={() => setShowLoginModal(false)} /> */}
-      <Login
-        visible={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-      />
+      <Login open={showLoginModal} onClose={() => setShowLoginModal(false)} />
       <div className="">
         <div className="flex overflow-hidden flex-col h-full">
           <Menu

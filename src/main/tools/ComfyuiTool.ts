@@ -33,10 +33,6 @@ export class ComfyuiTool extends BaseTool {
     },
   ];
 
-  static lc_name() {
-    return this.name;
-  }
-
   name: string = 'comfyui_tool';
 
   description: string = `comfyui workflow.`;

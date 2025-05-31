@@ -12,7 +12,6 @@ import path, { resolve } from 'path';
 import { app } from 'electron';
 import fs from 'fs';
 
-// import sherpa_onnx from 'sherpa-onnx-node';
 import Speaker from 'speaker';
 import { getModelsPath, getTmpPath } from '../utils/path';
 import { v4 as uuidv4 } from 'uuid';
@@ -40,11 +39,7 @@ export class TextToSpeech extends BaseTool {
     },
   ];
 
-  static lc_name() {
-    return 'TextToSpeech';
-  }
-
-  name: string = 'text-to-speech';
+  name: string = 'text_to_speech';
 
   description: string = 'text to speech';
 

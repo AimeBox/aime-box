@@ -1,3 +1,4 @@
+import { AIMessage } from '@langchain/core/messages';
 import { Command, interrupt, MessagesAnnotation } from '@langchain/langgraph';
 
 const HumanNode = (state: typeof MessagesAnnotation.State) => {
@@ -11,3 +12,4 @@ const HumanNode = (state: typeof MessagesAnnotation.State) => {
     goto: 'manus',
   });
 };
+

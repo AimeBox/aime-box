@@ -18,13 +18,15 @@ import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
 import { BaseTool } from './BaseTool';
+import { ExcelLoader } from '../loaders/ExcelLoader';
 
 export interface FileToTextParameters extends ToolParams {}
 
 export class FileToText extends BaseTool {
   name: string = 'file_to_text';
 
-  description: string = 'file convert to text';
+  description: string =
+    'file convert to text support (pdf, docx, doc, pptx, txt, md)';
 
   constructor(params?: FileToTextParameters) {
     super(params);
@@ -43,12 +45,15 @@ export class FileToText extends BaseTool {
       if (!isString(input.filePath)) {
         return 'input value is not filePath';
       }
+      if (!fs.existsSync(input.filePath)) {
+        return 'file not found';
+      }
       const ext = path.extname(input.filePath).toLowerCase();
       if (ext.toLowerCase() == '.pdf') {
         const loader = new PDFLoader(input.filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
-      } else if (ext.toLowerCase() == '.txt') {
+      } else if (ext.toLowerCase() == '.txt' || ext.toLowerCase() == '.md') {
         const loader = new TextLoader(input.filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
@@ -64,8 +69,17 @@ export class FileToText extends BaseTool {
         const loader = new PPTXLoader(input.filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
+      } else if (ext == '.xlsx' || ext == '.xls') {
+        const loader = new ExcelLoader(input.filePath);
+        const docs = await loader.load();
+        return docs.map((x) => x.pageContent).join('\n\n');
+      } else {
+        throw new Error(`Unsupported file type: ${ext}`);
       }
     } catch (err) {
+      if (err.message) {
+        return err.message;
+      }
       return JSON.stringify(err);
     }
     return null;

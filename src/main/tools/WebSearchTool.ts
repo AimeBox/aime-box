@@ -22,7 +22,7 @@ import { SearxngSearchTool } from './SearxngSearchTool';
 import { TavilySearchTool } from './TavilySearch';
 import { SerpAPI } from '@langchain/community/tools/serpapi';
 import { BaseTool } from './BaseTool';
-import { BraveWebSearchTool } from './websearch/BraveSearch';
+import { BraveSearchTool } from './websearch/BraveSearch';
 
 export interface WebSearchToolParameters extends ToolParams {
   provider?: string;
@@ -135,7 +135,7 @@ export class WebSearchTool extends BaseTool {
         this.provider == WebSearchEngine.Brave &&
         settings.webSearchEngine.brave.apiKey
       ) {
-        const d = new BraveWebSearchTool({
+        const d = new BraveSearchTool({
           apiKey: settings.webSearchEngine.brave.apiKey,
         });
         const res = await d.invoke({ query: input.query });

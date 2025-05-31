@@ -23,8 +23,11 @@ import {
   ClientOptions,
 } from '@langchain/openai';
 import settingsManager from '../settings';
-import { BaseTool } from './BaseTool';
+import { BaseTool, ToolTag } from './BaseTool';
 import { FormSchema } from '@/types/form';
+import { base64ToFile, downloadFile } from '../utils/common';
+import { getTmpPath } from '../utils/path';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface DallEParameters extends ToolParams {
   apiBase: string;
@@ -33,14 +36,20 @@ export interface DallEParameters extends ToolParams {
 }
 
 export class DallE extends BaseTool {
+  tags: string[] = [ToolTag.IMAGE];
+
   schema = z.object({
     prompt: z.string().describe('image prompt'),
     quality: z
-      .optional(z.enum(['standard', 'hd']))
+      .enum(['standard', 'hd'])
+      .optional()
+      .nullable()
       .default('standard')
       .describe('Image Quality'),
     dallEResponseFormat: z
-      .optional(z.enum(['url', 'b64_json']))
+      .enum(['url', 'b64_json'])
+      .optional()
+      .nullable()
       .default('url')
       .describe('Image Response Format'),
   });
@@ -50,11 +59,13 @@ export class DallE extends BaseTool {
       field: 'apiBase',
       component: 'Input',
       label: 'API Base URL',
+      defaultValue: 'https://api.openai.com/v1',
     },
     {
       field: 'apiKey',
       component: 'InputPassword',
       label: 'API Key',
+      required: true,
     },
     {
       field: 'model',
@@ -90,9 +101,9 @@ export class DallE extends BaseTool {
   client: OpenAIClient;
 
   constructor(params?: DallEParameters) {
-    super();
+    super(params);
     this.model = params?.model || 'dall-e-3';
-    this.apiKey = params?.apiKey;
+    this.apiKey = params?.apiKey || 'NULL';
     this.apiBase = params?.apiBase || 'https://api.openai.com/v1';
     const clientConfig = {
       apiKey: this.apiKey,
@@ -108,16 +119,6 @@ export class DallE extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    // const w = new DallEAPIWrapper({
-    //   model: this.model,
-    //   style: this.style,
-    //   quality: input.quality,
-    //   n: this.n,
-    //   size: this.size,
-    //   dallEResponseFormat: input.dallEResponseFormat,
-    //   apiKey: this.apiKey,
-    //   openAIApiKey: this.apiKey,
-    // });
     const generateImageFields = {
       model: this.model,
       prompt: input.prompt,
@@ -140,15 +141,25 @@ export class DallE extends BaseTool {
     }
     const response = await this.client.images.generate(generateImageFields);
     let data = '';
+    let loaclFile = '';
     if (input.dallEResponseFormat === 'url') {
       [data] = response.data
         .map((item) => item.url)
         .filter((url) => url !== 'undefined');
+      loaclFile = await downloadFile(
+        data,
+        path.join(getTmpPath(), `${uuidv4()}.png`),
+      );
     } else {
       [data] = response.data
         .map((item) => item.b64_json)
         .filter((b64_json) => b64_json !== 'undefined');
+      loaclFile = await base64ToFile(
+        data,
+        path.join(getTmpPath(), `${uuidv4()}.png`),
+      );
     }
+
     return data;
   }
 

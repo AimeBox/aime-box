@@ -273,12 +273,13 @@ export default function Tools() {
     const searchParams = new URLSearchParams(location.search);
     const toolsId = searchParams.get('id');
     if (toolsId) {
+      if (currentTool?.id == toolsId) {
+        return;
+      }
       const tool = tools.find((x) => x.name == toolsId);
       console.log(tool);
       setCurrentTool(tool);
-      let c = converFormSchemas(tool);
-
-      setToolInvokeSchemas(c);
+      setToolInvokeSchemas(converFormSchemas(tool));
     } else {
       setCurrentTool(undefined);
       setToolInvokeSchemas(undefined);
@@ -316,6 +317,7 @@ export default function Tools() {
               label: x,
               required: required.includes(x),
               subLabel: tool.schema.properties[x].description,
+              defaultValue: tool.schema.properties[x].default,
               component: 'InputTextArea',
             } as FormSchema);
           }
@@ -365,6 +367,10 @@ export default function Tools() {
             component: 'JsonEditor',
           } as FormSchema);
         }
+      } else if (
+        !tool.schema.properties[x].type &&
+        tool.schema.properties[x].anyOf
+      ) {
       }
 
       // c.properties[x] = {
@@ -569,7 +575,9 @@ export default function Tools() {
                     //   navigate(`/tools?id=${item.name}`);
                     // }}
                     button={
-                      (item.parameters || item?.configSchema?.length > 0) && (
+                      ((item.parameters &&
+                        Object.keys(item.parameters).length > 0) ||
+                        item?.configSchema?.length > 0) && (
                         <Button
                           type="text"
                           icon={<FaEdit />}

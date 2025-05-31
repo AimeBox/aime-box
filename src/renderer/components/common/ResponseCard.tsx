@@ -62,7 +62,7 @@ export function ResponseCard({ value, className }: ResponseCardProps) {
   return (
     <div
       className={cn(
-        'flex justify-start p-4 mb-4 w-full h-full bg-gray-200 rounded-2xl align-center',
+        'flex flex-col justify-start p-4 mb-2 w-full h-full bg-gray-100 rounded-2xl align-center',
         className,
       )}
     >
