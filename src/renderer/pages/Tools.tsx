@@ -305,6 +305,7 @@ export default function Tools() {
               required: required.includes(x),
               component: 'Select',
               subLabel: tool.schema.properties[x].description,
+              defaultValue: tool.schema.properties[x].default,
               componentProps: {
                 options: tool.schema.properties[x].enum.map((e) => {
                   return { label: e, value: e };
@@ -522,7 +523,7 @@ export default function Tools() {
       <div className="flex flex-row w-full h-full">
         <List
           onSearch={onSearch}
-          width={250}
+          width={300}
           dataLength={tools.length}
           hasMore={false}
           filterTags={['built-in', 'mcp', 'custom']}

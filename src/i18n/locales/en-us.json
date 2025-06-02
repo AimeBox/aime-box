@@ -46,7 +46,8 @@
     "description": "Description",
     "tags": "Tags",
     "restart": "Restart",
-    "localKB": "Local Knowledge Base"
+    "localKB": "Local Knowledge Base",
+    "difyKB": "Dify Knowledge Base"
   },
   "prompts": {
     "create_prompt": "Create Prompt"

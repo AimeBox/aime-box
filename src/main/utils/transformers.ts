@@ -3,7 +3,6 @@ import path from 'path';
 import { getModelsPath } from './path';
 import { isUrl } from './is';
 import fs from 'fs';
-import sharp from 'sharp';
 import { PNG } from 'pngjs';
 import {
   AutoProcessor,

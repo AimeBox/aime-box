@@ -42,7 +42,7 @@ export class FileWrite extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    const { workspace } = config.configurable;
+    const workspace = config?.configurable?.workspace;
     let filePath = input.path;
     if (workspace) {
       filePath = path.join(workspace, input.path);
@@ -77,7 +77,7 @@ export class FileRead extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    const { workspace } = config.configurable;
+    const workspace = config?.configurable?.workspace;
     let filePath = input.path;
     if (workspace) {
       filePath = path.isAbsolute(filePath)
@@ -116,7 +116,7 @@ export class ListDirectory extends BaseTool {
     runManager,
     config,
   ): Promise<string[] | string> {
-    const { workspace } = config.configurable;
+    const workspace = config?.configurable?.workspace;
     let filePath = input.path;
     if (workspace) {
       filePath = path.isAbsolute(filePath)
@@ -152,7 +152,7 @@ export class CreateDirectory extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    const { workspace } = config.configurable;
+    const workspace = config?.configurable?.workspace;
     let filePaths = input.paths;
     if (workspace) {
       filePaths = input.paths.map((x) =>

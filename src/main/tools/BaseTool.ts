@@ -3,6 +3,9 @@ import { FormSchema } from '@/types/form';
 
 export const ToolTag = {
   IMAGE: 'image',
+  VIDEO: 'video',
+  AUDIO: 'audio',
+  WEBSEARCH: 'websearch',
 } as const;
 
 export abstract class BaseTool extends StructuredTool {

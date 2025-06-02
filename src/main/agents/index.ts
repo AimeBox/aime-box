@@ -47,12 +47,9 @@ import {
 } from '@langchain/core/prompts';
 import dayjs from 'dayjs';
 import { parse as parseYaml } from 'yaml';
-import SwaggerParser from '@apidevtools/swagger-parser';
-import OpenAPIClientAxios from 'openapi-client-axios';
 import { A2ACardResolver, A2AClient } from 'a2a-js';
 import { createA2A } from './a2a/Agent2Agent';
 import { jsonSchemaToZod } from '../utils/jsonSchemaToZod';
-import { WatsonxToolkit } from '@langchain/community/agents/toolkits/ibm';
 
 export interface AgentInfo extends Agent {
   static: boolean;
@@ -499,9 +496,6 @@ export class AgentManager {
         });
         const text = await res.text();
         const openapiDocument = parseYaml(text);
-        const api = new OpenAPIClientAxios({ definition: openapiDocument });
-        const client = await api.init();
-
         const baseUrl = openapiDocument.servers[0].url;
         const { paths }: { paths: Record<string, any> } = openapiDocument;
         console.log(openapiDocument);

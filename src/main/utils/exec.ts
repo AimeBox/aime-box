@@ -42,29 +42,15 @@ export const runCommand = async (
       commands.push(command);
     }
 
-    // const cmd = spawn(commands.join(' ')); // /c 执行后关闭窗口；/k 是保持窗口打开
-
-    // cmd.stdout.on('data', (data) => {
-    //   console.log(`输出: ${data}`);
-    //   resolve(data);
-    // });
-
-    // cmd.stderr.on('data', (data) => {
-    //   console.error(`错误: ${data}`);
-    //   reject(new Error(`Error:\n${data}`));
-    // });
-
-    // cmd.on('close', (code) => {
-    //   console.log(`子进程退出，退出码 ${code}`);
-    // });
-    // return;
-
     const child2 = exec(
       commands.join(' '),
       {
         encoding: 'buffer',
         windowsHide: false,
         cwd: cwd,
+        env: {
+          ...process.env,
+        },
       },
       (error, stdout, stderr) => {
         const res_out = iconv.decode(

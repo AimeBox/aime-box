@@ -1,4 +1,4 @@
-import { createWriteStream } from 'fs';
+import fs, { createWriteStream } from 'fs';
 import path from 'path';
 import { getTmpPath } from './path';
 import { v4 as uuidv4 } from 'uuid';
@@ -81,4 +81,9 @@ export const base64ToFile = async (
   writer.write(buffer);
   writer.end();
   return savePath;
+};
+
+export const imageToBase64 = async (filePath: string): Promise<string> => {
+  const data = await fs.promises.readFile(filePath);
+  return data.toString('base64');
 };

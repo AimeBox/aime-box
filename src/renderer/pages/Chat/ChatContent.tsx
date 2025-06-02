@@ -54,7 +54,7 @@ import ChatOptionsDrawer from './ChatOptionsDrawer';
 import { t } from 'i18next';
 import EmojiPicker, { SkinTones } from 'emoji-picker-react';
 import { GlobalContext } from '@/renderer/context/GlobalContext';
-import { Editor, EditorRef } from '@/renderer/components/common/Editor';
+// import { Editor, EditorRef } from '@/renderer/components/common/Editor';
 import { ChatInputAttachment } from '@/types/chat';
 import ChatAttachment from '@/renderer/components/chat/ChatAttachment';
 import domtoimage from 'dom-to-image';
@@ -79,7 +79,7 @@ export default function ChatContent() {
   const [attachments, setAttachments] = useState<ChatInputAttachment[]>([]);
   const { agents, tools, knowledgeBase } = useContext(GlobalContext);
   const scrollRef = useRef<ScrollAreaRef | null>(null);
-  const editorRef = useRef<EditorRef>(null);
+  // const editorRef = useRef<EditorRef>(null);
   const [openCanvasView, setOpenCanvasView] = useState<boolean>(false);
 
   const [canvasViewValue, setCanvasViewValue] = useState<any>({});
@@ -150,7 +150,7 @@ export default function ChatContent() {
       content: chatInputMessage.trim(),
       extend: { attachments: attachments },
     });
-    editorRef.current?.clear();
+    // Ref.current?.clear();
     setChatInputMessage(undefined);
     setAttachments([]);
     scrollToBottom(false);
@@ -561,7 +561,7 @@ export default function ChatContent() {
                               <EmojiPicker
                                 className="!border-none"
                                 onEmojiClick={(v) => {
-                                  editorRef.current?.insertText(v.emoji);
+                                  //editorRef.current?.insertText(v.emoji);
                                   setEmojiOpen(false);
                                 }}
                               />
@@ -588,7 +588,7 @@ export default function ChatContent() {
                           ></Button>
                           <ChatQuickInput
                             onClick={(text) => {
-                              editorRef.current?.insertText(text);
+                              //editorRef.current?.insertText(text);
                               setChatInputMessage(text);
                             }}
                             className="ml-2"

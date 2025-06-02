@@ -86,6 +86,7 @@ import { BraveSearchTool } from './websearch/BraveSearch';
 import { ArxivTool } from './Arxiv';
 import { FireCrawl } from './FireCrawl';
 import { jsonSchemaToZod } from '../utils/jsonSchemaToZod';
+import { BFLImageEditing, BFLImageGeneration } from './BFLToolKit';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -514,6 +515,9 @@ export class ToolsManager {
     await this.registerTool(BraveSearchTool);
     await this.registerTool(FireCrawl);
     await this.registerTool(ArxivTool);
+
+    await this.registerTool(BFLImageGeneration);
+    await this.registerTool(BFLImageEditing);
   };
 
   public update = async (toolName: string, arg: any) => {

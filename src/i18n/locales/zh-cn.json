@@ -65,7 +65,8 @@
     "description": "描述",
     "tags": "标签",
     "restart": "失败重试",
-    "localKB": "本地知识库"
+    "localKB": "本地知识库",
+    "difyKB": "Dify知识库"
   },
   "enable": "是否启用",
   "prompts": {

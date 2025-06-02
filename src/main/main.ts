@@ -64,6 +64,10 @@ dbManager
   })
   .catch((error) => {
     console.log(error);
+    dialog.showErrorBox(
+      '应用错误',
+      `发生了一个错误: ${error.message}\n ${error.stack}`,
+    );
   });
 
 let tray: Tray | null = null;
@@ -148,7 +152,7 @@ const isDebug =
   process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 if (isDebug) {
-  require('electron-debug')();
+  require('electron-debug').default();
 }
 
 function registerPluginProtocol() {

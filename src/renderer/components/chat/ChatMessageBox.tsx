@@ -18,11 +18,8 @@ import {
   FaTrashAlt,
   FaUser,
 } from 'react-icons/fa';
-import ReactMarkdown from 'react-markdown';
 import dayjs from 'dayjs';
 import { Markdown } from '@/renderer/components/common/Markdown';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeGfm from 'remark-gfm';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/atom-one-dark.css';
 import { LoadingOutlined } from '@ant-design/icons';
