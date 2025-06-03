@@ -17,6 +17,7 @@ import { ChatInputAttachment } from '@/types/chat';
 import path from 'path';
 import { platform } from 'process';
 import { getDataPath } from '../utils/path';
+import { isArray } from '../utils/is';
 
 export class AppManager {
   textToSpeech: TextToSpeech;
@@ -34,6 +35,10 @@ export class AppManager {
       });
     });
     ipcMain.handle('app:getPathInfo', async (event, paths: string[]) => {
+      if(!isArray(paths)){
+        throw new Error('Input paths error');
+        
+      }
       const result: ChatInputAttachment[] = [];
       for (const _path of paths) {
         const stats = await fs.stat(_path);

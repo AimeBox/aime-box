@@ -64,6 +64,11 @@
 ### 🐞 **Dev**
 ```sh
 # node 22
+nvm install 22
+nvm use 22
+
+npm i -g node-gyp
+
 npm install
 npm run start
 ```

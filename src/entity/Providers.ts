@@ -17,6 +17,7 @@ export enum ProviderType {
   AZURE_OPENAI = 'azure_openai',
   VOLCANOENGINE = 'volcanoengine',
   MINIMAX = 'minimax',
+  REPLICATE = 'replicate',
 }
 
 @Entity('providers')

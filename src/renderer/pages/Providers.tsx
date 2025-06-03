@@ -180,6 +180,14 @@ export default function Connections() {
           },
         });
       }
+      else if (changedFields[0].value === 'replicate') {
+        form.setFieldsValue({
+          api_base: 'https://api.replicate.com/v1',
+          api_key: 'NULL',
+        });
+      }
+
+      
     }
   };
   const onManagerModel = async (data: Providers) => {

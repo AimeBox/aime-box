@@ -64,7 +64,7 @@ const FileDropZone = forwardRef((props: FileDropZoneProps) => {
       if (e.dataTransfer.files.length == 0) return;
       const _files: FileList = e.dataTransfer.files;
       const files = [];
-
+      debugger;
       for (let index = 0; index < _files.length; index++) {
         const file = _files[index];
         files.push(file.path);

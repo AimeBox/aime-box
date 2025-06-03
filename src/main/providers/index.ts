@@ -26,11 +26,14 @@ import { getProviderModel } from '../utils/providerUtil';
 import { Transformers } from '../utils/transformers';
 import { notificationManager } from '../app/NotificationManager';
 import { ChatBaiduQianfan } from '@langchain/baidu-qianfan';
-import { ChatCompletion } from '@baiducloud/qianfan';
 import { VolcanoEngineProvider } from './VolcanoEngineProvider';
+import { ReplicateProvider } from './ReplicateProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { MinimaxProvider } from './MinimaxProvider';
-
+import { DeepSeekProvider } from './DeepSeekProvider';
+import { BaseProvider } from './BaseProvider';
+import { AnthropicProvider } from './AnthropicProvider';
+import { isString } from '../utils/is';
 export class ProvidersManager {
   repository: Repository<Providers>;
 
@@ -94,8 +97,8 @@ export class ProvidersManager {
     const httpProxy = settingsManager.getHttpAgent();
     try {
       if (connection.type === ProviderType.OLLAMA) {
-        const ollama = new OllamaProvider();
-        const list = await ollama.getModelList(connection);
+        const ollama = new OllamaProvider({ provider: connection});
+        const list = await ollama.getModelList();
         return list;
       } else if (
         connection.type === ProviderType.OPENAI ||
@@ -293,32 +296,9 @@ export class ProvidersManager {
           })
           .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection.type === ProviderType.DEEPSEEK) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-
-        const url = 'https://api.deepseek.com/models';
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models?.find((z) => z.name == x.id)?.enable || false,
-              input_token:
-                connection.models.find((z) => z.name == x.id)?.input_token || 0,
-              output_token:
-                connection.models.find((z) => z.name == x.id)?.output_token ||
-                0,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const deepSeek = new DeepSeekProvider({ provider: connection });
+        const list = await deepSeek.getModelList();
+        return list;
       } else if (connection.type === ProviderType.AZURE_OPENAI) {
         //const apiKey = new AzureKeyCredential(connection.api_key);
         const endpoint = connection.api_base;
@@ -349,12 +329,16 @@ export class ProvidersManager {
           })
           .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection?.type === ProviderType.VOLCANOENGINE) {
-        const volcanoEngine = new VolcanoEngineProvider();
-        const list = await volcanoEngine.getModelList(connection);
+        const volcanoEngine = new VolcanoEngineProvider({ provider: connection });
+        const list = await volcanoEngine.getModelList();
         return list;
       } else if (connection?.type === ProviderType.MINIMAX) {
-        const minimax = new MinimaxProvider();
-        const list = await minimax.getModelList(connection);
+        const minimax = new MinimaxProvider({ provider: connection });
+        const list = await minimax.getModelList();
+        return list;
+      } else if (connection?.type === ProviderType.REPLICATE) {
+        const replicate = new ReplicateProvider({ provider: connection });
+        const list = await replicate.getModelList();
         return list;
       }
     } catch (e) {
@@ -364,6 +348,24 @@ export class ProvidersManager {
 
     return [];
   };
+  public async getProvider(provider: Providers | string): Promise<BaseProvider> {
+    let providerObj: Providers;
+    if(isString(provider)){
+      providerObj = await this.repository.findOneBy({id: provider});
+    }else{
+      providerObj = provider;
+    }
+    switch(providerObj.type){
+      case ProviderType.REPLICATE:
+        return new ReplicateProvider({ provider: providerObj});
+      case ProviderType.ANTHROPIC:
+        return new AnthropicProvider({ provider: providerObj});
+      case ProviderType.OLLAMA:
+        return new OllamaProvider({ provider: providerObj});
+      default:
+        return undefined;
+    }
+  }
 
   public getProviders = async (
     refresh: boolean = false,
@@ -601,6 +603,13 @@ export class ProvidersManager {
               models: [...new Set(emb_models.map((x) => x.id))],
             });
           } catch {}
+        } else if (connection?.type === ProviderType.REPLICATE){
+          const replicate = new ReplicateProvider({ provider: connection });
+          const list = await replicate.getEmbeddingModels();
+          emb_list.push({
+            name: connection.name,
+            models: list,
+          });
         }
       } catch {
         continue;

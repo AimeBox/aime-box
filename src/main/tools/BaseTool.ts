@@ -1,4 +1,4 @@
-import { BaseToolkit, StructuredTool } from '@langchain/core/tools';
+import { BaseToolkit as LangchainBaseToolkit, StructuredTool } from '@langchain/core/tools';
 import { FormSchema } from '@/types/form';
 
 export const ToolTag = {
@@ -28,7 +28,7 @@ export abstract class BaseTool extends StructuredTool {
   tags?: string[] = [];
 }
 
-export abstract class BaseToolKit extends BaseToolkit {
+export abstract class BaseToolKit extends LangchainBaseToolkit {
   name: string;
 
   description?: string;

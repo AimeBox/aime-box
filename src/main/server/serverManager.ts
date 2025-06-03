@@ -77,6 +77,7 @@ class ServerManager {
       }
     });
 
+    
     this.app.post(`/tools/:tool_name`, async (req, res) => {
       const toolName = req.params.tool_name;
       const methodName = req.body.method;

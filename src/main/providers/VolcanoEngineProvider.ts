@@ -9,16 +9,19 @@ export class VolcanoEngineProvider extends BaseProvider {
 
   defaultApiBase: string = 'https://ark.cn-beijing.volces.com/api/v3';
 
-  async getModelList(
-    provider: Providers,
-  ): Promise<{ name: string; enable: boolean }[]> {
+
+  constructor(params?: BaseProviderParams) {
+    super(params);
+  }
+
+  async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const httpProxy = settingsManager.getHttpAgent();
     const options = {
       method: 'GET',
       agent: httpProxy,
-      Authorization: `Bearer ${provider.api_key}`,
+      Authorization: `Bearer ${this.provider.api_key}`,
     };
-    const url = `${provider.api_base || this.defaultApiBase}/ListFoundationModels`;
+    const url = `${this.provider.api_base || this.defaultApiBase}/ListFoundationModels`;
     const res = await fetch(url, options);
     const data = await res.json();
     return data.models
@@ -26,7 +29,7 @@ export class VolcanoEngineProvider extends BaseProvider {
         return {
           name: x.name.split('/')[1],
           enable:
-            provider.models?.find((z) => z.name == x.name.split('/')[1])
+            this.provider.models?.find((z) => z.name == x.name.split('/')[1])
               ?.enable || false,
         };
       })

@@ -317,23 +317,28 @@ export default function ChatContent() {
         setAttachments([...attachments, ..._attachments]);
       }
     } else {
-      const res = await window.electron.app.getPathInfo(files);
-      if (res && res.length > 0) {
-        const _attachments = [];
-        for (const item of res) {
-          if (attachments.find((x) => x.path == item.path)) {
-            continue;
+      try {
+        const res = await window.electron.app.getPathInfo(files);
+        if (res && res.length > 0) {
+          const _attachments = [];
+          for (const item of res) {
+            if (attachments.find((x) => x.path == item.path)) {
+              continue;
+            }
+            _attachments.push({
+              path: item.path,
+              name: item.name,
+              type: item.type,
+              ext: item.ext,
+            });
           }
-          _attachments.push({
-            path: item.path,
-            name: item.name,
-            type: item.type,
-            ext: item.ext,
-          });
-        }
 
-        setAttachments([...attachments, ..._attachments]);
+          setAttachments([...attachments, ..._attachments]);
+        }
+      }catch(err){
+        message.error(err);
       }
+      
     }
   };
 
