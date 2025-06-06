@@ -58,10 +58,13 @@ import { MessageHistory, MessageManager } from '../message_manager';
 import {
   BaseAction,
   DoneAction,
+  GetMemoryAction,
   HandoffAction,
   HumanFeedbackAction,
   LockedTaskAction,
   PlanAction,
+  SaveMemoryAction,
+  SearchMemoryAction,
 } from './Actions';
 import { getAssetPath } from '@/main/utils/path';
 import fs from 'fs';
@@ -71,6 +74,7 @@ import { JsonOutputParser } from '@langchain/core/output_parsers';
 import { Memory, MemoryItem } from './Memory';
 import { MemoryVectorStore } from 'langchain/vectorstores/memory';
 import { getDefaultEmbeddingModel } from '@/main/embeddings';
+import path from 'path';
 
 export class ManusAgent extends BaseAgent {
   name: string = 'aime_manus';
@@ -132,6 +136,8 @@ export class ManusAgent extends BaseAgent {
 
   maxFailTimes: number;
 
+  workspace?:string;
+
   constructor(options: {
     provider: string;
     modelName: string;
@@ -151,6 +157,8 @@ export class ManusAgent extends BaseAgent {
     // next_goal: z.string().describe('Your next goal'),
     // reply: z.string().optional().nullable(),
   });
+
+  
 
   createAgentOutput = (actions: (BaseAction | BaseTool)[]) => {
     if (actions.length > 1) {
@@ -272,6 +280,7 @@ export class ManusAgent extends BaseAgent {
   }) {
     const { store, model, messageEvent, chatOptions, signal, configurable } =
       params;
+    this.workspace = configurable?.workspace;
 
     const checkpoint = await dbManager.langgraphSaver.get({
       configurable,
@@ -393,6 +402,9 @@ export class ManusAgent extends BaseAgent {
       HumanFeedbackAction,
       HandoffAction,
       LockedTaskAction,
+      SearchMemoryAction,
+      GetMemoryAction,
+      SaveMemoryAction,
       ...tools,
     ];
 
@@ -791,6 +803,22 @@ export class ManusAgent extends BaseAgent {
           signal: signal,
         },
       });
+      if(result.tool_calls.length==0){
+        return {
+          message: new AIMessage({
+            content: ``,
+            // tool_calls: [result.tool_calls[0]],
+          }),
+          current_state: {
+            thought: '',
+            action: HumanFeedbackAction.name,
+            action_description: HumanFeedbackAction.description,
+            action_args: {question: result.content },
+          },
+
+          // action: args.action,
+        };
+      }
 
       const tool_call = result.tool_calls[0];
       const { id, name, args } = tool_call;
@@ -801,6 +829,7 @@ export class ManusAgent extends BaseAgent {
       const modelWithActions = that.model.bindTools([action], {
         tool_choice: 'any',
       });
+      
       inputMessages.push(
         new AIMessage(
           `${result.text ? `${result.text}\n` : ''}💭 Thought: ${args.thought}\n🚀 Action: ${args.action}: ${args.action_description}`,
@@ -967,10 +996,11 @@ export class ManusAgent extends BaseAgent {
         if (state.plans) {
           inputMessages.push(
             new HumanMessage(
-              `[Here is todo.md Start]\n${todo}\n[Here is todo.md End]\n\n---\nfollow the todo.md to complete the task and current step is "${state.currentStep}", what next step action?`,
+              `[Here is todo.md Start]\n${todo}\n[Here is todo.md End]\n\n---\nfollow the todo.md to complete the task and current step is "${state.currentStep}"\nIf current step is completed, please update plan or if all steps are completed, please use "done" tool to response\nwhat next step action?`,
             ),
           );
         } else {
+
           inputMessages.push(new HumanMessage(`what next action?`));
         }
       }
@@ -1166,6 +1196,12 @@ export class ManusAgent extends BaseAgent {
                 message.tool_call_id = this.messageManager.toolId;
                 if (state == 'end') {
                   console.log('tool_call_id', this.messageManager.toolId);
+                  if (this.workspace) {
+                    await fs.promises.writeFile(
+                      path.join(this.workspace, 'todo.md'),
+                      message.content.toString(),
+                    );
+                  }
                   await this.messageManager?.addToolMessage(
                     message.content.toString(),
                     'plan',

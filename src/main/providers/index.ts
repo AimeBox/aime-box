@@ -34,6 +34,9 @@ import { DeepSeekProvider } from './DeepSeekProvider';
 import { BaseProvider } from './BaseProvider';
 import { AnthropicProvider } from './AnthropicProvider';
 import { isString } from '../utils/is';
+import { OpenAIProvider } from './OpenAIProvider';
+import { AzureOpenAIProvider } from './AzureOpenAIProvider';
+import { OpenrouterProvider } from './OpenrouterProvider';
 
 export class ProvidersManager {
   repository: Repository<Providers>;
@@ -256,28 +259,9 @@ export class ProvidersManager {
           })
           .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection.type === ProviderType.OPENROUTER) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-          },
-        };
-
-        const url = 'https://openrouter.ai/api/v1/models';
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models?.find((z) => z.name == x.id)?.enable || false,
-              input_token: ((x.pricing?.prompt ?? 0) * 1000000).toFixed(2),
-              output_token: ((x.pricing?.completion ?? 0) * 1000000).toFixed(2),
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const openrouter = new OpenrouterProvider({ provider: connection });
+        const list = await openrouter.getModelList();
+        return list;
       } else if (connection.type === ProviderType.SILICONFLOW) {
         const options = {
           method: 'GET',
@@ -304,34 +288,9 @@ export class ProvidersManager {
         const list = await deepSeek.getModelList();
         return list;
       } else if (connection.type === ProviderType.AZURE_OPENAI) {
-        //const apiKey = new AzureKeyCredential(connection.api_key);
-        const endpoint = connection.api_base;
-        const apiVersion = connection.config?.apiVersion || '2024-10-21';
-        // const deployment =
-        //   connection.extend_params?.deployment || 'gpt-35-turbo';
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-        const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .filter(
-            (x) => x.capabilities.chat_completion && x.status == 'succeeded',
-          )
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models?.find((z) => z.name == x.id)?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const ollama = new AzureOpenAIProvider({ provider: connection });
+        const list = await ollama.getModelList();
+        return list;
       } else if (connection?.type === ProviderType.VOLCANOENGINE) {
         const volcanoEngine = new VolcanoEngineProvider({
           provider: connection,
@@ -371,6 +330,17 @@ export class ProvidersManager {
         return new AnthropicProvider({ provider: providerObj });
       case ProviderType.OLLAMA:
         return new OllamaProvider({ provider: providerObj });
+      case ProviderType.OPENAI:
+        return new OpenAIProvider({ provider: providerObj });
+      case ProviderType.AZURE_OPENAI:
+        return new AzureOpenAIProvider({ provider: providerObj });
+      case ProviderType.DEEPSEEK:
+        return new DeepSeekProvider({ provider: providerObj });
+      case ProviderType.MINIMAX:
+          return new MinimaxProvider({ provider: providerObj });
+      case ProviderType.OPENROUTER:
+        return new OpenrouterProvider({ provider: providerObj });
+        
       default:
         return undefined;
     }
@@ -587,31 +557,12 @@ export class ProvidersManager {
             });
           } catch {}
         } else if (connection?.type === ProviderType.AZURE_OPENAI) {
-          const endpoint = connection.api_base;
-          const apiVersion = connection.config?.apiVersion || '2024-10-21';
-          const options = {
-            method: 'GET',
-            headers: {
-              accept: 'application/json',
-              'content-type': 'application/json',
-              Authorization: `Bearer ${connection.api_key}`,
-            },
-          };
-          const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
-          try {
-            const res = await fetch(url, options);
-            const models = await res.json();
-
-            const emb_models = models.data
-              .filter(
-                (x) => x.capabilities.embeddings && x.status == 'succeeded',
-              )
-              .sort((a, b) => a.id.localeCompare(b.id));
-            emb_list.push({
-              name: connection.name,
-              models: [...new Set(emb_models.map((x) => x.id))],
-            });
-          } catch {}
+          const azureOpenAI = new AzureOpenAIProvider({ provider: connection });
+          const list = await azureOpenAI.getEmbeddingModels();
+          emb_list.push({
+            name: connection.name,
+            models: list,
+          });
         } else if (connection?.type === ProviderType.REPLICATE) {
           const replicate = new ReplicateProvider({ provider: connection });
           const list = await replicate.getEmbeddingModels();

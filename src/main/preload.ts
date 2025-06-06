@@ -22,6 +22,7 @@ import { ChatInputAttachment, ChatInputExtend, ChatMode } from '@/types/chat';
 import { Prompt, PromptGroup } from '@/entity/Prompt';
 import { ChatInfo } from './chat';
 import { get } from 'http';
+import { Instances } from '@/entity/Instances';
 
 const electronHandler = {
   ipcRenderer: {
@@ -381,33 +382,12 @@ const electronHandler = {
     },
   },
   plugins: {
-    get(id: String) {
-      const res = ipcRenderer.sendSync('plugins:get', id);
-      return res;
-    },
-    getList() {
-      const res = ipcRenderer.sendSync('plugins:getList');
-      return res;
-    },
-    reload() {
-      ipcRenderer.sendSync('plugins:reload');
-    },
-    setEnable(id: String, enable: boolean) {
-      ipcRenderer.sendSync('plugins:setEnable', id, enable);
-    },
-    import(path: String) {
-      ipcRenderer.sendSync('plugins:import', path);
-    },
-    delete(id: String) {
-      ipcRenderer.sendSync('plugins:delete', id);
-    },
-    callSync(methodName: string, ...args: any[]) {
-      const res = ipcRenderer.sendSync('plugins:callSync', methodName, ...args);
-      return res;
-    },
-    call(methodName: string, ...args: any[]) {
-      ipcRenderer.sendSync('plugins:call', methodName, ...args);
-    },
+    get: (id: string)=> ipcRenderer.invoke('plugins:get',id),
+    getList: () => ipcRenderer.invoke('plugins:getList'),
+    delete: (id: string) => ipcRenderer.invoke('plugins:delete',id),
+    reload: (id: string) => ipcRenderer.invoke('plugins:reload',id),
+    setEnable: (id: string, enable: boolean) => ipcRenderer.invoke('plugins:setEnable',id, enable),
+    import: (path: string) => ipcRenderer.invoke('plugins:import', path)
   },
   explores: {
     getList() {
@@ -433,6 +413,14 @@ const electronHandler = {
       ipcRenderer.invoke('prompts:updateGroup', group),
     deleteGroup: (groupId: string) =>
       ipcRenderer.invoke('prompts:deleteGroup', groupId),
+  },
+  instances: {
+    getList: () => ipcRenderer.invoke('instances:getList'),
+    get: (id: string) => ipcRenderer.invoke('instances:get', id),
+    create: (instance: Instances) => ipcRenderer.invoke('instances:create', instance),
+    update: (id: string, instance: Instances) => ipcRenderer.invoke('instances:update', id, instance),
+    delete: (id: string) => ipcRenderer.invoke('instances:delete', id),
+    run: (id: string) => ipcRenderer.invoke('instances:run', id),
   },
 };
 

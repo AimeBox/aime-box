@@ -156,6 +156,8 @@
     "general_settings": "General Settings",
     "defaultSTT": "Default STT",
     "about": "About",
+    "plugins": "Plugins",
+    "plugins_import": "Import",
     "theme": {
       "theme": "Theme",
       "light": "☀️Light",

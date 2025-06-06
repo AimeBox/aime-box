@@ -19,6 +19,7 @@ import { Prompt, PromptGroup } from '@/entity/Prompt';
 import { Agent } from '@/entity/Agent';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { McpServers, Tools } from '@/entity/Tools';
+import { Instances } from '@/entity/Instances';
 
 export class DBManager {
   // defaultDb: Database;
@@ -51,6 +52,7 @@ export class DBManager {
         Agent,
         Tools,
         McpServers,
+        Instances,
       ],
       migrations: [],
       subscribers: [],

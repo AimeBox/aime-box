@@ -113,6 +113,8 @@
     "general_settings": "常规设置",
     "defaultSTT": "默认语音识别模型",
     "about": "关于我们",
+    "plugins": "插件",
+    "plugins_import": "导入",
     "theme": {
       "theme": "主题模式",
       "light": "☀️明亮模式",

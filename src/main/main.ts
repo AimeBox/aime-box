@@ -45,7 +45,7 @@ import {
 import tokenCounter from './utils/tokenCounter';
 import { getChatModel } from './llm';
 import { getAssetPath } from './utils/path';
-
+import { instanceManager } from './instances';
 dbManager
   .init()
   .then(async () => {
@@ -59,6 +59,7 @@ dbManager
     await serverManager.init();
     await appManager.init();
     await promptsManager.init();
+    await instanceManager.init();
 
     return true;
   })
