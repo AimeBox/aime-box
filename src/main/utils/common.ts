@@ -2,6 +2,8 @@ import fs, { createWriteStream } from 'fs';
 import path from 'path';
 import { getTmpPath } from './path';
 import { v4 as uuidv4 } from 'uuid';
+import { RunnableConfig } from '@langchain/core/runnables';
+import { isString, isUrl } from './is';
 
 export const removeEmptyValues = (
   obj: Record<string, any>,
@@ -86,4 +88,26 @@ export const base64ToFile = async (
 export const imageToBase64 = async (filePath: string): Promise<string> => {
   const data = await fs.promises.readFile(filePath);
   return data.toString('base64');
+};
+
+export const saveFile = async (
+  data: string | Buffer,
+  filePath: string,
+  config?: RunnableConfig,
+): Promise<string> => {
+  const workspace = config?.configurable?.workspace;
+  let _filePath = filePath;
+  if (!path.isAbsolute(_filePath)) {
+    _filePath = workspace
+      ? path.join(workspace, filePath)
+      : path.join(getTmpPath(), filePath);
+  }
+  if (isString(data) && isUrl(data)) {
+    return await downloadFile(data, _filePath);
+  } else if (data instanceof Buffer) {
+    await fs.promises.writeFile(_filePath, data);
+    return _filePath;
+  } else {
+    throw new Error('not support');
+  }
 };

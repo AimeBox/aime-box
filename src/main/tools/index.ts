@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { In, Like, Repository } from 'typeorm';
 import { DuckDuckGoSearchParameters } from '@langchain/community/tools/duckduckgo_search';
+import { execSync } from 'child_process';
 
 import {
   GoogleRoutesAPI,
@@ -86,7 +87,12 @@ import { BraveSearchTool } from './websearch/BraveSearch';
 import { ArxivTool } from './Arxiv';
 import { FireCrawl } from './FireCrawl';
 import { jsonSchemaToZod } from '../utils/jsonSchemaToZod';
-import { BFLImageEditing, BFLImageGeneration } from './BFLToolKit';
+import { BFLImageEditing, BFLImageGeneration, BFLToolkit } from './BFLToolkit';
+import { ReplicateToolkit } from './ReplicateToolkit';
+import { ViduToolKit } from './Vidu';
+import { splitContextAndFiles } from '@/renderer/utils/ContentUtils';
+import { CodeSandbox } from './CodeSandbox';
+import { getDataPath } from '../utils/path';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -122,7 +128,25 @@ export class ToolsManager {
     try {
       const parent = Object.getPrototypeOf(ClassType);
       if (parent?.name == BaseToolKit.name) {
-        const toolKit: BaseToolKit = Reflect.construct(ClassType, []);
+        let toolKitEntity = await this.toolRepository.findOne({
+          where: { name: ClassType.name },
+        });
+
+        if (!toolKitEntity) {
+          toolKitEntity = new Tools(
+            ClassType.name,
+            ClassType.description,
+            'built-in',
+          );
+          toolKitEntity.enabled = true;
+          toolKitEntity.toolkit_name = ClassType.name;
+          await this.toolRepository.save(toolKitEntity);
+        }
+        const toolkitConfig = toolKitEntity.config ?? {};
+
+        const toolKit: BaseToolKit = Reflect.construct(ClassType, [
+          toolkitConfig,
+        ]);
 
         for (const tool of toolKit.getTools()) {
           this.builtInToolsClassType.push({
@@ -260,7 +284,7 @@ export class ToolsManager {
     return list;
   }
 
-  public buildTool = async (tool: Tools, config: any): Promise<BaseTool> => {
+  public buildTool = async (tool: Tools, config?: any): Promise<BaseTool> => {
     try {
       if (tool.type == 'mcp') {
         let mcpClient = this.mcpClients.find(
@@ -325,9 +349,10 @@ export class ToolsManager {
           },
         );
       } else if (tool.type == 'built-in') {
+        const params = config || tool.config ? [tool.config] : [];
         const baseTool = Reflect.construct(
           this.builtInToolsClassType.find((x) => x.name == tool.name).classType,
-          tool.config ? [tool.config] : [],
+          params,
         ) as BaseTool;
 
         return baseTool;
@@ -339,14 +364,17 @@ export class ToolsManager {
     return null;
   };
 
-  public buildTools = async (toolNames: String[]): Promise<BaseTool[]> => {
+  public buildTools = async (
+    toolNames: String[],
+    toolConfig?: Record<string, any>,
+  ): Promise<BaseTool[]> => {
     if (isArray(toolNames)) {
       const tools = await this.toolRepository.find({
         where: { name: In(toolNames) },
       });
       const buildedTools: BaseTool[] = [];
       for (const tool of tools) {
-        const buildedTool = await this.buildTool(tool, tool.config);
+        const buildedTool = await this.buildTool(tool, toolConfig?.[tool.name]);
         if (buildedTool) {
           buildedTools.push(buildedTool);
         } else {
@@ -449,6 +477,11 @@ export class ToolsManager {
     ipcMain.handle('tools:deleteMcp', (event, name: string) =>
       this.deleteMcp(name),
     );
+    ipcMain.handle(
+      'tools:getCodeSandboxSetup',
+      (event, path: string, chatId?: string) =>
+        this.getCodeSandboxSetup(path, chatId),
+    );
   };
 
   public webSearch = async (
@@ -516,8 +549,10 @@ export class ToolsManager {
     await this.registerTool(FireCrawl);
     await this.registerTool(ArxivTool);
 
-    await this.registerTool(BFLImageGeneration);
-    await this.registerTool(BFLImageEditing);
+    await this.registerTool(BFLToolkit);
+    await this.registerTool(ReplicateToolkit);
+    await this.registerTool(ViduToolKit);
+    await this.registerTool(CodeSandbox);
   };
 
   public update = async (toolName: string, arg: any) => {
@@ -563,7 +598,34 @@ export class ToolsManager {
       } else if (isUrl(res)) {
         return `![](${res})`;
       } else if (fs.existsSync(res)) {
-        return `![](file:///${res.replace(/\\/g, '/')})`;
+        return `![](file:///${res.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+      } else if (splitContextAndFiles(res)?.attachments.length > 0) {
+        const { context, attachments } = splitContextAndFiles(res);
+        let text = context;
+        attachments.forEach((attachment) => {
+          if (fs.existsSync(attachment.path) && attachment.type == 'file') {
+            if (
+              attachment.ext == '.png' ||
+              attachment.ext == '.jpg' ||
+              attachment.ext == '.jpeg' ||
+              attachment.ext == '.gif' ||
+              attachment.ext == '.webp' ||
+              attachment.ext == '.mp4' ||
+              attachment.ext == '.mp3' ||
+              attachment.ext == '.wav' ||
+              attachment.ext == '.ogg' ||
+              attachment.ext == '.flac' ||
+              attachment.ext == '.m4a'
+            ) {
+              text += `\n![](file:///${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+            } else {
+              text += `\n[${attachment.name}](${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+            }
+          } else if (attachment.type == 'folder') {
+            text += `\n[${attachment.name}](${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+          }
+        });
+        return text;
       }
       return res;
     }
@@ -949,6 +1011,34 @@ export class ToolsManager {
     }
     return url;
   }
+
+  public getCodeSandboxSetup = async (_path: string, chatId: string) => {
+    const realPath = path.join(getDataPath(), 'chats', chatId, _path);
+    function readFilesRecursively(dir, fileMap = {}, baseDir = dir) {
+      const files = fs.readdirSync(dir);
+      files.forEach((file) => {
+        const fullPath = path.join(dir, file);
+        const relPath = `/${path.relative(baseDir, fullPath).replace(/\\/g, '/')}`;
+        if (file.startsWith('.')) {
+          return;
+        }
+        if (fs.statSync(fullPath).isDirectory()) {
+          readFilesRecursively(fullPath, fileMap, baseDir);
+        } else if (
+          path.extname(fullPath) == '.png' ||
+          path.extname(fullPath) == '.jpg' ||
+          path.extname(fullPath) == '.jpeg'
+        ) {
+          fileMap[relPath] = fs.readFileSync(fullPath, 'base64');
+        } else {
+          fileMap[relPath] = fs.readFileSync(fullPath, 'utf-8');
+        }
+      });
+      return fileMap;
+    }
+    const result = readFilesRecursively(realPath);
+    return { files: result };
+  };
 }
 
 export const toolsManager = new ToolsManager();

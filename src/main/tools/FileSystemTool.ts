@@ -164,7 +164,7 @@ export class CreateDirectory extends BaseTool {
       for (const path of filePaths) {
         fs.mkdirSync(path, { recursive: true });
       }
-      return 'Directory created successfully';
+      return `Directory created successfully\n\n<folder>${filePaths.join('\n')}</folder>`;
     } else {
       return 'No directory to create';
     }
@@ -200,6 +200,14 @@ export class SearchFiles extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
+    const workspace = config?.configurable?.workspace;
+    let filePath = input.path;
+    if (workspace) {
+      filePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(workspace, filePath);
+    }
+
     const results: string[] = [];
 
     // 创建用于匹配的正则表达式
@@ -233,7 +241,7 @@ export class SearchFiles extends BaseTool {
       }
     };
 
-    searchRecursively(input.path);
+    searchRecursively(filePath);
 
     if (results.length === 0) {
       return '未找到匹配的文件';
@@ -276,6 +284,7 @@ export class SearchFiles extends BaseTool {
           ) {
             const loader = new ImageLoader(filePath);
             const docs = await loader.load();
+            if (!docs) continue;
             content = docs.map((x) => x.pageContent).join('\n\n');
           } else {
             continue;
@@ -310,7 +319,7 @@ export class SearchFiles extends BaseTool {
           }
         }
       }
-      return JSON.stringify(list);
+      return list.length > 0 ? JSON.stringify(list) : 'No match any file';
     }
 
     return JSON.stringify(results);
@@ -372,15 +381,17 @@ export class DeleteFile extends BaseTool {
 }
 
 export class FileSystemToolKit extends BaseToolKit {
-  name: string = 'file-system';
+  name: string = 'file_system';
 
-  tools = [
-    new FileWrite(),
-    new FileRead(),
-    new ListDirectory(),
-    new CreateDirectory(),
-    new SearchFiles(),
-    new MoveFile(),
-    new DeleteFile(),
-  ];
+  getTools(): BaseTool[] {
+    return [
+      new FileWrite(),
+      new FileRead(),
+      new ListDirectory(),
+      new CreateDirectory(),
+      new SearchFiles(),
+      new MoveFile(),
+      new DeleteFile(),
+    ];
+  }
 }

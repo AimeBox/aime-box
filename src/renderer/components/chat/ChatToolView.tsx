@@ -24,19 +24,20 @@ export interface ChatToolViewProps {
   toolName?: string;
   toolCall: string;
   value?: { title: string; content?: any; toolCall?: any };
+  chatId?: string;
 }
 
 export default function ChatToolView(props: ChatToolViewProps) {
-  const { className, open, onClose, value, toolName, toolCall } = props;
+  const { className, open, onClose, value, toolName, toolCall, chatId } = props;
   const [toolCallInputView, setToolCallInputView] = useState<'json' | 'text'>(
     'json',
   );
   const getToolView = () => {
     switch (toolName) {
-      case 'code-sandbox':
-        return <CodeSandboxView toolCall={toolCall} />;
+      case 'code_sandbox':
+        return <CodeSandboxView toolCall={toolCall} chatId={chatId} />;
       case 'file_write':
-        return <FileView toolCall={toolCall} />;
+        return <FileView toolCall={toolCall} content={value?.content} />;
       case 'web_search':
         return <WebSearchView toolCall={toolCall} content={value?.content} />;
       case 'python_interpreter':
@@ -61,8 +62,7 @@ export default function ChatToolView(props: ChatToolViewProps) {
                 <ReactJsonView src={value.toolCall.args} />
               )}
             </div>
-
-            {renderToolContent()}
+            <div className="h-auto">{renderToolContent()}</div>
           </>
         );
     }
@@ -114,7 +114,7 @@ export default function ChatToolView(props: ChatToolViewProps) {
             </div>
           </div>
           <ScrollArea className="flex-1 h-full mt-2">
-            <div className="mr-3">{getToolView()}</div>
+            <div className="mr-3 h-full">{getToolView()}</div>
           </ScrollArea>
         </div>
       </div>

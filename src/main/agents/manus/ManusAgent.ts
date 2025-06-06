@@ -86,7 +86,7 @@ export class ManusAgent extends BaseAgent {
     task: z.string().describe('用户的任务'),
   });
 
-  model: BaseChatModel;
+  // model: BaseChatModel;
 
   systemPrompt: string;
 
@@ -142,11 +142,14 @@ export class ManusAgent extends BaseAgent {
   }
 
   current_state = z.object({
-    thought: z.string().describe('Your current thinking step'),
-    evaluation_previous_goal: z.string(),
-    memory: z.string().optional(),
-    next_goal: z.string().describe('Your next goal'),
-    reply: z.string().optional().nullable(),
+    thought: z.string(),
+    action: z.string(),
+    action_description: z.string(),
+    action_args: z.any(),
+    // evaluation_previous_goal: z.string(),
+    // memory: z.string().optional(),
+    // next_goal: z.string().describe('Your next goal'),
+    // reply: z.string().optional().nullable(),
   });
 
   createAgentOutput = (actions: (BaseAction | BaseTool)[]) => {
@@ -212,42 +215,42 @@ export class ManusAgent extends BaseAgent {
         //   `Currently, you do not have any ultimate task.`,
         // );
       }
-      await this.messageManager?.addMessage(
-        new HumanMessage('Example Output:'),
-        undefined,
-        'init',
-      );
+      // await this.messageManager?.addMessage(
+      //   new HumanMessage('Example Output:'),
+      //   undefined,
+      //   'init',
+      // );
 
-      await this.messageManager?.addMessage(
-        new AIMessage({
-          content: '',
-          tool_calls: [
-            {
-              id: this.messageManager.toolId,
-              name: 'AgentOutput',
-              args: {
-                current_state: {
-                  thought: '',
-                  evaluation_previous_goal: '',
-                  // memory: '',
-                  next_goal: '',
-                },
-                action: {
-                  human_feedback: {
-                    question: 'hello, how are you?',
-                  },
-                },
-              },
+      // await this.messageManager?.addMessage(
+      //   new AIMessage({
+      //     content: '',
+      //     tool_calls: [
+      //       {
+      //         id: this.messageManager.toolId,
+      //         name: 'AgentOutput',
+      //         args: {
+      //           current_state: {
+      //             thought: '',
+      //             evaluation_previous_goal: '',
+      //             // memory: '',
+      //             next_goal: '',
+      //           },
+      //           action: {
+      //             human_feedback: {
+      //               question: 'hello, how are you?',
+      //             },
+      //           },
+      //         },
 
-              type: 'tool_call',
-            },
-          ],
-        }),
-        undefined,
-        'init',
-      );
+      //         type: 'tool_call',
+      //       },
+      //     ],
+      //   }),
+      //   undefined,
+      //   'init',
+      // );
 
-      await this.messageManager?.addToolMessage('', 'init');
+      // await this.messageManager?.addToolMessage('', 'init');
     }
 
     // await this.messageManager?.addMessage(
@@ -292,14 +295,14 @@ export class ManusAgent extends BaseAgent {
       ...BaseAnnotation,
       ...{
         task: Annotation<string>,
-        logList: Annotation<string>,
-        current_state: Annotation<typeof this.current_state>,
-        action: Annotation<any>,
-        actionName: Annotation<string>,
+        log_list: Annotation<string>,
+        current_state: Annotation<z.infer<typeof this.current_state>>,
+        // action: Annotation<any>,
+        // actionName: Annotation<string>,
         memory: Annotation<MemoryItem[]>,
         messages: Annotation<BaseMessage[]>,
         history: Annotation<MessageHistory>,
-        failTimes: Annotation<number>,
+        fail_times: Annotation<number>,
       },
       ...PlannerAnnotation,
     });
@@ -409,8 +412,7 @@ export class ManusAgent extends BaseAgent {
 
     const humanNode = async (state: typeof StateAnnotation.State) => {
       const value = interrupt({
-        text_to_revise:
-          state.action.human_feedback.question || state.current_state.reply,
+        text_to_revise: state.current_state.action_args.question,
       });
       const humanMessage = value;
       await that.messageManager?.addMessage(humanMessage);
@@ -428,11 +430,14 @@ export class ManusAgent extends BaseAgent {
     const lockedTaskNode = async (state: typeof StateAnnotation.State) => {
       const userInput = state.messages[state.messages.length - 1].content;
       const task =
-        state.action.locked_task.task == '<copy_user_input>'
+        state.current_state.action_args.task == '<copy_user_input>'
           ? state.messages[state.messages.length - 1].content
-          : state.action.locked_task.task;
+          : state.current_state.action_args.task;
       console.log(`📝 主要任务: ${task}`);
-      await that.messageManager?.addTaskMessage(
+      that.messageManager?.removeLastMessage();
+      that.messageManager?.removeLastMessage();
+
+      await that.messageManager?.addLockedTaskMessage(
         `Your new ultimate task is: "${task}" . Take the previous context into account and finish your new ultimate task. `,
       );
       return new Command({
@@ -447,6 +452,7 @@ export class ManusAgent extends BaseAgent {
     const toolNode = async (tools: BaseTool[]) => {
       const cb = async (state: typeof StateAnnotation.State) => {
         const lastMessage = state.messages[state.messages.length - 1];
+
         if (
           isAIMessage(lastMessage) &&
           lastMessage.tool_calls &&
@@ -497,12 +503,12 @@ export class ManusAgent extends BaseAgent {
           const tool_message = new ToolMessage('', lastMessage.tool_call_id);
           tool_message.id = uuidv4();
           tool_message.additional_kwargs = {};
-          tool_message.additional_kwargs['model'] = state.actionName;
+          tool_message.additional_kwargs['model'] = state.current_state.action;
           await messageEvent.created([tool_message]);
-          const tool = tools.find((x) => x.name == state.actionName);
+          const tool = tools.find((x) => x.name == state.current_state.action);
           if (tool) {
             try {
-              const res = await tool?.invoke(state.action[state.actionName]);
+              const res = await tool?.invoke(state.current_state.action_args);
               tool_message.content = res;
               tool_message.status = ChatStatus.SUCCESS;
             } catch (err) {
@@ -510,12 +516,12 @@ export class ManusAgent extends BaseAgent {
               tool_message.status = ChatStatus.ERROR;
             }
             this.messageManager.removeLastMessage();
+
             await this.messageManager.addToolMessage(
               new ToolMessage(
                 tool_message.content.toString(),
                 lastMessage.tool_call_id,
               ),
-
               'tool',
             );
             await messageEvent.finished([tool_message]);
@@ -597,7 +603,7 @@ export class ManusAgent extends BaseAgent {
               .describe('output files'),
           }),
         });
-        const { messages, task, todo, action } = state;
+        const { messages, task, todo, current_state } = state;
         const handoffTask = action.handoff.task;
         const handoffAgent = action.handoff.agent_name;
         await sendMessage(
@@ -758,94 +764,154 @@ export class ManusAgent extends BaseAgent {
       task?: string,
     ): Promise<{
       message: BaseMessage;
-      current_state: typeof this.current_state;
-      action: any;
+      current_state: z.infer<typeof this.current_state>;
+      // action: any;
     }> => {
       const agentOutput = this.createAgentOutput(agentActionList);
-      const structured_llm = that.model.withStructuredOutput(agentOutput, {
-        name: 'AgentOutput',
-        includeRaw: true,
-        method: 'functionCalling',
+
+      const actionTool = tool((args) => {}, {
+        name: 'action',
+        description: 'thought and select action to execute',
+        schema: z.object({
+          thought: z.string().describe('Your current thinking step'),
+          action: z
+            .enum(agentActionList.map((x) => x.name) as [string, ...string[]])
+            .describe('The action you want to take'),
+          action_description: z
+            .string()
+            .describe('The description of the action you want to take'),
+        }),
       });
-      const res = await structured_llm.invoke(inputMessages, {
+      const modelWithThought = that.model.bindTools([actionTool], {
+        tool_choice: 'any',
+      });
+      let result = await modelWithThought.invoke(inputMessages, {
         tags: ['ignore'],
         configurable: {
           signal: signal,
         },
       });
 
-      if (!res.parsed) {
-        await that.messageManager.addMessage(
-          res.raw,
-          undefined,
-          'action',
-          that.name,
-        );
-        await that.messageManager?.addToolMessage(
-          new ToolMessage(
-            `🚨 Action output error: \nYou must response json format like this:\n
-{
- current_state: {
-  thought: '',
-  evaluation_previous_goal: '',
-  memory: '',
-  next_goal: '',
-  reply: '',
-},
-action: {
-  human_feedback: {
-    question: '',
-  },
-}`,
-            (res.raw as AIMessage).tool_calls[0].id,
-            that.name,
-          ),
-          'action',
-        );
-        if (res.raw.text) {
-          const content = removeThinkTags(res.raw.text);
-          const parser = new JsonOutputParser<typeof agentOutput>();
-          const result = await parser.invoke(content);
-
-          return {
-            message: res.raw,
-            current_state: result?.current_state,
-            action: result?.action,
-          };
-        } else if (res.raw.tool_calls) {
-          const tool_calls = res.raw.tool_calls;
-          const tool_call = tool_calls[0];
-          try {
-            const ss = agentOutput.parse(tool_call.args);
-            debugger;
-          } catch (err) {
-            console.error(tool_call);
-          }
-
-          debugger;
-        }
-      }
-      if (task) {
-        console.log(`📝 当前主要任务: ${task}`);
-      }
-      const actionName = Object.keys(res.parsed.action)[0];
-      const actionArgs = res.parsed.action[actionName];
-      console.log(`💭 思考: ${res.parsed.current_state.thought}`);
-      console.log(`🧠 记忆: ${res.parsed.current_state.memory}`);
-      console.log(`🚀 行动: ${actionName} ${JSON.stringify(actionArgs)}`);
-      console.log(`💬 回复: ${res.parsed.current_state.reply}`);
-      if (isAIMessage(res.raw)) {
-        console.log(
-          `🪙 花费: ${res.raw.usage_metadata?.total_tokens} 输入: ${res.raw.usage_metadata?.input_tokens} 输出: ${res.raw.usage_metadata?.output_tokens}`,
-        );
-      }
-      console.log('--------------------------------');
+      const tool_call = result.tool_calls[0];
+      const { id, name, args } = tool_call;
+      console.log(`💭 思考: ${args.thought}`);
+      console.log(`🚀 行动: ${args.action}: ${args.action_description}`);
+      if (result.text) console.log(`💬 回复: ${result.text}`);
+      const action = agentActionList.find((x) => x.name == args.action);
+      const modelWithActions = that.model.bindTools([action], {
+        tool_choice: 'any',
+      });
+      inputMessages.push(
+        new AIMessage(
+          `${result.text ? `${result.text}\n` : ''}💭 Thought: ${args.thought}\n🚀 Action: ${args.action}: ${args.action_description}`,
+        ),
+      );
+      result = await modelWithActions.invoke(inputMessages, {
+        tags: ['ignore'],
+        configurable: {
+          signal: signal,
+        },
+      });
+      const action_args = result.tool_calls[0].args;
 
       return {
-        message: res.raw,
-        current_state: res.parsed.current_state,
-        action: res.parsed.action,
+        message: new AIMessage({
+          content: `${`${result.text}\n` || ''}💭 Thought: ${args.thought}`,
+          // tool_calls: [result.tool_calls[0]],
+        }),
+        current_state: {
+          thought: args.thought,
+          action: args.action,
+          action_description: args.action_description,
+          action_args: action_args,
+        },
+        // action: args.action,
       };
+
+      //       const structured_llm = that.model.withStructuredOutput(agentOutput, {
+      //         name: 'AgentOutput',
+      //         includeRaw: true,
+      //         method: 'functionCalling',
+      //       });
+      //       const res = await structured_llm.invoke(inputMessages, {
+      //         tags: ['ignore'],
+      //         configurable: {
+      //           signal: signal,
+      //         },
+      //       });
+
+      //       if (!res.parsed) {
+      //         await that.messageManager.addMessage(
+      //           res.raw,
+      //           undefined,
+      //           'action',
+      //           that.name,
+      //         );
+      //         await that.messageManager?.addToolMessage(
+      //           new ToolMessage(
+      //             `🚨 Action output error: \nYou must response json format like this:\n
+      // {
+      //  current_state: {
+      //   thought: '',
+      //   evaluation_previous_goal: '',
+      //   memory: '',
+      //   next_goal: '',
+      //   reply: '',
+      // },
+      // action: {
+      //   human_feedback: {
+      //     question: '',
+      //   },
+      // }`,
+      //             (res.raw as AIMessage).tool_calls[0].id,
+      //             that.name,
+      //           ),
+      //           'action',
+      //         );
+      //         if (res.raw.text) {
+      //           const content = removeThinkTags(res.raw.text);
+      //           const parser = new JsonOutputParser<typeof agentOutput>();
+      //           const result = await parser.invoke(content);
+
+      //           return {
+      //             message: res.raw,
+      //             current_state: result?.current_state,
+      //             action: result?.action,
+      //           };
+      //         } else if (res.raw.tool_calls) {
+      //           const tool_calls = res.raw.tool_calls;
+      //           const tool_call = tool_calls[0];
+      //           try {
+      //             const ss = agentOutput.parse(tool_call.args);
+      //             debugger;
+      //           } catch (err) {
+      //             console.error(tool_call);
+      //           }
+
+      //           debugger;
+      //         }
+      //       }
+      //       if (task) {
+      //         console.log(`📝 当前主要任务: ${task}`);
+      //       }
+      //       const actionName = Object.keys(res.parsed.action)[0];
+      //       const actionArgs = res.parsed.action[actionName];
+      //       console.log(`💭 思考: ${res.parsed.current_state.thought}`);
+      //       console.log(`🧠 记忆: ${res.parsed.current_state.memory}`);
+      //       console.log(`🚀 行动: ${actionName} ${JSON.stringify(actionArgs)}`);
+      //       console.log(`💬 回复: ${res.parsed.current_state.reply}`);
+      //       if (isAIMessage(res.raw)) {
+      //         console.log(
+      //           `🪙 花费: ${res.raw.usage_metadata?.total_tokens} 输入: ${res.raw.usage_metadata?.input_tokens} 输出: ${res.raw.usage_metadata?.output_tokens}`,
+      //         );
+      //       }
+      //       console.log('--------------------------------');
+
+      //       return {
+      //         message: res.raw,
+      //         current_state: res.parsed.current_state,
+      //         action: res.parsed.action,
+      //       };
     };
 
     const manusAgent = async (
@@ -891,7 +957,7 @@ action: {
       if (
         isHumanMessage(lastMessage) &&
         !task &&
-        state?.actionName != 'human_feedback'
+        state?.current_state?.action != 'human_feedback'
       ) {
         inputMessages.push(lastMessage);
         await this.messageManager?.addMessage(lastMessage, undefined, 'user');
@@ -910,7 +976,7 @@ action: {
       }
 
       let nextAction;
-      let failTimes = state.failTimes || 0;
+      let failTimes = state.fail_times || 0;
       try {
         nextAction = await getNextAction(inputMessages, task);
         failTimes = 0;
@@ -937,26 +1003,26 @@ action: {
       }
 
       let goto = END;
-      const { current_state, action } = nextAction;
+      const { current_state, message } = nextAction;
 
-      const actionName =
-        Object.keys(action).length == 1 ? Object.keys(action)[0] : undefined;
+      // 添加当前动作
+      await this.messageManager.addMessage(
+        message,
+        undefined,
+        'action',
+        this.name,
+      );
+
+      const actionName = current_state.action;
+
       if (actionName) {
         if (actionName.startsWith('handoff')) {
-          goto = `handoff_to_${action[actionName].agent_name}`;
-        } else if (actionName == 'human_feedback') {
+          goto = `handoff_to_${current_state.action_args.agent_name}`;
+        } else if (actionName == HumanFeedbackAction.name) {
           goto = 'human';
-          const askMessage = new AIMessage(`${action.human_feedback.question}`);
-          askMessage.name = this.name;
-          askMessage.additional_kwargs.model = 'human_feedback';
-          askMessage.additional_kwargs.history = [...inputMessages].map((x) =>
-            x.toJSON(),
-          );
-          await sendMessage(askMessage);
-          await this.messageManager?.addMessage(askMessage);
-        } else if (actionName == 'locked_task') {
+        } else if (actionName == LockedTaskAction.name) {
           goto = 'locked_task';
-        } else if (actionName == 'plan') {
+        } else if (actionName == PlanAction.name) {
           goto = 'plan';
         } else if (tools.map((x) => x.name).includes(actionName)) {
           goto = 'tool';
@@ -965,45 +1031,39 @@ action: {
         }
       }
 
-      if (actionName.startsWith('handoff') || actionName == 'locked_task') {
-        await this.messageManager.addMessage(
-          new AIMessage({
-            content: '',
-            tool_calls: [
-              {
-                name: 'AgentOutput',
-                args: {
-                  current_state: nextAction.current_state,
-                  action: nextAction.action,
-                },
-                id: this.messageManager.toolId,
-                type: 'tool_call',
-              },
-            ],
-          }),
-          undefined,
-          'action',
-          this.name,
+      if (goto == 'human') {
+        const askMessage = new AIMessage(
+          `${current_state.action_args.question}`,
         );
-
-        await this.messageManager.addToolMessage('action success', 'action');
-
-        if (nextAction.current_state.reply) {
-          await sendMessage(
-            new AIMessage({
-              content: nextAction.current_state.reply,
-              name: this.name,
-            }),
-          );
-        }
+        askMessage.name = this.name;
+        askMessage.additional_kwargs.model = 'human_feedback';
+        askMessage.additional_kwargs.history = [...inputMessages].map((x) =>
+          x.toJSON(),
+        );
+        await sendMessage(askMessage);
+        await this.messageManager?.addMessage(askMessage);
       }
-      if (actionName == 'plan') {
+
+      if (
+        actionName.startsWith('handoff') ||
+        actionName == LockedTaskAction.name
+      ) {
+        // if (current_state.thought) {
+        //   await sendMessage(
+        //     new AIMessage({
+        //       content: nextAction.current_state.thought,
+        //       name: this.name,
+        //     }),
+        //   );
+        // }
+      }
+      if (actionName == PlanAction.name) {
         const toolCallMessage = new AIMessage({
-          content: nextAction.current_state.reply,
+          content: current_state.action_description,
           tool_calls: [
             {
               name: actionName,
-              args: action[actionName],
+              args: current_state.action_args,
               id: this.messageManager.toolId,
               type: 'tool_call',
             },
@@ -1018,15 +1078,20 @@ action: {
           this.name,
         );
         await this.messageManager.addToolMessage('', 'action');
-        // await sendMessage(toolCallMessage);
+        await sendMessage(
+          new AIMessage({
+            content: current_state.action_description,
+            name: this.name,
+          }),
+        );
       }
       if (goto == 'tool') {
         const toolCallMessage = new AIMessage({
-          content: nextAction.current_state.reply,
+          content: current_state.action_description,
           tool_calls: [
             {
               name: actionName,
-              args: action[actionName],
+              args: current_state.action_args,
               id: this.messageManager.toolId,
               type: 'tool_call',
             },
@@ -1050,9 +1115,7 @@ action: {
           messages: this.messageManager.getMessages(),
           history: this.messageManager.history,
           current_state: nextAction.current_state,
-          action: nextAction.action,
-          actionName: actionName,
-          waitHumanAsk: actionName == 'human_feedback',
+          waitHumanAsk: actionName == HumanFeedbackAction.name,
         },
         goto: goto,
       });
@@ -1144,9 +1207,10 @@ action: {
     const app = workflow.compile({
       store: store,
       checkpointer: dbManager.langgraphSaver,
+
       // interruptAfter: ['ask'],
     });
-
+    app.config = { recursionLimit: 1000 };
     return app;
   }
 }

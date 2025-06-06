@@ -50,6 +50,7 @@ import { parse as parseYaml } from 'yaml';
 import { A2ACardResolver, A2AClient } from 'a2a-js';
 import { createA2A } from './a2a/Agent2Agent';
 import { jsonSchemaToZod } from '../utils/jsonSchemaToZod';
+import { DataMaskingAgent } from './data_masking/DataMaskingAgent';
 
 export interface AgentInfo extends Agent {
   static: boolean;
@@ -70,7 +71,7 @@ export class AgentManager {
     await this.registerAgent(ScriptAssistant);
     //this.registerAgent(TranslateAgent);
     await this.registerAgent(PlannerAgent);
-
+    await this.registerAgent(DataMaskingAgent);
     await this.registerAgent(ManusAgent);
     if (!ipcMain) return;
     ipcMain.on('agent:getList', async (event, filter?: string) => {

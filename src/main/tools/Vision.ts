@@ -1,33 +1,14 @@
 import { Tool, ToolParams, StructuredTool } from '@langchain/core/tools';
-import {
-  exec,
-  execSync,
-  execFileSync,
-  ExecSyncOptionsWithStringEncoding,
-} from 'child_process';
-import { isArray, isString, isUrl } from '../utils/is';
 import { z } from 'zod';
-import iconv from 'iconv-lite';
-import path from 'path';
-import { app } from 'electron';
 import { promises as fsPromises, existsSync } from 'fs';
-import { TextLoader } from 'langchain/document_loaders/fs/text';
-import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
-import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
-import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
-
-import {
-  DallEAPIWrapper,
-  DallEAPIWrapperParams,
-  OpenAIClient,
-  ClientOptions,
-} from '@langchain/openai';
 import settingsManager from '../settings';
 import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import { getProviderModel } from '../utils/providerUtil';
 import { getChatModel } from '../llm';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { isUrl } from '../utils/is';
+import { t } from 'i18next';
 
 export interface VisionParameters extends ToolParams {
   model: string;
@@ -43,7 +24,7 @@ export class Vision extends BaseTool {
     {
       field: 'model',
       component: 'ProviderSelect',
-      label: 'Model',
+      label: t('common.model'),
       componentProps: {
         type: 'llm',
       },

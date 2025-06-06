@@ -1,58 +1,34 @@
 import { Tool, ToolParams } from '@langchain/core/tools';
 import { z } from 'zod';
-import { WolframAlphaTool } from '@langchain/community/tools/wolframalpha';
+import { BaseTool } from './BaseTool';
+
 export interface WeatherToolParameters extends ToolParams {
   localtion: string;
   unit: string;
 }
 
-export class WeatherTool extends Tool {
-  static lc_name() {
-    return 'WeatherTool';
-  }
-
+export class WeatherTool extends BaseTool {
   localtion!: string;
 
   unit!: string;
 
-  name: string;
+  name: string = 'get_current_weather';
 
-  description: string;
+  description: string = 'Get the current weather in a given location';
+
+  schema = z.object({
+    localtion: z
+      .string()
+      .describe('The city and state, e.g. San Francisco, CA'),
+    unit: z.enum(['celsius', 'fahrenheit']),
+  });
 
   constructor(params?: WeatherToolParameters) {
     super(params);
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'get_current_weather',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'Get the current weather in a given location',
-    });
-    Object.defineProperty(this, 'schema', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: z.object({
-        localtion: z
-          .string()
-          .describe('The city and state, e.g. San Francisco, CA'),
-        unit: z.enum(['celsius', 'fahrenheit']),
-      }),
-    });
+
     const { localtion, unit } = params ?? {};
     this.localtion = localtion;
     this.unit = unit || this.unit;
-  }
-  call(arg, callbacks) {
-    return super.call(
-      typeof arg === 'string' || !arg ? { input: arg } : arg,
-      callbacks,
-    );
   }
 
   async _call(input): Promise<string> {

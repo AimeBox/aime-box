@@ -1,6 +1,7 @@
 import tokenCounter from '@/main/utils/tokenCounter';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
+  AIMessage,
   BaseMessage,
   HumanMessage,
   isSystemMessage,
@@ -130,6 +131,48 @@ export class MessageManager {
       },
       1,
     );
+  }
+
+  async addLockedTaskMessage(task: string) {
+    this.task = task;
+
+    const message = new HumanMessage(task);
+    const tokenCount = await this.countTokens(message);
+    const index = this.history.messages.findIndex(
+      (x) => x.metadata.type === 'task',
+    );
+    if (index >= 1) {
+      this.history.removeMessage(index);
+    }
+    this.history.addMessage(
+      message,
+      {
+        type: 'task',
+        tokens: tokenCount,
+      },
+      1,
+    );
+
+    const lockedTaskMessage = new AIMessage({
+      content: 'Locked task',
+      tool_calls: [
+        {
+          id: this.toolId,
+          name: 'locked_task',
+          type: 'tool_call',
+          args: {},
+        },
+      ],
+    });
+    this.history.addMessage(
+      lockedTaskMessage,
+      {
+        type: 'task',
+        tokens: await this.countTokens(lockedTaskMessage),
+      },
+      2,
+    );
+    await this.addToolMessage('Task is locked', 'task');
   }
 
   async addMessage(

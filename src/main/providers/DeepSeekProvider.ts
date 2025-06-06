@@ -8,7 +8,6 @@ import { getEnvironmentVariable } from '@langchain/core/utils/env';
 import { ChatOpenAI } from '@langchain/openai';
 
 export class DeepSeekProvider extends BaseProvider {
-  
   name: string = ProviderType.DEEPSEEK;
 
   description: string;
@@ -20,7 +19,6 @@ export class DeepSeekProvider extends BaseProvider {
   }
 
   getChatModel(modelName: string, options: ChatOptions): BaseChatModel {
-
     const llm = new ChatOpenAI({
       apiKey: this.provider.api_key,
       modelName: modelName,
@@ -37,32 +35,31 @@ export class DeepSeekProvider extends BaseProvider {
     return llm;
   }
 
-  async getModelList(): Promise<{ name: string; enable: boolean; }[]> {
+  async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${this.provider.api_key}`,
-          },
-        };
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: `Bearer ${this.provider.api_key}`,
+      },
+    };
 
-        const url = 'https://api.deepseek.com/models';
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                this.provider.models?.find((z) => z.name == x.id)?.enable || false,
-              input_token:
-                this.provider.models.find((z) => z.name == x.id)?.input_token || 0,
-              output_token:
-                this.provider.models.find((z) => z.name == x.id)?.output_token ||
-                0,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+    const url = 'https://api.deepseek.com/models';
+    const res = await fetch(url, options);
+    const models = await res.json();
+    return models.data
+      .map((x) => {
+        return {
+          name: x.id,
+          enable:
+            this.provider.models?.find((z) => z.name == x.id)?.enable || false,
+          input_token:
+            this.provider.models.find((z) => z.name == x.id)?.input_token || 0,
+          output_token:
+            this.provider.models.find((z) => z.name == x.id)?.output_token || 0,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 }

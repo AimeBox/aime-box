@@ -2,7 +2,6 @@ import { Tool, ToolParams } from '@langchain/core/tools';
 import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import { PassThrough } from 'stream';
-import { Transformers } from '../utils/transformers';
 import FormData from 'form-data';
 import fetch, { Response } from 'node-fetch';
 import { BaseTool } from './BaseTool';
@@ -22,6 +21,7 @@ export class Vectorizer extends BaseTool {
   schema = z.object({
     image: z.string().describe('The image to vectorize'),
   });
+
   configSchema: FormSchema[] = [
     {
       label: 'Api Key Name',
@@ -91,7 +91,5 @@ export class Vectorizer extends BaseTool {
     } else {
       throw new Error(`HTTP error! status: ${res.status}`);
     }
-
-    return '';
   }
 }

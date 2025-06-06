@@ -5,9 +5,10 @@ import { ImageLoader } from './ImageLoader';
 import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
 import { JSONLoader } from 'langchain/document_loaders/fs/json';
 import { EPubLoader } from '@langchain/community/document_loaders/fs/epub';
+import { ExcelLoader } from './ExcelLoader';
 
 export const getLoaderFromExt = (ext: string, value: string) => {
-  switch (ext) {
+  switch (ext.toLowerCase()) {
     case '.txt':
       return new TextLoader(value);
     case '.pdf':
@@ -26,6 +27,9 @@ export const getLoaderFromExt = (ext: string, value: string) => {
       return new JSONLoader(value);
     case '.epub':
       return new EPubLoader(value);
+    case '.xlsx':
+    case '.xls':
+      return new ExcelLoader(value);
     default:
       return null;
   }

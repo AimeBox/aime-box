@@ -106,7 +106,7 @@ export const runAgent = async (
     let _toolStart = [];
     const _messages = [];
     for await (const { event, tags, data } of eventStream) {
-      console.log(event, tags, data);
+      // console.log(event, tags, data);
       if (tags.includes('ignore')) {
         // console.log(event, tags, data);
         continue;
@@ -208,6 +208,8 @@ export const runAgent = async (
             };
             await options?.callbacks?.handlerMessageFinished?.(msg);
             _lastMessage = msg;
+          } else {
+            debugger;
           }
         } else {
           const _toolMessage =

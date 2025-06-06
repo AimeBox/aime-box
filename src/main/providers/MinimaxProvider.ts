@@ -18,10 +18,7 @@ export class MinimaxProvider extends BaseProvider {
     super(params);
   }
 
-  getChatModel(
-    modelName: string,
-    options: ChatOptions,
-  ): BaseChatModel {
+  getChatModel(modelName: string, options: ChatOptions): BaseChatModel {
     const apiKey =
       this.provider.api_key || getEnvironmentVariable('MINIMAX_API_KEY');
     const groupId =
@@ -59,7 +56,8 @@ export class MinimaxProvider extends BaseProvider {
       .map((x) => {
         return {
           name: x,
-          enable: this.provider.models.find((z) => z.name == x)?.enable || false,
+          enable:
+            this.provider.models.find((z) => z.name == x)?.enable || false,
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));

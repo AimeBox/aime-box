@@ -82,6 +82,11 @@ export class TerminalTool extends BaseTool {
     config,
   ): Promise<string> {
     console.log(`Executing command:\n ${input.command}`);
+    let cwd;
+    const workspace = config?.configurable?.workspace;
+    if (workspace) {
+      cwd = workspace;
+    }
 
     if (this.ask_human_input) {
       // if (user_input == 'y') {
@@ -93,6 +98,7 @@ export class TerminalTool extends BaseTool {
         res = await runCommand(
           input.command as string,
           (input.terminal as string) || this.terminale,
+          cwd,
         );
       } catch (err) {
         console.error(err);

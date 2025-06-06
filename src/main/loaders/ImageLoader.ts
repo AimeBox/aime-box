@@ -26,11 +26,15 @@ export class ImageLoader extends BaseDocumentLoader {
 
     const { RapidOcrTool } = await ImageLoader.imports();
     const ocrTool = new RapidOcrTool();
-    const text = await ocrTool.invoke(this.filePathOrBlob);
-    const metadata = { source: this.filePathOrBlob };
+    try {
+      const text = await ocrTool.invoke(this.filePathOrBlob);
+      const metadata = { source: this.filePathOrBlob };
 
-    const pageContent = text;
-    return [new Document({ pageContent, metadata })];
+      const pageContent = text;
+      return [new Document({ pageContent, metadata })];
+    } catch (err) {
+      return undefined;
+    }
   }
 
   static async imports(): Promise<{ RapidOcrTool: typeof RapidOcrToolT }> {

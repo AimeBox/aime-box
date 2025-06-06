@@ -139,7 +139,7 @@ export default function ChatFileContent() {
       filters: [{ name: 'Files', extensions: exts }],
     });
     if (res && res.length > 0) {
-      setCurrentFileExt(res[0].ext);
+      //setCurrentFileExt(res[0].ext);
       const options = { files: res };
 
       await window.electron.chat.update(

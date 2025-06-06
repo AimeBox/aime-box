@@ -6,6 +6,7 @@ import {
   BrowserWindow,
   app,
   IpcMainInvokeEvent,
+  shell,
 } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
 import { concat } from '@langchain/core/utils/stream';
@@ -61,7 +62,6 @@ import {
 import { handler } from 'tailwindcss-animate';
 import { agentManager } from '../agents';
 import { getProviderModel } from '../utils/providerUtil';
-import { Serialized } from '@langchain/core/dist/load/serializable';
 import { notificationManager } from '../app/NotificationManager';
 import { BaseTool } from '../tools/BaseTool';
 import { KnowledgeBaseQuery } from '../tools/KnowledgeBaseQuery';
@@ -94,7 +94,7 @@ export interface ChatInfo extends Chat {
   totalToken?: number;
   inputToken?: number;
   outputToken?: number;
-  status: string;
+  status: 'running' | 'idle' | string;
   agentName?: string;
 }
 
@@ -197,9 +197,11 @@ export class ChatManager {
     ipcMain.on(
       'chat:delete-chatmessage',
       async (event, chatMessageId: string) => {
-        event.returnValue =
-          await this.chatMessageRepository.delete(chatMessageId);
+        event.returnValue = await this.onDeleteMessage(chatMessageId);
       },
+    );
+    ipcMain.handle('chat:openWorkspace', async (event, chatId: string) =>
+      this.openWorkspace(chatId),
     );
     ipcMain.on(
       'chat:update-chatmessage',
@@ -465,11 +467,15 @@ export class ChatManager {
               )};base64,${imageData.toString('base64')}`,
             },
           });
+          res.content.find((x) => x.type == 'text')!.text +=
+            `\n\n<${attachment.type}>${attachment.path}</${attachment.type}>`;
         } else if (attachment.type == 'file' && attachment.ext == '.mp4') {
-          res.content.push({
-            type: 'video_path',
-            video_path: attachment.path,
-          });
+          // res.content.push({
+          //   type: 'video_path',
+          //   video_path: attachment.path,
+          // });
+          res.content.find((x) => x.type == 'text')!.text +=
+            `\n\n<${attachment.type}>${attachment.path}</${attachment.type}>`;
         } else if (attachment.type == 'file' || attachment.type == 'folder') {
           res.content.find((x) => x.type == 'text')!.text +=
             `\n\n<${attachment.type}>${attachment.path}</${attachment.type}>`;
@@ -573,6 +579,7 @@ export class ChatManager {
     messages = [...headHistory, ...messages].filter((x) => x.content);
 
     event(`chat:message-changed:${chatId}`, insertData);
+    chat.status = 'running';
     event(`chat:start`, chat);
     const controller = new AbortController();
 
@@ -807,6 +814,7 @@ export class ChatManager {
       event(`chat:changed:${chatId}`, chat);
     }
     console.info('chat end');
+    chat.status = 'idle';
     event(`chat:end`, chat);
 
     if (isFirst) {
@@ -1321,6 +1329,41 @@ export class ChatManager {
     const _image = image.substring(image.indexOf(',') + 1);
     const imageBuffer = Buffer.from(_image, 'base64');
     await writeFile(_savePath, imageBuffer);
+  }
+
+  public async onDeleteMessage(chatMessageId: string) {
+    const message = await this.chatMessageRepository.findOne({
+      where: { id: chatMessageId },
+    });
+    if (message) {
+      const delMsg = [message];
+      if (message.role == 'assistant') {
+        const { tool_calls } = message;
+        if (tool_calls && tool_calls.length > 0) {
+          const tool_messages = await this.chatMessageRepository.find({
+            where: { chatId: message.chatId, role: 'tool' },
+          });
+          for (const tool_call of tool_calls) {
+            for (const tool_message of tool_messages) {
+              if (
+                tool_message.content.find((x) => x.tool_call_id == tool_call.id)
+              )
+                delMsg.push(tool_message);
+            }
+          }
+        }
+      }
+      await this.chatMessageRepository.remove(delMsg);
+    }
+  }
+
+  public async openWorkspace(chatId: string) {
+    const workspace = path.join(getDataPath(), 'chats', chatId);
+    try {
+      if ((await fs.stat(workspace)).isDirectory()) {
+        await shell.openPath(workspace);
+      }
+    } catch {}
   }
 }
 

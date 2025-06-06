@@ -6,6 +6,7 @@ import {
   IpcRendererEvent,
   OpenDialogOptions,
   SaveDialogOptions,
+  webUtils,
 } from 'electron';
 import { Chat } from '../entity/Chat';
 import { Providers } from '../entity/Providers';
@@ -20,6 +21,7 @@ import { GlobalSettings } from './settings';
 import { ChatInputAttachment, ChatInputExtend, ChatMode } from '@/types/chat';
 import { Prompt, PromptGroup } from '@/entity/Prompt';
 import { ChatInfo } from './chat';
+import { get } from 'http';
 
 const electronHandler = {
   ipcRenderer: {
@@ -54,6 +56,9 @@ const electronHandler = {
     },
   },
   app: {
+    getPathForFile: (file: File) => {
+      return webUtils.getPathForFile(file);
+    },
     showSaveDialog: (arg: SaveDialogOptions) =>
       ipcRenderer.invoke('app:showSaveDialog', arg),
     showOpenDialog: (
@@ -131,6 +136,8 @@ const electronHandler = {
     },
   },
   chat: {
+    openWorkspace: (chatId: string) =>
+      ipcRenderer.invoke('chat:openWorkspace', chatId),
     getChatPage: (input: {
       filter?: string;
       skip: number;
@@ -257,6 +264,8 @@ const electronHandler = {
     getSTTModels: () => ipcRenderer.invoke('providers:getSTTModels'),
     getWebSearchProviders: () =>
       ipcRenderer.invoke('providers:getWebSearchProviders'),
+    getImageGenerationProviders: () =>
+      ipcRenderer.invoke('providers:getImageGenerationProviders'),
   },
   kb: {
     save(pathOrUrl: string) {
@@ -345,6 +354,8 @@ const electronHandler = {
       ipcRenderer.invoke('tools:addMcp', data),
     deleteMcp: (name: string) => ipcRenderer.invoke('tools:deleteMcp', name),
     refreshMcp: (name: string) => ipcRenderer.invoke('tools:refreshMcp', name),
+    getCodeSandboxSetup: (path: string, chatId?: string) =>
+      ipcRenderer.invoke('tools:getCodeSandboxSetup', path, chatId),
   },
   agents: {
     getList(filter?: string) {

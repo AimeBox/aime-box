@@ -1,5 +1,5 @@
 import { Providers, ProviderType } from '@/entity/Providers';
-import { BaseProvider } from './BaseProvider';
+import { BaseProvider, BaseProviderParams } from './BaseProvider';
 import settingsManager from '../settings';
 
 export class VolcanoEngineProvider extends BaseProvider {
@@ -8,7 +8,6 @@ export class VolcanoEngineProvider extends BaseProvider {
   description: string;
 
   defaultApiBase: string = 'https://ark.cn-beijing.volces.com/api/v3';
-
 
   constructor(params?: BaseProviderParams) {
     super(params);
@@ -36,7 +35,7 @@ export class VolcanoEngineProvider extends BaseProvider {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  getEmbeddingModels(provider: Providers) {
+  async getEmbeddingModels(): Promise<string[]> {
     return [];
   }
 }

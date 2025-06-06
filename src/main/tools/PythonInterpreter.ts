@@ -55,13 +55,12 @@ export class PythonInterpreterTool extends BaseTool {
     dependencies: z
       .array(z.string())
       .optional()
-      .nullable()
       .describe('python pip dependencies to install'),
   });
 
   name: string = 'python_interpreter';
 
-  description: string = `Evaluates python code in a sandbox environment. The environment resets on every execution. You must send the whole script every time and print your outputs.`;
+  description: string = `Evaluates python code in a sandbox environment. The environment resets on every execution.If need use pip install please set dependencies, you must send the whole script every time and print your outputs.`;
 
   pythonPath: string;
 
@@ -84,7 +83,11 @@ export class PythonInterpreterTool extends BaseTool {
   ): Promise<string> {
     let tempDir;
     try {
-      if (!this.pythonPath || !fs.statSync(this.pythonPath).isFile()) {
+      if (
+        !this.pythonPath ||
+        !fs.existsSync(this.pythonPath) ||
+        !fs.statSync(this.pythonPath).isFile()
+      ) {
         try {
           this.pythonPath = (
             await runCommand(`python -c "import sys;print(sys.executable)"`)

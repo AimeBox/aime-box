@@ -6,7 +6,14 @@ import { Providers } from '@/entity/Providers';
 const { Option } = Select;
 
 interface ProviderSelectProps extends SelectProps<any> {
-  type?: 'llm' | 'reranker' | 'stt' | 'tts' | 'embedding' | 'websearch';
+  type?:
+    | 'llm'
+    | 'reranker'
+    | 'stt'
+    | 'tts'
+    | 'embedding'
+    | 'websearch'
+    | 'image_generation';
 }
 
 interface ProviderSelectRef {
@@ -29,6 +36,8 @@ const ProviderSelect = React.forwardRef(
         res = await window.electron.providers.getEmbeddingModels();
       else if (props.type == 'websearch')
         res = await window.electron.providers.getWebSearchProviders();
+      else if (props.type == 'image_generation')
+        res = await window.electron.providers.getImageGenerationProviders();
 
       const options = res.map((x) => {
         const options = x.models.map((o) => {

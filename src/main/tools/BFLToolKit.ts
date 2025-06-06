@@ -3,12 +3,12 @@ import { z } from 'zod';
 import { getEnvironmentVariable } from '@langchain/core/utils/env';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import fs from 'fs';
-import { BaseTool, ToolTag } from './BaseTool';
+import { BaseTool, BaseToolKit, ToolTag } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import { imageToBase64 } from '../utils/common';
 
-export interface BFLImageGenerationParameters extends ToolParams {
+export interface BFLParameters extends ToolParams {
   apiKey: string;
 }
 const BFL_API_URL = 'https://api.bfl.ai/v1';
@@ -50,7 +50,7 @@ export class BFLImageGeneration extends BaseTool {
 
   apiKey?: string;
 
-  constructor(params?: BFLImageGenerationParameters) {
+  constructor(params?: BFLParameters) {
     super();
     this.apiKey = params?.apiKey || getEnvironmentVariable('BFL_API_KEY');
   }
@@ -115,7 +115,7 @@ export class BFLImageEditing extends BaseTool {
 
   apiKey?: string;
 
-  constructor(params?: BFLImageGenerationParameters) {
+  constructor(params?: BFLParameters) {
     super();
     this.apiKey = params?.apiKey || getEnvironmentVariable('BFL_API_KEY');
   }
@@ -166,3 +166,33 @@ const get_result = async (request_id: string, apiKey: string) => {
   const data = await response.json();
   return data;
 };
+
+export class BFLToolkit extends BaseToolKit {
+  name: string = 'bfl_toolkit';
+
+  configSchema?: FormSchema[] = [
+    {
+      field: 'apiKey',
+      component: 'Input',
+      label: 'API Key',
+      required: true,
+    },
+  ];
+
+  apiKey?: string;
+
+  params?: BFLParameters;
+
+  constructor(params?: BFLParameters) {
+    super();
+    this.params = params;
+    this.apiKey = params?.apiKey;
+  }
+
+  getTools(): BaseTool[] {
+    return [
+      new BFLImageGeneration(this.params),
+      new BFLImageEditing(this.params),
+    ];
+  }
+}

@@ -125,11 +125,12 @@ export class StdioClientTransport implements Transport {
       const windowsHide =
         process.platform === 'win32' &&
         settingsManager.getSettings()?.showMcpWindows === false;
+      const env = { ...getDefaultEnvironment(), ...this._serverParams.env };
       this._process = spawn(
         this._serverParams.command,
         this._serverParams.args ?? [],
         {
-          env: this._serverParams.env ?? getDefaultEnvironment(),
+          env: env,
           stdio: ['pipe', 'pipe', this._serverParams.stderr ?? 'inherit'],
           shell: false,
           signal: this._abortController.signal,

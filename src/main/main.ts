@@ -234,7 +234,9 @@ const createWindow = async () => {
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
       webSecurity: false,
-      nodeIntegration: true,
+      nodeIntegration: false,
+      spellcheck: false,
+      //contextIsolation: false,
       contextIsolation: true,
     },
   });

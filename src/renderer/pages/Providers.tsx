@@ -179,15 +179,22 @@ export default function Connections() {
             apiVersion: '2024-10-21',
           },
         });
-      }
-      else if (changedFields[0].value === 'replicate') {
+      } else if (changedFields[0].value === 'minimax') {
+        form.setFieldsValue({
+          api_base: 'https://api.minimax.chat/v1',
+          api_key: 'NULL',
+        });
+      } else if (changedFields[0].value === 'replicate') {
         form.setFieldsValue({
           api_base: 'https://api.replicate.com/v1',
           api_key: 'NULL',
         });
+      } else if (changedFields[0].value === 'volcanoengine') {
+        form.setFieldsValue({
+          api_base: 'https://ark.cn-beijing.volces.com/api/v3',
+          api_key: 'NULL',
+        });
       }
-
-      
     }
   };
   const onManagerModel = async (data: Providers) => {

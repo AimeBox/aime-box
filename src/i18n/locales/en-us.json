@@ -61,7 +61,8 @@
     "tool": "Tools",
     "fileChat": "File Chat",
     "export_image": "Export Image",
-    "plannerChat": "Planner Chat"
+    "plannerChat": "Planner Chat",
+    "open_workspace": "Open Workspace"
   },
   "language": {
     "english": "English",

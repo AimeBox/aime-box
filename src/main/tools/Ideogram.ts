@@ -12,7 +12,6 @@ import path from 'path';
 import { app } from 'electron';
 import fs from 'fs';
 import { PlaywrightWebBaseLoader } from '@langchain/community/document_loaders/web/playwright';
-import settingsManager from '../settings';
 import { getDataPath } from '../utils/path';
 import { chromium } from 'playwright';
 
@@ -64,12 +63,6 @@ export class Ideogram extends BaseTool {
       .optional()
       .describe('The style type to generate with'),
     save_path: z.string().optional().describe('The path to save the image to'),
-    // resolution: z
-    //   .enum([])
-    //   .optional()
-    //   .describe(
-    //     'The resolution to use for image generation, represented in width x height',
-    //   ),
   });
 
   configSchema: FormSchema[] = [

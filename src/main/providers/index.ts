@@ -34,6 +34,7 @@ import { DeepSeekProvider } from './DeepSeekProvider';
 import { BaseProvider } from './BaseProvider';
 import { AnthropicProvider } from './AnthropicProvider';
 import { isString } from '../utils/is';
+
 export class ProvidersManager {
   repository: Repository<Providers>;
 
@@ -72,6 +73,9 @@ export class ProvidersManager {
     ipcMain.handle('providers:getWebSearchProviders', (event) =>
       this.getWebSearchProviders(),
     );
+    ipcMain.handle('providers:getImageGenerationProviders', (event) =>
+      this.getImageGenerationProviders(),
+    );
     ipcMain.handle(
       'providers:getDefaultLLM',
       (event) => settingsManager.getSettings()?.defaultLLM,
@@ -97,7 +101,7 @@ export class ProvidersManager {
     const httpProxy = settingsManager.getHttpAgent();
     try {
       if (connection.type === ProviderType.OLLAMA) {
-        const ollama = new OllamaProvider({ provider: connection});
+        const ollama = new OllamaProvider({ provider: connection });
         const list = await ollama.getModelList();
         return list;
       } else if (
@@ -329,7 +333,9 @@ export class ProvidersManager {
           })
           .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection?.type === ProviderType.VOLCANOENGINE) {
-        const volcanoEngine = new VolcanoEngineProvider({ provider: connection });
+        const volcanoEngine = new VolcanoEngineProvider({
+          provider: connection,
+        });
         const list = await volcanoEngine.getModelList();
         return list;
       } else if (connection?.type === ProviderType.MINIMAX) {
@@ -348,20 +354,23 @@ export class ProvidersManager {
 
     return [];
   };
-  public async getProvider(provider: Providers | string): Promise<BaseProvider> {
+
+  public async getProvider(
+    provider: Providers | string,
+  ): Promise<BaseProvider> {
     let providerObj: Providers;
-    if(isString(provider)){
-      providerObj = await this.repository.findOneBy({id: provider});
-    }else{
+    if (isString(provider)) {
+      providerObj = await this.repository.findOneBy({ id: provider });
+    } else {
       providerObj = provider;
     }
-    switch(providerObj.type){
+    switch (providerObj.type) {
       case ProviderType.REPLICATE:
-        return new ReplicateProvider({ provider: providerObj});
+        return new ReplicateProvider({ provider: providerObj });
       case ProviderType.ANTHROPIC:
-        return new AnthropicProvider({ provider: providerObj});
+        return new AnthropicProvider({ provider: providerObj });
       case ProviderType.OLLAMA:
-        return new OllamaProvider({ provider: providerObj});
+        return new OllamaProvider({ provider: providerObj });
       default:
         return undefined;
     }
@@ -603,7 +612,7 @@ export class ProvidersManager {
               models: [...new Set(emb_models.map((x) => x.id))],
             });
           } catch {}
-        } else if (connection?.type === ProviderType.REPLICATE){
+        } else if (connection?.type === ProviderType.REPLICATE) {
           const replicate = new ReplicateProvider({ provider: connection });
           const list = await replicate.getEmbeddingModels();
           emb_list.push({
@@ -753,6 +762,25 @@ export class ProvidersManager {
       name: 'serpapi',
       models: ['basic'],
     });
+
+    return list;
+  };
+
+  getImageGenerationProviders = async (): Promise<any[]> => {
+    const list = [];
+    const providers = await this.getProviders(false);
+    for (const provider of providers) {
+      const _provider = await this.getProvider(provider);
+      if (_provider) {
+        const models = await _provider.getImageGenerationModels();
+        if (models && models.length > 0) {
+          list.push({
+            name: provider.name,
+            models: models,
+          });
+        }
+      }
+    }
 
     return list;
   };

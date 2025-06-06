@@ -88,7 +88,8 @@ const ScrollArea = React.forwardRef<ScrollAreaRef, ScrollAreaProps>(
       // 获取正确的滚动元素 - 在Radix UI中，实际滚动的是Viewport元素
       const viewportElement = internalViewportRef.current;
       const rootElement = internalScrollRef.current;
-
+      viewportElement.children[0].style.display = 'block';
+      viewportElement.children[0].style.height = '100%';
       if (!viewportElement || !rootElement) return undefined;
       let timeoutId: NodeJS.Timeout | null = null;
 

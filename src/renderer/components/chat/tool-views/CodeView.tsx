@@ -5,7 +5,7 @@ import {
   SandpackPreview,
   SandpackProvider,
 } from '@codesandbox/sandpack-react';
-import { Button } from 'antd';
+import { Button, Tag } from 'antd';
 import { useMemo } from 'react';
 import { FaDownload } from 'react-icons/fa';
 import { Markdown } from '../../common/Markdown';
@@ -25,7 +25,14 @@ export default function CodeView(props: CodeViewProps) {
       {/* <a href={toolCall.args.path} target="_blank" rel="noreferrer">
         {tcontent}
       </a> */}
-      <Markdown value={`\`\`\`python\n${toolCall.args.script}\`\`\``} />
+      <div className="flex flex-row gap-2">
+        {toolCall?.args?.dependencies &&
+          toolCall.args.dependencies.map((x) => {
+            return <Tag>{x}</Tag>;
+          })}
+      </div>
+
+      <Markdown value={`\`\`\`python\n${toolCall.args.script}\n\`\`\``} />
       {content && <Markdown value={content.text} />}
     </div>
   );

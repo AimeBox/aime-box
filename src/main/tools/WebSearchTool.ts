@@ -116,7 +116,7 @@ export class WebSearchTool extends BaseTool {
         return res;
       } else if (
         this.provider == WebSearchEngine.Tavily &&
-        settings.webSearchEngine.searxng.apiBase
+        settings.webSearchEngine.tavily.apiKey
       ) {
         const d = new TavilySearchTool({
           apiKey: settings.webSearchEngine.tavily.apiKey,

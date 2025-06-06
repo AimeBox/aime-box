@@ -35,6 +35,7 @@ import {
   FaEdit,
   FaEllipsisH,
   FaFile,
+  FaFolder,
   FaPaperclip,
   FaPaperPlane,
   FaSeedling,
@@ -335,14 +336,16 @@ export default function ChatContent() {
 
           setAttachments([...attachments, ..._attachments]);
         }
-      }catch(err){
+      } catch (err) {
         message.error(err);
       }
-      
     }
   };
 
   const onExport = async () => {};
+  const onOpenWorkspace = async () => {
+    const res = await window.electron.chat.openWorkspace(currentChat.id);
+  };
   const onExportImage = async () => {
     try {
       const dataUrl = await domtoimage.toJpeg(
@@ -447,7 +450,7 @@ export default function ChatContent() {
                             placement="bottomRight"
                             trigger="click"
                             content={
-                              <div className="flex flex-col w-full">
+                              <div className="flex flex-col w-full items-start">
                                 {/* <Button
                               icon={<FaFileExport />}
                               type="text"
@@ -458,6 +461,16 @@ export default function ChatContent() {
                             >
                               {t('chat.export')}
                             </Button> */}
+                                <Button
+                                  icon={<FaFolder />}
+                                  type="text"
+                                  block
+                                  onClick={() => {
+                                    onOpenWorkspace();
+                                  }}
+                                >
+                                  {t('chat.open_workspace')}
+                                </Button>
                                 <Button
                                   icon={<FaFileExport />}
                                   type="text"
@@ -790,6 +803,7 @@ export default function ChatContent() {
                   value={canvasViewValue}
                   toolName={canvasViewValue?.toolCall?.name}
                   toolCall={canvasViewValue?.toolCall}
+                  chatId={currentChat?.id}
                 />
               </div>
             </Splitter.Panel>

@@ -5,24 +5,40 @@ import {
   SandpackPreview,
   SandpackProvider,
 } from '@codesandbox/sandpack-react';
-import { Button } from 'antd';
-import { useMemo } from 'react';
+import { Button, Radio } from 'antd';
+import { useMemo, useState } from 'react';
 import { FaDownload } from 'react-icons/fa';
 import { Markdown } from '../../common/Markdown';
+import { ResponseCard } from '../../common/ResponseCard';
 
 export interface FileViewProps {
   className?: string;
   toolName?: string;
   toolCall?: any;
+  content?: any;
 }
 
 export default function FileView(props: FileViewProps) {
-  const { className, toolName, toolCall } = props;
-  const extension = useMemo(
-    () => toolCall.args.path.split('.').pop().toLowerCase(),
-    [toolCall.args.path],
-  );
-  const content = useMemo(() => {
+  const { className, toolName, toolCall, content } = props;
+  const [mode, setMode] = useState<'preview' | 'code'>('preview');
+  const [ext, setExt] = useState<string>('');
+  const extension = useMemo(() => {
+    const ext = toolCall.args.path.split('.').pop().toLowerCase();
+    if (ext == 'html') {
+      return 'html';
+    }
+    if (ext == 'md') {
+      return 'md';
+    }
+    if (ext == 'js' || ext == 'ts' || ext == 'py' || ext == 'json') {
+      setExt(ext);
+      return 'code';
+    }
+
+    return 'text';
+  }, [toolCall.args.path]);
+
+  const data = useMemo(() => {
     if (extension == 'html') {
       return toolCall.args.data;
     }
@@ -36,11 +52,23 @@ export default function FileView(props: FileViewProps) {
       </a>
       {extension == 'html' && (
         <div className="h-full w-full">
-          <iframe
-            srcDoc={content}
-            className="w-full h-[600px]"
-            title="toolCall.args.path"
-          ></iframe>
+          <Radio.Group
+            size="small"
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+            className="mb-2"
+          >
+            <Radio.Button value="preview">Preview</Radio.Button>
+            <Radio.Button value="code">Code</Radio.Button>
+          </Radio.Group>
+          {mode == 'preview' && (
+            <iframe
+              srcDoc={data}
+              className="w-full h-[600px]"
+              title={toolCall.args.path}
+            ></iframe>
+          )}
+          {mode == 'code' && <Markdown value={`\`\`\`html\n${data}\n\`\`\``} />}
           {/* <SandpackProvider
             template="static"
             style={{ height: '600px' }}
@@ -54,8 +82,27 @@ export default function FileView(props: FileViewProps) {
           </SandpackProvider>  */}
         </div>
       )}
-      {extension == 'md' && <Markdown value={content} />}
-      {!extension && toolCall.args.data}
+      {extension == 'md' && (
+        <div className="h-full w-full">
+          <Radio.Group
+            size="small"
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+            className="mb-2"
+          >
+            <Radio.Button value="preview">Preview</Radio.Button>
+            <Radio.Button value="code">Code</Radio.Button>
+          </Radio.Group>
+          {mode == 'preview' && <Markdown value={data} />}
+          {mode == 'code' && <Markdown value={`\`\`\`md\n${data}\n\`\`\``} />}
+        </div>
+      )}
+      {extension == 'code' && (
+        <Markdown className="" value={`\`\`\`${ext}\n${data}\n\`\`\``} />
+      )}
+      {extension == 'text' && toolCall.args.data}
+      {content?.text && <ResponseCard value={content.text} />}
+
       {/* <pre className="text-xs break-all whitespace-pre-wrap mt-2 bg-gray-100 p-2 rounded-md"></pre> */}
     </div>
   );

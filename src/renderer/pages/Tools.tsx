@@ -44,8 +44,6 @@ import Content from '../components/layout/Content';
 import { FaArrowRotateLeft, FaRegMessage } from 'react-icons/fa6';
 import { t } from 'i18next';
 import { ListItem } from '../components/common/ListItem';
-import { cat } from '@huggingface/transformers';
-import { MultiServerMCPClient } from '@langchain/mcp-adapters';
 
 export default function Tools() {
   const [open, setOpen] = useState(false);

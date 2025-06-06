@@ -9,6 +9,7 @@ import {
   MessageBoxOptions,
   SaveDialogOptions,
   OpenDialogOptions,
+  webUtils,
 } from 'electron';
 import settingsManager from '../settings';
 import { TextToSpeech } from '../tools/TextToSpeech';
@@ -34,20 +35,28 @@ export class AppManager {
         icon: path.join(app.getAppPath(), 'assets/file-drag.png'),
       });
     });
+    ipcMain.handle('app:getPathForFile', (event, fileList: FileList) => {
+      return Array.from(fileList).map((file) => {
+        const path = webUtils.getPathForFile(file);
+        debugger;
+        return path;
+      });
+    });
     ipcMain.handle('app:getPathInfo', async (event, paths: string[]) => {
-      if(!isArray(paths)){
+      if (!isArray(paths)) {
         throw new Error('Input paths error');
-        
       }
       const result: ChatInputAttachment[] = [];
       for (const _path of paths) {
-        const stats = await fs.stat(_path);
-        result.push({
-          path: _path,
-          name: path.basename(_path),
-          type: stats.isDirectory() ? 'folder' : 'file',
-          ext: path.extname(_path),
-        });
+        if (_path) {
+          const stats = await fs.stat(_path);
+          result.push({
+            path: _path,
+            name: path.basename(_path),
+            type: stats.isDirectory() ? 'folder' : 'file',
+            ext: path.extname(_path),
+          });
+        }
       }
       return result;
     });
