@@ -1,6 +1,12 @@
 import { Providers, ProviderType } from '@/entity/Providers';
-import { BaseProvider } from './BaseProvider';
+import { BaseProvider, BaseProviderParams } from './BaseProvider';
 import { Ollama } from 'ollama';
+import { ChatOllama } from '@langchain/ollama';
+import {
+  BaseChatModel,
+  BaseChatModelParams,
+} from '@langchain/core/language_models/chat_models';
+import { ChatOptions } from '@/entity/Chat';
 
 export class OllamaProvider extends BaseProvider {
   name: string = ProviderType.OLLAMA;
@@ -9,11 +15,28 @@ export class OllamaProvider extends BaseProvider {
 
   defaultApiBase: string = 'http://localhost:11434';
 
-  async getModelList(
-    provider: Providers,
-  ): Promise<{ name: string; enable: boolean }[]> {
+
+  constructor(params?: BaseProviderParams) {
+    super(params);
+  }
+
+  getChatModel(modelName: string, options: ChatOptions): BaseChatModel {
+    const llm = new ChatOllama({
+      baseUrl: this.provider.api_base, // Default value
+      model: modelName, // Default value
+      temperature: options?.temperature,
+      topP: options?.top_p,
+      topK: options?.top_k,
+      streaming: options?.streaming,
+      format: options?.format,
+    });
+    return llm;
+  }
+
+
+  async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const ollama = new Ollama({
-      host: provider.api_base || this.defaultApiBase,
+      host: this.provider.api_base || this.defaultApiBase,
     });
     const list = await ollama.list();
     return list.models
@@ -21,13 +44,13 @@ export class OllamaProvider extends BaseProvider {
         return {
           name: x.name,
           enable:
-            provider.models.find((z) => z.name == x.name)?.enable || false,
+            this.provider.models.find((z) => z.name == x.name)?.enable || false,
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  getEmbeddingModels(provider: Providers) {
+  async getEmbeddingModels(): Promise<string[]> {
     return [];
   }
 }

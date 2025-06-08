@@ -14,6 +14,8 @@ import DefaultWenSearchEnginSettings from './DefaultWenSearchEnginSettings';
 import LocalModelManager from './LocalModelManager';
 import { Route, Routes, useNavigate, Link } from 'react-router-dom';
 import Content from '@/renderer/components/layout/Content';
+import PluginsManager from './PluginsManager';
+import InstancesManager from './InstancesManager';
 
 // import { Container } from '@/components/Container';
 
@@ -72,6 +74,22 @@ export default function Settings() {
                 ),
               },
               {
+                key: 'plugins',
+                label: (
+                  <Link to="/settings/plugins-manager">
+                    {t('settings.plugins')}
+                  </Link>
+                ),
+              },
+              {
+                key: 'instances',
+                label: (
+                  <Link to="/settings/instances-manager">
+                    {t('settings.instances')}
+                  </Link>
+                ),
+              },
+              {
                 key: 'about',
 
                 label: <Link to="/settings/about">{t('settings.about')}</Link>,
@@ -94,6 +112,8 @@ export default function Settings() {
             />
             <Route path="about" element={<AboutPage />} />
             <Route path="localModelManager" element={<LocalModelManager />} />
+            <Route path="plugins-manager" element={<PluginsManager />} />
+            <Route path="instances-manager" element={<InstancesManager />} />
           </Routes>
 
           {/* {currentPage == 'general' && <GeneralSettings />}

@@ -9,7 +9,6 @@ import { BaseStore, Annotation } from '@langchain/langgraph';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { BaseMessage } from '@langchain/core/messages';
 
-
 export interface AgentMessageEvent {
   created?: (msg: BaseMessage[]) => Promise<void>;
   updated?: (msg: BaseMessage[]) => Promise<void>;
@@ -20,10 +19,6 @@ export interface AgentMessageEvent {
 export const BaseAnnotation = {
   waitHumanAsk: Annotation<boolean>,
 };
-
-
-
-
 
 export abstract class BaseAgent extends Tool {
   abstract name: string;
@@ -47,6 +42,8 @@ export abstract class BaseAgent extends Tool {
   configSchema: FormSchema[];
 
   config: any;
+
+  model?: BaseChatModel;
 
   abstract hidden: boolean;
 

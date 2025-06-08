@@ -99,7 +99,7 @@ const DocumentView = forwardRef<DocumentViewRef, DocumentViewProps>(
     }, []);
 
     async function pdfToBase64(pdfUrl) {
-      const loadingTask = pdfjs.getDocument(pdfUrl);
+      const loadingTask = pdfjs.getDocument(`file://${pdfUrl}`);
       const pdf = await loadingTask.promise;
       const base64Images = [];
       for (let i = 1; i <= pdf.numPages; i++) {
@@ -405,7 +405,7 @@ const DocumentView = forwardRef<DocumentViewRef, DocumentViewProps>(
         </PdfLoader> */}
           <PdfViewer
             ref={pdfViewerRef}
-            url={currentFile.path}
+            url={`file://${currentFile.path}`}
             scale={scale}
             onPageDimensions={(pageDimensions) => {
               setPageDimensions(pageDimensions);

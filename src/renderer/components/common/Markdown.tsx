@@ -23,9 +23,13 @@ import ChatAttachment from '../chat/ChatAttachment';
 import { marked } from 'marked';
 import rehypeMathjax from 'rehype-mathjax/browser';
 import { visit } from 'unist-util-visit';
+import { isString } from '@/main/utils/is';
+import { splitContextAndFiles } from '@/renderer/utils/ContentUtils';
+import { cn } from '@/lib/utils';
 
 export interface MarkdownProps {
   value?: string;
+  className?: string;
 }
 const production = {
   Fragment: prod.Fragment,
@@ -47,52 +51,6 @@ export function Markdown(props: MarkdownProps) {
   const [renderedContent, setRenderedContent] = useState<string | null>(null);
   const [thinkContent, setThinkContent] = useState<string | undefined>();
   const [files, setFiles] = useState<ChatInputAttachment[]>([]);
-  function splitContextAndFiles(input: string): {
-    context: string;
-    attachments: ChatInputAttachment[];
-  } {
-    const attachments: ChatInputAttachment[] = [];
-    const fileRegex = /<file>([\s\S]*?)<\/file>/g;
-    let match: RegExpExecArray | null;
-
-    // 提取所有 <file>xxx</file> 内容
-
-    while ((match = fileRegex.exec(input)) !== null) {
-      const attachment = parseMarkdownFileLink(match[1], 'file');
-      if (attachment) {
-        attachments.push(attachment);
-      }
-    }
-
-    // 去掉所有 <file>...</file> 后，剩下的就是 context
-    let context = input.replace(fileRegex, '').trim();
-
-    const folderRegex = /<folder>([\s\S]*?)<\/folder>/g;
-    while ((match = folderRegex.exec(input)) !== null) {
-      const attachment = parseMarkdownFileLink(match[1], 'folder');
-      if (attachment) {
-        attachments.push(attachment);
-      }
-    }
-    context = context.replace(folderRegex, '').trim();
-
-    return { context, attachments: attachments };
-  }
-  function parseMarkdownFileLink(
-    md: string,
-    type: 'file' | 'folder',
-  ): ChatInputAttachment | undefined {
-    const name = md.split(/[/\\]/).pop();
-
-    const path = md;
-    const ext = `.${name.split('.').pop()}`;
-    return {
-      name,
-      path,
-      type: type,
-      ext: ext,
-    };
-  }
 
   useEffect(() => {
     const { thinkContent, restContent } = splitThinkTag(props?.value);
@@ -100,11 +58,11 @@ export function Markdown(props: MarkdownProps) {
 
     setFiles(attachments);
     setThinkContent(thinkContent);
-    setRenderedContent(context);
+    // setRenderedContent(context);
 
     unified()
       .use(remarkParse, { fragment: true })
-      .use(remarkEncodeLinks)
+      //.use(remarkEncodeLinks)
       .use(remarkGfm)
       .use(rehypeMathjax)
       .use(remarkBreaks)
@@ -128,8 +86,8 @@ export function Markdown(props: MarkdownProps) {
 
       .process(context)
       .then((res) => {
-        const content = res.toString();
-        setRenderedContent(content);
+        const _html = res.toString();
+        setRenderedContent(_html);
         return null;
       })
       .catch((err) => {});
@@ -139,7 +97,7 @@ export function Markdown(props: MarkdownProps) {
     thinkContent: string | null;
     restContent: string;
   } {
-    if (input) {
+    if (input && isString(input)) {
       const match = input.match(/^<think>([\s\S]*?)<\/think>\n\n/);
       if (match) {
         const thinkContent = match[1].trim(); // 提取 think 中的内容
@@ -152,8 +110,8 @@ export function Markdown(props: MarkdownProps) {
     return { thinkContent: null, restContent: '' };
   }
 
-  useEffect(() => {}, [renderedContent]);
-  return renderedContent ? (
+  // useEffect(() => {}, [renderedContent]);
+  return thinkContent || renderedContent || (files && files.length > 0) ? (
     <>
       {thinkContent && (
         <div className="pl-2 mb-4 italic text-gray-500 whitespace-pre-wrap border-l-4 border-gray-300">
@@ -161,7 +119,10 @@ export function Markdown(props: MarkdownProps) {
         </div>
       )}
       <div
-        className="overflow-auto w-full  break-all max-w-max break-words prose dark:prose-invert dark prose-hr:m-0 prose-td:whitespace-pre-line"
+        className={cn(
+          'w-full text-sm break-all max-w-max break-words prose dark:prose-invert dark prose-hr:m-0 prose-td:whitespace-pre-line min-w-[100%]',
+          props?.className,
+        )}
         dangerouslySetInnerHTML={{ __html: renderedContent }}
         key={renderedContent}
       />
@@ -169,7 +130,11 @@ export function Markdown(props: MarkdownProps) {
         <div className="flex flex-wrap gap-2 p-1">
           {files.map((file) => {
             return (
-              <ChatAttachment value={file} key={file.path}></ChatAttachment>
+              <ChatAttachment
+                value={file}
+                key={file.path}
+                showPreview
+              ></ChatAttachment>
             );
           })}
         </div>

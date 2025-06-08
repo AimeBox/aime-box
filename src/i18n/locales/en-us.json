@@ -46,7 +46,8 @@
     "description": "Description",
     "tags": "Tags",
     "restart": "Restart",
-    "localKB": "Local Knowledge Base"
+    "localKB": "Local Knowledge Base",
+    "difyKB": "Dify Knowledge Base"
   },
   "prompts": {
     "create_prompt": "Create Prompt"
@@ -60,7 +61,8 @@
     "tool": "Tools",
     "fileChat": "File Chat",
     "export_image": "Export Image",
-    "plannerChat": "Planner Chat"
+    "plannerChat": "Planner Chat",
+    "open_workspace": "Open Workspace"
   },
   "language": {
     "english": "English",
@@ -154,6 +156,8 @@
     "general_settings": "General Settings",
     "defaultSTT": "Default STT",
     "about": "About",
+    "plugins": "Plugins",
+    "plugins_import": "Import",
     "theme": {
       "theme": "Theme",
       "light": "☀️Light",
@@ -179,6 +183,9 @@
     "localModelManager": "Local Model Manager",
     "defaultModel": "Default Model",
     "showMcpWindows": "Show Mcp Windows",
-    "braveApiKey": "Brave Api Key"
+    "braveApiKey": "Brave Api Key",
+    "instances_manager": "Instances Manager",
+    "instances": "Instances",
+    "instances_create": "Create Instance"
   }
 }

@@ -253,8 +253,16 @@ export function GlobalContextProvider({
         }
       },
     );
+    window.electron.ipcRenderer.on(
+      'play-audio',
+      (input: { filename: string }) => {
+        const audio = new Audio(input.filename);
+        audio.play();
+      },
+    );
     return () => {
       window.electron.ipcRenderer.removeAllListeners('app:notification');
+      window.electron.ipcRenderer.removeAllListeners('play-audio');
     };
   }, []);
 

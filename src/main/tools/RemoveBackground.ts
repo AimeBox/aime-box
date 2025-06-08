@@ -1,8 +1,12 @@
 /* eslint-disable import/prefer-default-export */
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import { RunnableConfig } from '@langchain/core/runnables';
-import { Tool, StructuredTool, ToolParams } from '@langchain/core/tools';
-import { HuggingFaceTransformersEmbeddings } from '../embeddings/HuggingFaceTransformersEmbeddings';
+import {
+  Tool,
+  StructuredTool,
+  ToolParams,
+  ToolRunnableConfig,
+} from '@langchain/core/tools';
 
 import { Transformers } from '../utils/transformers';
 import { z } from 'zod';
@@ -14,6 +18,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import { t } from 'i18next';
+import { saveFile } from '../utils/common';
 
 export interface RemoveBackgroundParameters extends ToolParams {
   modelName: string;
@@ -22,12 +27,8 @@ export interface RemoveBackgroundParameters extends ToolParams {
 export class RemoveBackground extends BaseTool {
   schema = z.object({
     pathOrUrl: z.string().describe('local file or folder path, or Url '),
-    outputFormat: z.optional(z.enum(['base64', 'file'])).default('file'),
-    outputPath: z.optional(
-      z
-        .string()
-        .describe('if outputFormat is file ,this path for save png file'),
-    ),
+    // outputFormat: z.optional(z.enum(['base64', 'file'])).default('file'),
+    savePath: z.string().optional().describe('save png file path'),
   });
 
   configSchema: FormSchema[] = [
@@ -45,7 +46,7 @@ export class RemoveBackground extends BaseTool {
     },
   ];
 
-  name = 'remove-background';
+  name = 'remove_background';
 
   description = 'Remove Image Background';
 
@@ -58,19 +59,31 @@ export class RemoveBackground extends BaseTool {
     this.modelName = params?.modelName;
   }
 
-  async _call(input: z.infer<typeof this.schema>): Promise<string> {
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager?: CallbackManagerForToolRun,
+    config?: ToolRunnableConfig,
+  ): Promise<string> {
+    const workspace = config?.configurable?.workspace;
+    let { pathOrUrl } = input;
+    if (workspace && !isUrl(pathOrUrl)) {
+      pathOrUrl = path.isAbsolute(pathOrUrl)
+        ? pathOrUrl
+        : path.join(workspace, pathOrUrl);
+    }
+
     const buffer = await new Transformers({
       task: 'image-segmentation',
       modelName: this.modelName ?? 'rmbg-1.4',
-    }).rmbg(input.pathOrUrl);
-    if (input.outputFormat == 'base64') {
-      const base64String = buffer.toString('base64');
-      return `data:image/png;base64,${base64String}`;
+    }).rmbg(pathOrUrl);
+
+    let savePath;
+    if (input.savePath) {
+      savePath = await saveFile(buffer, input.savePath, config);
     } else {
-      if (!input.outputPath)
-        input.outputPath = path.join(getTmpPath(), `${uuidv4()}.png`);
-      fs.writeFileSync(input.outputPath, buffer);
-      return input.outputPath;
+      savePath = await saveFile(buffer, `${uuidv4()}.png`, config);
     }
+
+    return `<file>${savePath}</file>`;
   }
 }

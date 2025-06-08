@@ -25,14 +25,14 @@ import {
 import settingsManager from '../settings';
 import { BaseTool, ToolTag } from './BaseTool';
 import { FormSchema } from '@/types/form';
-import { base64ToFile, downloadFile } from '../utils/common';
+import { base64ToFile, downloadFile, saveFile } from '../utils/common';
 import { getTmpPath } from '../utils/path';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface DallEParameters extends ToolParams {
   apiBase: string;
   apiKey: string;
-  model: 'dall-e-3' | 'dall-e-2';
+  model: 'dall-e-3' | 'dall-e-2' | 'gpt-image-1';
 }
 
 export class DallE extends BaseTool {
@@ -40,18 +40,19 @@ export class DallE extends BaseTool {
 
   schema = z.object({
     prompt: z.string().describe('image prompt'),
-    quality: z
-      .enum(['standard', 'hd'])
+    // quality: z
+    //   .enum(['standard', 'hd'])
+    //   .optional()
+    //   .default('standard')
+    //   .describe('Image Quality'),
+    size: z
+      .enum(['256x256', '512x512', '1024x1024', '1792x1024', '1024x1792'])
       .optional()
-      .nullable()
-      .default('standard')
-      .describe('Image Quality'),
-    dallEResponseFormat: z
-      .enum(['url', 'b64_json'])
+      .default('1024x1024'),
+    background: z
+      .enum(['transparent', 'opaque', 'auto'])
       .optional()
-      .nullable()
-      .default('url')
-      .describe('Image Response Format'),
+      .default('auto'),
   });
 
   configSchema?: FormSchema[] = [
@@ -76,6 +77,7 @@ export class DallE extends BaseTool {
         options: [
           { label: 'Dall-E 3', value: 'dall-e-3' },
           { label: 'Dall-E 2', value: 'dall-e-2' },
+          { label: 'GPT-Image-1', value: 'gpt-image-1' },
         ],
       },
     },
@@ -86,19 +88,17 @@ export class DallE extends BaseTool {
   description: string =
     'A wrapper around OpenAI DALL-E API. Useful for when you need to generate images from a text description. Input should be an image description.';
 
-  model?: 'dall-e-3' | 'dall-e-2';
-
   style?: 'natural' | 'vivid';
 
   n?: number = 1;
-
-  size?: '256x256' | '512x512' | '1024x1024' | '1792x1024' | '1024x1792';
 
   apiBase: string;
 
   apiKey: string;
 
   client: OpenAIClient;
+
+  model: 'dall-e-3' | 'dall-e-2' | 'gpt-image-1';
 
   constructor(params?: DallEParameters) {
     super(params);
@@ -123,44 +123,36 @@ export class DallE extends BaseTool {
       model: this.model,
       prompt: input.prompt,
       n: 1,
-      size: this.size,
-      response_format: input.dallEResponseFormat,
+      size: input.size,
+      response_format: 'url' as 'url' | 'b64_json',
       style: this.style,
-      quality: input.quality,
+      // quality: input.quality,
+      background: input.background,
     };
+
+    if (this.model !== 'gpt-image-1') {
+      delete generateImageFields.background;
+    } else {
+      delete generateImageFields.response_format;
+    }
+
     if (this.n > 1) {
       const results = await Promise.all(
         Array.from({ length: this.n }).map(() =>
           this.client.images.generate(generateImageFields),
         ),
       );
-      return this.processMultipleGeneratedUrls(
-        results,
-        input.dallEResponseFormat,
-      );
+      return this.processMultipleGeneratedUrls(results, 'url');
     }
     const response = await this.client.images.generate(generateImageFields);
     let data = '';
     let loaclFile = '';
-    if (input.dallEResponseFormat === 'url') {
-      [data] = response.data
-        .map((item) => item.url)
-        .filter((url) => url !== 'undefined');
-      loaclFile = await downloadFile(
-        data,
-        path.join(getTmpPath(), `${uuidv4()}.png`),
-      );
-    } else {
-      [data] = response.data
-        .map((item) => item.b64_json)
-        .filter((b64_json) => b64_json !== 'undefined');
-      loaclFile = await base64ToFile(
-        data,
-        path.join(getTmpPath(), `${uuidv4()}.png`),
-      );
-    }
+    [data] = response.data
+      .map((item) => item.url)
+      .filter((url) => url !== 'undefined');
+    loaclFile = await saveFile(data, `${uuidv4()}.png`, config);
 
-    return data;
+    return `<file>${loaclFile}</file>`;
   }
 
   processMultipleGeneratedUrls(response, dallEResponseFormat) {

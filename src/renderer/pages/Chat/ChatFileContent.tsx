@@ -24,7 +24,7 @@ import {
   FaTrashAlt,
 } from 'react-icons/fa';
 import { FaGear } from 'react-icons/fa6';
-import { Editor, EditorRef } from '@/renderer/components/common/Editor';
+// import { Editor, EditorRef } from '@/renderer/components/common/Editor';
 import { useEffect, useRef, useState } from 'react';
 import { t } from 'i18next';
 import DocumentView, {
@@ -59,7 +59,7 @@ export default function ChatFileContent() {
   );
   const documentRef = useRef<DocumentViewRef>(null);
 
-  const editorRef = useRef<EditorRef>(null);
+  // const editorRef = useRef<EditorRef>(null);
   const onDelete = async (chatMessage: ChatMessage) => {};
   const onChangeCurrentModel = async (currentModel: string) => {};
   const onClearChatMessages = async () => {};
@@ -139,7 +139,7 @@ export default function ChatFileContent() {
       filters: [{ name: 'Files', extensions: exts }],
     });
     if (res && res.length > 0) {
-      setCurrentFileExt(res[0].ext);
+      //setCurrentFileExt(res[0].ext);
       const options = { files: res };
 
       await window.electron.chat.update(
@@ -426,18 +426,18 @@ export default function ChatFileContent() {
                 <div className="flex flex-col flex-1 h-full">
                   <ChatQuickInput
                     onClick={(text) => {
-                      editorRef.current?.insertText(text);
+                      // editorRef.current?.insertText(text);
                       setChatInputMessage(text);
                     }}
                     className="mb-1"
                   />
                   <ScrollArea className="flex-1 h-full rounded-xl border border-gray-300 border-solid dark:border-gray-700">
-                    <Editor
+                    {/* <Editor
                       ref={editorRef}
                       className={`flex-1 w-full h-full text-sm bg-transparent outline-none resize-none`}
                       value={chatInputMessage}
                       onChange={setChatInputMessage}
-                    />
+                    /> */}
                   </ScrollArea>
                 </div>
               </div>

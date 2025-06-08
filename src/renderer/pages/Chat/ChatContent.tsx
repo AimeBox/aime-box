@@ -35,6 +35,7 @@ import {
   FaEdit,
   FaEllipsisH,
   FaFile,
+  FaFolder,
   FaPaperclip,
   FaPaperPlane,
   FaSeedling,
@@ -54,7 +55,7 @@ import ChatOptionsDrawer from './ChatOptionsDrawer';
 import { t } from 'i18next';
 import EmojiPicker, { SkinTones } from 'emoji-picker-react';
 import { GlobalContext } from '@/renderer/context/GlobalContext';
-import { Editor, EditorRef } from '@/renderer/components/common/Editor';
+// import { Editor, EditorRef } from '@/renderer/components/common/Editor';
 import { ChatInputAttachment } from '@/types/chat';
 import ChatAttachment from '@/renderer/components/chat/ChatAttachment';
 import domtoimage from 'dom-to-image';
@@ -79,7 +80,7 @@ export default function ChatContent() {
   const [attachments, setAttachments] = useState<ChatInputAttachment[]>([]);
   const { agents, tools, knowledgeBase } = useContext(GlobalContext);
   const scrollRef = useRef<ScrollAreaRef | null>(null);
-  const editorRef = useRef<EditorRef>(null);
+  // const editorRef = useRef<EditorRef>(null);
   const [openCanvasView, setOpenCanvasView] = useState<boolean>(false);
 
   const [canvasViewValue, setCanvasViewValue] = useState<any>({});
@@ -150,7 +151,7 @@ export default function ChatContent() {
       content: chatInputMessage.trim(),
       extend: { attachments: attachments },
     });
-    editorRef.current?.clear();
+    // Ref.current?.clear();
     setChatInputMessage(undefined);
     setAttachments([]);
     scrollToBottom(false);
@@ -317,27 +318,34 @@ export default function ChatContent() {
         setAttachments([...attachments, ..._attachments]);
       }
     } else {
-      const res = await window.electron.app.getPathInfo(files);
-      if (res && res.length > 0) {
-        const _attachments = [];
-        for (const item of res) {
-          if (attachments.find((x) => x.path == item.path)) {
-            continue;
+      try {
+        const res = await window.electron.app.getPathInfo(files);
+        if (res && res.length > 0) {
+          const _attachments = [];
+          for (const item of res) {
+            if (attachments.find((x) => x.path == item.path)) {
+              continue;
+            }
+            _attachments.push({
+              path: item.path,
+              name: item.name,
+              type: item.type,
+              ext: item.ext,
+            });
           }
-          _attachments.push({
-            path: item.path,
-            name: item.name,
-            type: item.type,
-            ext: item.ext,
-          });
-        }
 
-        setAttachments([...attachments, ..._attachments]);
+          setAttachments([...attachments, ..._attachments]);
+        }
+      } catch (err) {
+        message.error(err);
       }
     }
   };
 
   const onExport = async () => {};
+  const onOpenWorkspace = async () => {
+    const res = await window.electron.chat.openWorkspace(currentChat.id);
+  };
   const onExportImage = async () => {
     try {
       const dataUrl = await domtoimage.toJpeg(
@@ -442,7 +450,7 @@ export default function ChatContent() {
                             placement="bottomRight"
                             trigger="click"
                             content={
-                              <div className="flex flex-col w-full">
+                              <div className="flex flex-col w-full items-start">
                                 {/* <Button
                               icon={<FaFileExport />}
                               type="text"
@@ -453,6 +461,16 @@ export default function ChatContent() {
                             >
                               {t('chat.export')}
                             </Button> */}
+                                <Button
+                                  icon={<FaFolder />}
+                                  type="text"
+                                  block
+                                  onClick={() => {
+                                    onOpenWorkspace();
+                                  }}
+                                >
+                                  {t('chat.open_workspace')}
+                                </Button>
                                 <Button
                                   icon={<FaFileExport />}
                                   type="text"
@@ -561,7 +579,7 @@ export default function ChatContent() {
                               <EmojiPicker
                                 className="!border-none"
                                 onEmojiClick={(v) => {
-                                  editorRef.current?.insertText(v.emoji);
+                                  //editorRef.current?.insertText(v.emoji);
                                   setEmojiOpen(false);
                                 }}
                               />
@@ -588,7 +606,7 @@ export default function ChatContent() {
                           ></Button>
                           <ChatQuickInput
                             onClick={(text) => {
-                              editorRef.current?.insertText(text);
+                              //editorRef.current?.insertText(text);
                               setChatInputMessage(text);
                             }}
                             className="ml-2"
@@ -785,6 +803,7 @@ export default function ChatContent() {
                   value={canvasViewValue}
                   toolName={canvasViewValue?.toolCall?.name}
                   toolCall={canvasViewValue?.toolCall}
+                  chatId={currentChat?.id}
                 />
               </div>
             </Splitter.Panel>

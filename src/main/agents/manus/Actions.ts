@@ -1,4 +1,5 @@
 import { ComponentTypes } from '@/types';
+import { ids } from 'webpack';
 import { z } from 'zod';
 
 export type BaseAction = {
@@ -58,10 +59,39 @@ const LockedTaskAction: BaseAction = {
   }),
 };
 
+const SearchMemoryAction: BaseAction = {
+  name: 'search_memory',
+  description: 'search the memory by keyword',
+  schema: z.object({
+    keyword: z.string(),
+  }),
+};
+
+const GetMemoryAction: BaseAction = {
+  name: 'get_memory',
+  description: 'get the memory by ids',
+  schema: z.object({
+    ids: z.array(z.string()),
+  }),
+};
+
+const SaveMemoryAction: BaseAction = {
+  name: 'save_memory',
+  description: 'save the important data to memory',
+  schema: z.object({
+    description: z.string(),
+    content: z.string(),
+    type: z.enum(['text', 'code', 'asset']).default('text'),
+  }),
+};
+
 export {
   DoneAction,
   PlanAction,
   HumanFeedbackAction,
   HandoffAction,
   LockedTaskAction,
+  SearchMemoryAction,
+  GetMemoryAction,
+  SaveMemoryAction,
 };

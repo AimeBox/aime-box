@@ -106,7 +106,7 @@ export const runAgent = async (
     let _toolStart = [];
     const _messages = [];
     for await (const { event, tags, data } of eventStream) {
-      console.log(event, tags, data);
+      // console.log(event, tags, data);
       if (tags.includes('ignore')) {
         // console.log(event, tags, data);
         continue;
@@ -208,8 +208,15 @@ export const runAgent = async (
             };
             await options?.callbacks?.handlerMessageFinished?.(msg);
             _lastMessage = msg;
+          } else {
+            debugger;
           }
         } else {
+          if (tooStart) {
+            const msg = _messages.find(
+              (x) => x.tool_call_id == tooStart.tool_call_id,
+            );
+          }
           const _toolMessage =
             data.output?.update?.messages[
               data.output.update.messages.length - 1
@@ -233,19 +240,37 @@ export const runAgent = async (
         event == 'on_chain_end' ||
         tags.find((x) => x.startsWith('graph:'))
       ) {
-        if (
-          data?.output?.messages?.length > 0 &&
-          isToolMessage(data.output.messages[0])
-        ) {
-          const tooStart = _toolStart.shift();
-          const msg = _messages.find(
-            (x) => x.tool_call_id == data.output.messages[0].tool_call_id,
-          );
-          if (msg && msg.status === undefined) {
-            msg.content = data.output.messages[0].content;
-            msg.status = data.output.messages[0].status;
-            await options?.callbacks?.handlerMessageFinished?.(msg);
+        if (data?.output?.messages?.length > 0) {
+          for (const msg of data.output.messages) {
+            if (isToolMessage(msg)) {
+              const _msg = _messages.find(
+                (x) => x.tool_call_id == msg.tool_call_id,
+              );
+              if (_msg && _msg.status === undefined) {
+                const tooStart = _toolStart.find(
+                  (x) => x.tool_call_id == msg.tool_call_id,
+                );
+                _toolStart = _toolStart.filter(
+                  (x) => x.tool_call_id != msg.tool_call_id,
+                );
+                _msg.content = msg.content;
+                _msg.status = msg.status || ChatStatus.ERROR;
+                _msg.additional_kwargs['error'] = msg.content;
+
+                await options?.callbacks?.handlerMessageFinished?.(_msg);
+              }
+            }
           }
+
+          // const tooStart = _toolStart.shift();
+          // const msg = _messages.find(
+          //   (x) => x.tool_call_id == data.output.messages[0].tool_call_id,
+          // );
+          // if (msg && msg.status === undefined) {
+          //   msg.content = data.output.messages[0].content;
+          //   msg.status = data.output.messages[0].status || ChatStatus.SUCCESS;
+          //   await options?.callbacks?.handlerMessageFinished?.(msg);
+          // }
         }
       } else if (event == 'on_custom_event') {
         console.log('on_custom_event', data);

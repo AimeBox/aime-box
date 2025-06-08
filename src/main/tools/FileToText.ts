@@ -26,7 +26,7 @@ export class FileToText extends BaseTool {
   name: string = 'file_to_text';
 
   description: string =
-    'file convert to text support (pdf, docx, doc, pptx, txt, md)';
+    'read file support (pdf, docx, doc, pptx, txt, md, xlsx, xls)';
 
   constructor(params?: FileToTextParameters) {
     super(params);
@@ -72,7 +72,9 @@ export class FileToText extends BaseTool {
       } else if (ext == '.xlsx' || ext == '.xls') {
         const loader = new ExcelLoader(input.filePath);
         const docs = await loader.load();
-        return docs.map((x) => x.pageContent).join('\n\n');
+        return docs
+          .map((x) => `Sheet: [${x.id}]\n\n${x.pageContent}`)
+          .join('\n\n');
       } else {
         throw new Error(`Unsupported file type: ${ext}`);
       }

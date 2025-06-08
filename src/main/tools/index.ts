@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { In, Like, Repository } from 'typeorm';
 import { DuckDuckGoSearchParameters } from '@langchain/community/tools/duckduckgo_search';
+import { execSync } from 'child_process';
 
 import {
   GoogleRoutesAPI,
@@ -62,7 +63,7 @@ import { z, ZodObject } from 'zod';
 import { BaseTool, BaseToolKit } from './BaseTool';
 import { KnowledgeBaseQuery } from './KnowledgeBaseQuery';
 import fs from 'fs';
-import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket';
+import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from './mcp/StdioClientTransport';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -86,6 +87,15 @@ import { BraveSearchTool } from './websearch/BraveSearch';
 import { ArxivTool } from './Arxiv';
 import { FireCrawl } from './FireCrawl';
 import { jsonSchemaToZod } from '../utils/jsonSchemaToZod';
+import { BFLImageEditing, BFLImageGeneration, BFLToolkit } from './BFLToolkit';
+import { ReplicateToolkit } from './ReplicateToolkit';
+import { ViduToolKit } from './Vidu';
+import { splitContextAndFiles } from '@/renderer/utils/ContentUtils';
+import { CodeSandbox } from './CodeSandbox';
+import { getDataPath } from '../utils/path';
+import { BaseManager } from '../BaseManager';
+import { channel } from '../ipc/IpcController';
+import { ErrorTest } from './ErrorTest';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -102,7 +112,7 @@ export interface McpServerInfo extends McpServers {
   status: 'activated' | 'deactivated' | 'pending';
 }
 
-export class ToolsManager {
+export class ToolsManager extends BaseManager {
   public tools: ToolInfo[];
 
   public builtInToolsClassType: any[] = [];
@@ -115,13 +125,29 @@ export class ToolsManager {
 
   public mcpServerRepository: Repository<McpServers>;
 
-  constructor() {}
-
   public async registerTool(ClassType) {
     try {
       const parent = Object.getPrototypeOf(ClassType);
       if (parent?.name == BaseToolKit.name) {
-        const toolKit: BaseToolKit = Reflect.construct(ClassType, []);
+        let toolKitEntity = await this.toolRepository.findOne({
+          where: { name: ClassType.name },
+        });
+
+        if (!toolKitEntity) {
+          toolKitEntity = new Tools(
+            ClassType.name,
+            ClassType.description,
+            'built-in',
+          );
+          toolKitEntity.enabled = true;
+          toolKitEntity.toolkit_name = ClassType.name;
+          await this.toolRepository.save(toolKitEntity);
+        }
+        const toolkitConfig = toolKitEntity.config ?? {};
+
+        const toolKit: BaseToolKit = Reflect.construct(ClassType, [
+          toolkitConfig,
+        ]);
 
         for (const tool of toolKit.getTools()) {
           this.builtInToolsClassType.push({
@@ -234,6 +260,7 @@ export class ToolsManager {
     this.tools = this.tools.filter((x) => x.tool.name != name);
   }
 
+  @channel('tools:getList')
   public getList(
     filter: string = undefined,
     type: 'all' | 'built-in' | 'mcp' = 'all',
@@ -259,7 +286,7 @@ export class ToolsManager {
     return list;
   }
 
-  public buildTool = async (tool: Tools, config: any): Promise<BaseTool> => {
+  public buildTool = async (tool: Tools, config?: any): Promise<BaseTool> => {
     try {
       if (tool.type == 'mcp') {
         let mcpClient = this.mcpClients.find(
@@ -324,9 +351,10 @@ export class ToolsManager {
           },
         );
       } else if (tool.type == 'built-in') {
+        const params = config || tool.config ? [tool.config] : [];
         const baseTool = Reflect.construct(
           this.builtInToolsClassType.find((x) => x.name == tool.name).classType,
-          tool.config ? [tool.config] : [],
+          params,
         ) as BaseTool;
 
         return baseTool;
@@ -338,14 +366,17 @@ export class ToolsManager {
     return null;
   };
 
-  public buildTools = async (toolNames: String[]): Promise<BaseTool[]> => {
+  public buildTools = async (
+    toolNames: String[],
+    toolConfig?: Record<string, any>,
+  ): Promise<BaseTool[]> => {
     if (isArray(toolNames)) {
       const tools = await this.toolRepository.find({
         where: { name: In(toolNames) },
       });
       const buildedTools: BaseTool[] = [];
       for (const tool of tools) {
-        const buildedTool = await this.buildTool(tool, tool.config);
+        const buildedTool = await this.buildTool(tool, toolConfig?.[tool.name]);
         if (buildedTool) {
           buildedTools.push(buildedTool);
         } else {
@@ -364,18 +395,19 @@ export class ToolsManager {
     await this.refresh();
     this.refreshMcpList();
     if (!ipcMain) return;
+    this.registerIpcChannels();
 
-    ipcMain.handle(
-      'tools:getList',
-      (
-        event,
-        filter: string = undefined,
-        type: 'all' | 'built-in' | 'mcp' = 'all',
-      ) => this.getList(filter, type),
-    );
-    ipcMain.handle('tools:getMcpList', (event, filter: string = undefined) =>
-      this.getMcpList(filter),
-    );
+    // ipcMain.handle(
+    //   'tools:getList',
+    //   (
+    //     event,
+    //     filter: string = undefined,
+    //     type: 'all' | 'built-in' | 'mcp' = 'all',
+    //   ) => this.getList(filter, type),
+    // );
+    // ipcMain.handle('tools:getMcpList', (event, filter: string = undefined) =>
+    //   this.getMcpList(filter),
+    // );
     ipcMain.handle(
       'tools:refreshMcp',
       async (event, id: string): Promise<McpServerInfo> => {
@@ -427,35 +459,41 @@ export class ToolsManager {
         }
       },
     );
-    ipcMain.on(
-      'tools:update',
-      async (event, input: { toolName: string; arg: any }) => {
-        const res = await this.update(input.toolName, input.arg);
-        event.returnValue = res;
-      },
-    );
-    ipcMain.handle(
-      'tools:webSearch',
-      (
-        event,
-        provider: WebSearchEngine,
-        search: string,
-        limit: number = 10,
-        outputFormat: 'default' | 'markdown' = 'default',
-      ) => this.webSearch(provider, search, limit, outputFormat),
-    );
-    ipcMain.handle('tools:addMcp', (event, data: any) => this.addMcp(data));
-    ipcMain.handle('tools:deleteMcp', (event, name: string) =>
-      this.deleteMcp(name),
-    );
+    // ipcMain.on(
+    //   'tools:update',
+    //   async (event, input: { toolName: string; arg: any }) => {
+    //     const res = await this.update(input.toolName, input.arg);
+    //     event.returnValue = res;
+    //   },
+    // );
+    // ipcMain.handle(
+    //   'tools:webSearch',
+    //   (
+    //     event,
+    //     provider: WebSearchEngine,
+    //     search: string,
+    //     limit: number = 10,
+    //     outputFormat: 'default' | 'markdown' = 'default',
+    //   ) => this.webSearch(provider, search, limit, outputFormat),
+    // );
+    //ipcMain.handle('tools:addMcp', (event, data: any) => this.addMcp(data));
+    // ipcMain.handle('tools:deleteMcp', (event, name: string) =>
+    //   this.deleteMcp(name),
+    // );
+    // ipcMain.handle(
+    //   'tools:getCodeSandboxSetup',
+    //   (event, path: string, chatId?: string) =>
+    //     this.getCodeSandboxSetup(path, chatId),
+    // );
   };
 
-  public webSearch = async (
+  @channel('tools:webSearch')
+  async webSearch(
     provider: WebSearchEngine,
     search: string,
     limit: number = 10,
     outputFormat: 'default' | 'markdown' = 'default',
-  ): Promise<string> => {
+  ): Promise<string> {
     const tool = new WebSearchTool({ provider: provider, limit: limit });
     let resJson = await tool.invoke({ query: search });
     if (isString(resJson)) {
@@ -466,7 +504,7 @@ export class ToolsManager {
     if (outputFormat == 'default') return resJson;
     else if (outputFormat == 'markdown') return this.toMarkdown(resJson);
     return resJson;
-  };
+  }
 
   public refresh = async () => {
     this.tools = [];
@@ -474,6 +512,7 @@ export class ToolsManager {
     // await this.registerTool(new CmdTool());
     if (!app.isPackaged) {
       await this.registerTool(SleepTool);
+      await this.registerTool(ErrorTest);
       await this.registerTool(ChartjsTool);
       await this.registerTool(NodejsVM);
     }
@@ -514,9 +553,15 @@ export class ToolsManager {
     await this.registerTool(BraveSearchTool);
     await this.registerTool(FireCrawl);
     await this.registerTool(ArxivTool);
+
+    await this.registerTool(BFLToolkit);
+    await this.registerTool(ReplicateToolkit);
+    await this.registerTool(ViduToolKit);
+    await this.registerTool(CodeSandbox);
   };
 
-  public update = async (toolName: string, arg: any) => {
+  @channel('tools:update')
+  async update(toolName: string, arg: any) {
     const tv = await this.toolRepository.findOne({
       where: { name: toolName },
     });
@@ -526,7 +571,7 @@ export class ToolsManager {
     tv.config = arg;
     await this.toolRepository.save(tv);
     await this.refresh();
-  };
+  }
 
   public toMarkdown(res: any) {
     let isJson = false;
@@ -559,7 +604,34 @@ export class ToolsManager {
       } else if (isUrl(res)) {
         return `![](${res})`;
       } else if (fs.existsSync(res)) {
-        return `![](file:///${res.replace(/\\/g, '/')})`;
+        return `![](file:///${res.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+      } else if (splitContextAndFiles(res)?.attachments.length > 0) {
+        const { context, attachments } = splitContextAndFiles(res);
+        let text = context;
+        attachments.forEach((attachment) => {
+          if (fs.existsSync(attachment.path) && attachment.type == 'file') {
+            if (
+              attachment.ext == '.png' ||
+              attachment.ext == '.jpg' ||
+              attachment.ext == '.jpeg' ||
+              attachment.ext == '.gif' ||
+              attachment.ext == '.webp' ||
+              attachment.ext == '.mp4' ||
+              attachment.ext == '.mp3' ||
+              attachment.ext == '.wav' ||
+              attachment.ext == '.ogg' ||
+              attachment.ext == '.flac' ||
+              attachment.ext == '.m4a'
+            ) {
+              text += `\n![](file:///${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+            } else {
+              text += `\n[${attachment.name}](${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+            }
+          } else if (attachment.type == 'folder') {
+            text += `\n[${attachment.name}](${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+          }
+        });
+        return text;
       }
       return res;
     }
@@ -622,7 +694,8 @@ export class ToolsManager {
     return input;
   };
 
-  public addMcp = async (data: {
+  @channel('tools:addMcp')
+  async addMcp(data: {
     id?: string;
     name: string;
     command?: string;
@@ -630,7 +703,7 @@ export class ToolsManager {
     type: 'sse' | 'stdio' | 'ws';
     config?: any;
     enabled?: boolean;
-  }) => {
+  }) {
     //const transport = this.createTransport(data.url, {});
     let mcpClient;
     try {
@@ -720,9 +793,10 @@ export class ToolsManager {
     //   });
     //   console.log(result);
     // }
-  };
+  }
 
-  public deleteMcp = async (id: string) => {
+  @channel('tools:deleteMcp')
+  async deleteMcp(id: string) {
     const ts = await this.mcpServerRepository.findOne({
       where: { id: id },
     });
@@ -740,11 +814,12 @@ export class ToolsManager {
       this.mcpServerInfos = this.mcpServerInfos.filter((x) => x.id != id);
       await this.mcpServerRepository.delete(ts.id);
     }
-  };
+  }
 
-  public getMcpList = async (filter: string = undefined) => {
+  @channel('tools:getMcpList')
+  async getMcpList(filter: string = undefined) {
     return this.mcpServerInfos;
-  };
+  }
 
   public refreshMcpList = async () => {
     const mcpServers = await this.mcpServerRepository.find();
@@ -944,6 +1019,37 @@ export class ToolsManager {
       url.searchParams.set('config', param);
     }
     return url;
+  }
+
+  @channel('tools:getCodeSandboxSetup')
+  async getCodeSandboxSetup(_path: string, chatId: string) {
+    const realPath = path.join(getDataPath(), 'chats', chatId, _path);
+    function readFilesRecursively(dir, fileMap = {}, baseDir = dir) {
+      const files = fs.readdirSync(dir);
+      files.forEach((file) => {
+        const fullPath = path.join(dir, file);
+        const relPath = `/${path.relative(baseDir, fullPath).replace(/\\/g, '/')}`;
+        if (file.startsWith('.')) {
+          return;
+        }
+        if (fs.statSync(fullPath).isDirectory()) {
+          const dirName = path.basename(fullPath);
+          if (!'node_modules'.includes(dirName)) {
+            readFilesRecursively(fullPath, fileMap, baseDir);
+          }
+        } else {
+          const ext = path.extname(fullPath);
+          if (['.png', '.jpg', '.jpeg'].includes(ext)) {
+            //fileMap[relPath] = fs.readFileSync(fullPath, 'base64');
+          } else {
+            fileMap[relPath] = fs.readFileSync(fullPath, 'utf-8');
+          }
+        }
+      });
+      return fileMap;
+    }
+    const result = readFilesRecursively(realPath);
+    return { files: result };
   }
 }
 

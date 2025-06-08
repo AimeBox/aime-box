@@ -1,7 +1,9 @@
-import { createWriteStream } from 'fs';
+import fs, { createWriteStream } from 'fs';
 import path from 'path';
 import { getTmpPath } from './path';
 import { v4 as uuidv4 } from 'uuid';
+import { RunnableConfig } from '@langchain/core/runnables';
+import { isString, isUrl } from './is';
 
 export const removeEmptyValues = (
   obj: Record<string, any>,
@@ -81,4 +83,49 @@ export const base64ToFile = async (
   writer.write(buffer);
   writer.end();
   return savePath;
+};
+
+export const imageToBase64 = async (filePath: string): Promise<string> => {
+  const data = await fs.promises.readFile(filePath);
+  return data.toString('base64');
+};
+
+export const saveFile = async (
+  data: string | Buffer,
+  filePath: string,
+  config?: RunnableConfig,
+): Promise<string> => {
+  const workspace = config?.configurable?.workspace;
+  let _filePath = filePath;
+  if (!path.isAbsolute(_filePath)) {
+    _filePath = workspace
+      ? path.join(workspace, filePath)
+      : path.join(getTmpPath(), filePath);
+  }
+  if (isString(data) && isUrl(data)) {
+    return await downloadFile(data, _filePath);
+  } else if (data instanceof Buffer) {
+    await fs.promises.writeFile(_filePath, data);
+    return _filePath;
+  } else {
+    throw new Error('not support');
+  }
+};
+
+export const truncateText = (
+  text: string,
+  maxLength: number = 1000,
+): string => {
+  if (text.length <= maxLength) {
+    return text; // 如果原文本小于最大长度，则直接返回
+  }
+
+  // 计算前后部分的字符数
+  const halfLength = Math.floor((maxLength - 100) / 2); // 保留前后各一半，留出省略的"..."
+
+  // 获取前后字符和省略的部分
+  const front = text.slice(0, halfLength);
+  const back = text.slice(-halfLength);
+
+  return `${front}\n...[text is too long]...\n${back}`;
 };

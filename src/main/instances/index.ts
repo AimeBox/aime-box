@@ -1,0 +1,100 @@
+import { ipcMain } from 'electron';
+import { dbManager } from '../db';
+import { Instances } from '../../entity/Instances';
+import { Repository } from 'typeorm';
+import { channel } from '../ipc/IpcController';
+import { BaseManager } from '../BaseManager';
+import { v4 as uuidv4 } from 'uuid';
+import { BrowserInstance } from './BrowserInstance';
+import { BaseInstance } from './BaseInstance';
+
+export interface InstanceInfo extends Instances {
+  status: 'running' | 'stop';
+}
+
+export class InstanceManager extends BaseManager {
+  repository: Repository<Instances>;
+
+  instanceInfos: Map<string, InstanceInfo> = new Map();
+
+  instances: Map<string, BaseInstance> = new Map();
+
+  constructor() {
+    super();
+    this.repository = dbManager.dataSource.getRepository(Instances);
+  }
+
+  public async init() {
+    if (!ipcMain) return;
+    this.registerIpcChannels();
+    const _instances = await this.repository.find();
+    _instances.forEach((instance) => {
+      this.instanceInfos.set(instance.id, { ...instance, status: 'stop' });
+    });
+  }
+
+  @channel('instances:get')
+  public async get(id: string) {
+    return await this.repository.findOneBy({ id: id });
+  }
+
+  @channel('instances:getList')
+  public async getList() {
+    return Array.from(this.instanceInfos.values());
+  }
+
+  @channel('instances:create')
+  public async create(instance: Instances) {
+    instance.id = uuidv4();
+    const _instance = await this.repository.save(instance);
+    this.instanceInfos.set(_instance.id, { ..._instance, status: 'stop' });
+    return _instance;
+  }
+
+  @channel('instances:update')
+  public async update(id: string, instance: Instances) {
+    const oldInstance = await this.repository.findOneBy({ id: id });
+    if (!oldInstance) return;
+    const _instance = await this.repository.save({
+      ...oldInstance,
+      ...instance,
+    });
+    this.instanceInfos.set(_instance.id, { ..._instance, status: 'stop' });
+    return _instance;
+  }
+
+  @channel('instances:delete')
+  public async delete(id: string) {
+    await this.repository.delete(id);
+    this.instanceInfos.delete(id);
+  }
+
+  @channel('instances:run')
+  public async run(id: string) {
+    const instance = await this.repository.findOneBy({ id: id });
+    if (instance.type === 'browser') {
+      try {
+        const browserInstance = new BrowserInstance({ instances: instance });
+        const browserContext = await browserInstance.run();
+        this.instanceInfos.set(id, { ...instance, status: 'running' });
+        this.instances.set(id, browserInstance);
+        browserInstance.on('close', () => {
+          this.instanceInfos.set(id, { ...instance, status: 'stop' });
+          this.instances.delete(id);
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }
+
+  @channel('instances:stop')
+  public async stop(id: string) {
+    const instance = this.instances.get(id);
+    if (instance) {
+      await instance.stop();
+    }
+  }
+}
+
+export const instanceManager = new InstanceManager();

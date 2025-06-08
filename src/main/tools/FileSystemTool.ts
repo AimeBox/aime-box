@@ -10,6 +10,9 @@ import { TextLoader } from 'langchain/document_loaders/fs/text';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
 import { ImageLoader } from '../loaders/ImageLoader';
+import { filesize } from 'filesize';
+import { fromFile } from 'file-type';
+import { chardet } from 'chardet';
 
 export interface FileWriteParameters extends ToolParams {}
 export interface FileReadParameters extends ToolParams {}
@@ -42,10 +45,14 @@ export class FileWrite extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    const { workspace } = config.configurable;
+    const workspace = config?.configurable?.workspace;
     let filePath = input.path;
     if (workspace) {
       filePath = path.join(workspace, input.path);
+    }
+    const dirPath = path.dirname(filePath);
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
     }
     const { mode = 'overwrite' } = input;
     if (mode === 'append') {
@@ -57,12 +64,12 @@ export class FileWrite extends BaseTool {
   }
 }
 
-export class FileRead extends BaseTool {
+export class FileInfo extends BaseTool {
   toolKitName?: string = 'file-system';
 
-  name: string = 'file_read';
+  name: string = 'file_info';
 
-  description: string = 'read file plain text';
+  description: string = 'get file info';
 
   schema = z.object({
     path: z.string().describe('local file path'),
@@ -77,7 +84,50 @@ export class FileRead extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    const { workspace } = config.configurable;
+    const workspace = config?.configurable?.workspace;
+    let filePath = input.path;
+    if (workspace) {
+      filePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(workspace, filePath);
+    }
+    const stats = await fs.promises.stat(filePath);
+
+    return JSON.stringify({
+      fullPath: filePath,
+      isFile: stats.isFile(),
+
+      name: path.basename(filePath),
+      size: filesize(stats.size), // 文件大小(字节)
+      createdAt: stats.birthtime, // 创建时间
+      modifiedAt: stats.mtime, // 修改时间
+      //lineCount: lineCount, // 行数
+    });
+  }
+}
+
+export class FileRead extends BaseTool {
+  toolKitName?: string = 'file-system';
+
+  name: string = 'file_read';
+
+  description: string = 'read file plain text';
+
+  schema = z.object({
+    path: z.string().describe('local file path'),
+    searchText: z.string().optional(),
+  });
+
+  constructor(params?: FileReadParameters) {
+    super(params);
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<string> {
+    const workspace = config?.configurable?.workspace;
     let filePath = input.path;
     if (workspace) {
       filePath = path.isAbsolute(filePath)
@@ -116,7 +166,7 @@ export class ListDirectory extends BaseTool {
     runManager,
     config,
   ): Promise<string[] | string> {
-    const { workspace } = config.configurable;
+    const workspace = config?.configurable?.workspace;
     let filePath = input.path;
     if (workspace) {
       filePath = path.isAbsolute(filePath)
@@ -152,7 +202,7 @@ export class CreateDirectory extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    const { workspace } = config.configurable;
+    const workspace = config?.configurable?.workspace;
     let filePaths = input.paths;
     if (workspace) {
       filePaths = input.paths.map((x) =>
@@ -164,7 +214,8 @@ export class CreateDirectory extends BaseTool {
       for (const path of filePaths) {
         fs.mkdirSync(path, { recursive: true });
       }
-      return 'Directory created successfully';
+      const folders = filePaths.map((x) => `<folder>${x}</folder>`).join('\n');
+      return `Directory created successfully\n\n${folders}`;
     } else {
       return 'No directory to create';
     }
@@ -200,6 +251,14 @@ export class SearchFiles extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
+    const workspace = config?.configurable?.workspace;
+    let filePath = input.path;
+    if (workspace) {
+      filePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(workspace, filePath);
+    }
+
     const results: string[] = [];
 
     // 创建用于匹配的正则表达式
@@ -233,7 +292,7 @@ export class SearchFiles extends BaseTool {
       }
     };
 
-    searchRecursively(input.path);
+    searchRecursively(filePath);
 
     if (results.length === 0) {
       return '未找到匹配的文件';
@@ -276,6 +335,7 @@ export class SearchFiles extends BaseTool {
           ) {
             const loader = new ImageLoader(filePath);
             const docs = await loader.load();
+            if (!docs) continue;
             content = docs.map((x) => x.pageContent).join('\n\n');
           } else {
             continue;
@@ -310,7 +370,7 @@ export class SearchFiles extends BaseTool {
           }
         }
       }
-      return JSON.stringify(list);
+      return list.length > 0 ? JSON.stringify(list) : 'No match any file';
     }
 
     return JSON.stringify(results);
@@ -339,7 +399,19 @@ export class MoveFile extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    fs.renameSync(input.source, input.destination);
+    const workspace = config?.configurable?.workspace;
+    let sourcePath = input.source;
+    let destinationPath = input.destination;
+    if (workspace) {
+      sourcePath = path.isAbsolute(sourcePath)
+        ? sourcePath
+        : path.join(workspace, sourcePath);
+      destinationPath = path.isAbsolute(destinationPath)
+        ? destinationPath
+        : path.join(workspace, destinationPath);
+    }
+
+    fs.renameSync(sourcePath, destinationPath);
     return 'File moved successfully';
   }
 }
@@ -372,15 +444,18 @@ export class DeleteFile extends BaseTool {
 }
 
 export class FileSystemToolKit extends BaseToolKit {
-  name: string = 'file-system';
+  name: string = 'file_system';
 
-  tools = [
-    new FileWrite(),
-    new FileRead(),
-    new ListDirectory(),
-    new CreateDirectory(),
-    new SearchFiles(),
-    new MoveFile(),
-    new DeleteFile(),
-  ];
+  getTools(): BaseTool[] {
+    return [
+      new FileWrite(),
+      new FileRead(),
+      new FileInfo(),
+      new ListDirectory(),
+      new CreateDirectory(),
+      new SearchFiles(),
+      new MoveFile(),
+      new DeleteFile(),
+    ];
+  }
 }

@@ -98,8 +98,22 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
       return updatedChats;
     });
   };
+  const handleChatChanged = (chat: ChatInfo) => {
+    console.log('chat:changed', chat);
+    setChats((prevChats) => {
+      const updatedChats = prevChats.map((x) => {
+        if (x.id === chat.id) {
+          return { ...x, ...chat };
+        }
+        return x;
+      });
+      return updatedChats;
+    });
+  };
   useEffect(() => {
     window.electron.ipcRenderer.on('chat:title-changed', handleTitleChanged);
+    window.electron.ipcRenderer.on('chat:start', handleChatChanged);
+    window.electron.ipcRenderer.on('chat:end', handleChatChanged);
     return () => {
       window.electron.ipcRenderer.removeListener(
         'chat:title-changed',
@@ -185,7 +199,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
                 icon={renderChatIcon(chat.mode)}
                 active={currentChatId === chat.id}
                 title={chat.title}
-                // shiny={chat.status === 'running'}
+                shiny={chat.status === 'running'}
                 subTitle={
                   chat.mode === 'agent' && <small>@{chat.agentName}</small>
                 }

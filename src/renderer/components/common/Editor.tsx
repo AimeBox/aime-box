@@ -6,9 +6,9 @@ import React, {
   useImperativeHandle,
 } from 'react';
 import ReactDOM from 'react-dom';
-import ReactQuill, { Quill } from 'react-quill';
-import quill, { Delta, DeltaStatic } from 'quill';
-import 'react-quill/dist/quill.bubble.css';
+// import ReactQuill, { Quill } from 'react-quill';
+// import quill, { Delta, DeltaStatic } from 'quill';
+// import 'react-quill/dist/quill.bubble.css';
 import { cn } from '@/lib/utils';
 
 const BlockEmbed = Quill.import('blots/block/embed');

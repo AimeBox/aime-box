@@ -47,12 +47,10 @@ import {
 } from '@langchain/core/prompts';
 import dayjs from 'dayjs';
 import { parse as parseYaml } from 'yaml';
-import SwaggerParser from '@apidevtools/swagger-parser';
-import OpenAPIClientAxios from 'openapi-client-axios';
 import { A2ACardResolver, A2AClient } from 'a2a-js';
 import { createA2A } from './a2a/Agent2Agent';
 import { jsonSchemaToZod } from '../utils/jsonSchemaToZod';
-import { WatsonxToolkit } from '@langchain/community/agents/toolkits/ibm';
+import { DataMaskingAgent } from './data_masking/DataMaskingAgent';
 
 export interface AgentInfo extends Agent {
   static: boolean;
@@ -73,7 +71,7 @@ export class AgentManager {
     await this.registerAgent(ScriptAssistant);
     //this.registerAgent(TranslateAgent);
     await this.registerAgent(PlannerAgent);
-
+    await this.registerAgent(DataMaskingAgent);
     await this.registerAgent(ManusAgent);
     if (!ipcMain) return;
     ipcMain.on('agent:getList', async (event, filter?: string) => {
@@ -499,9 +497,6 @@ export class AgentManager {
         });
         const text = await res.text();
         const openapiDocument = parseYaml(text);
-        const api = new OpenAPIClientAxios({ definition: openapiDocument });
-        const client = await api.init();
-
         const baseUrl = openapiDocument.servers[0].url;
         const { paths }: { paths: Record<string, any> } = openapiDocument;
         console.log(openapiDocument);
@@ -626,6 +621,10 @@ export class AgentManager {
       await this.addAnp(data);
     } else if (data.type == 'a2a') {
       await this.addA2A(data);
+    } else if (data.type == 'dify') {
+      await this.addDifyAgent(data);
+    } else if (data.type == 'coze') {
+      await this.addCozeAgent(data);
     } else {
       throw new Error('不支持的agent类型');
     }
@@ -680,6 +679,21 @@ export class AgentManager {
     );
     agent.remote_url = data.baseUrl;
     await this.agentRepository.save(agent);
+  }
+
+  public async addCozeAgent(data: { baseUrl: string; apiKey: string }) {}
+
+  public async addDifyAgent(data: { baseUrl: string; apiKey: string }) {
+    const res = await fetch(`${data.baseUrl}/parameters`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${data.apiKey}`,
+      },
+    });
+    if (!res.ok) {
+      throw new Error('');
+    }
+    const json = await res.json();
   }
 }
 

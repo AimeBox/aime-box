@@ -7,21 +7,24 @@ import { pathToFileURL } from 'url';
 import { toolsManager } from '../tools';
 import { StructuredTool, Tool } from '@langchain/core/tools';
 import exploresManager from '../explores';
+import { BaseManager } from '../BaseManager';
+import { channel } from '../ipc/IpcController';
+import { notificationManager } from '../app/NotificationManager';
 
-export class PluginsManager {
-  private plugins: Map<string, Plugins> = new Map();
+export class PluginsManager extends BaseManager {
+  private plugins: Map<string, any> = new Map();
 
   private pluginsRepository = dbManager.dataSource.getRepository(Plugins);
 
-  public init() {
+  public async init() {
     this.pluginsRepository
       .find()
       .then((res) => {
         for (let index = 0; index < res.length; index++) {
           const plugin = res[index];
-          this.plugins.set(plugin.id, plugin);
+          // this.plugins.set(plugin.id, plugin);
           if (plugin.isEnable) {
-            this.loadPlugins(plugin.path);
+            this.loadPlugins(plugin);
           }
         }
         return null;
@@ -29,33 +32,15 @@ export class PluginsManager {
       .catch((error) => {});
 
     if (!ipcMain) return;
-    ipcMain.on('plugins:loadPlugins', async (event, input: string) => {
-      event.returnValue = null;
-    });
-    ipcMain.on('plugins:reload', async (event) => {
-      event.returnValue = null;
-    });
-    ipcMain.on('plugins:getList', async (event) => {
-      event.returnValue = await this.pluginsRepository.find();
-    });
-    ipcMain.on('plugins:import', async (event, path: string) => {
-      await this.import(path);
-      event.returnValue = null;
-    });
-    ipcMain.on('plugins:delete', async (event, id: string) => {
-      await this.delete(id);
-      event.returnValue = null;
-    });
-    ipcMain.on(
-      'plugins:setEnable',
-      async (event, id: string, enable: boolean) => {
-        if (enable) await this.enablePlugin(id);
-        else await this.disablePlugin(id);
-        event.returnValue = null;
-      },
-    );
+    this.registerIpcChannels();
   }
 
+  @channel('plugins:getList')
+  public async getList() {
+    return await this.pluginsRepository.find();
+  }
+
+  @channel('plugins:import')
   public async import(directory: string) {
     try {
       const url = pathToFileURL(path.join(directory, 'index.js')).href;
@@ -72,9 +57,37 @@ export class PluginsManager {
       data.path = directory;
       data.isEnable = false;
       await this.pluginsRepository.save(data);
+      this.loadPlugins(data, pluginModule);
     } catch (e) {
       console.log(e);
     }
+  }
+
+  @channel('plugins:reload')
+  public async reload(id: string) {
+    const plugin = await this.pluginsRepository.findOne({
+      where: { id: id },
+    });
+
+    const isEnable = plugin.isEnable;
+    if (!isEnable) return;
+    await this.unloadPlugin(plugin);
+    if (isEnable) await this.loadPlugins(plugin);
+  }
+
+  @channel('plugins:setEnable')
+  public async setEnable(id: string, isEnable: boolean) {
+    const plugin = await this.pluginsRepository.findOne({
+      where: { id: id },
+    });
+
+    plugin.isEnable = isEnable;
+    if (!isEnable) {
+      await this.unloadPlugin(plugin);
+    } else {
+      await this.loadPlugins(plugin);
+    }
+    await this.pluginsRepository.save(plugin);
   }
 
   public async loadTool(directory: string) {
@@ -153,22 +166,43 @@ export class PluginsManager {
     }
   }
 
-  public async loadPlugins(directory: string) {
-    this.loadTool(directory);
-    this.loadExplores(directory);
+  public async loadPlugins(plugin: Plugins, pluginModule?: any) {
+    try {
+      if (!pluginModule) {
+        const url = pathToFileURL(path.join(plugin.path, 'index.js')).href;
+        // const modulePath = require.resolve(path.join(plugin.path, 'index.js'));
+        // const module = await import(modulePath);
+        // const url = pathToFileURL(path.join(plugin.path, 'index.js')).href;
+        pluginModule = await Function(
+          `return import("${url}?v=${Date.now()}")`,
+        )();
+      }
+      this.plugins[plugin.name] = pluginModule;
+      await pluginModule.default.main();
+      plugin.isEnable = true;
+      await this.pluginsRepository.save(plugin);
+      console.log(`Plugin "${plugin.name}:${plugin.version}" import success`);
+    } catch (err) {
+      console.log(`Plugin "${plugin.name}:${plugin.version}" import fail`);
+      notificationManager.sendNotification(err.message, 'error');
+    }
+
+    // this.loadTool(directory);
+    // this.loadExplores(directory);
   }
 
-  public async unloadPlugins(directory: string) {
-    await this.unloadTool(directory);
-    await exploresManager.unload(directory);
-  }
+  // public async unloadPlugins(directory: string) {
+  //   const sss = require.cache;
+  //   // await this.unloadTool(directory);
+  //   // await exploresManager.unload(directory);
+  // }
 
   public async enablePlugin(id: string) {
     const plugin = await this.pluginsRepository.findOne({
       where: { id: id },
     });
-    plugin.isEnable = true;
-    this.loadPlugins(plugin.path);
+    // plugin.isEnable = true;
+    await this.loadPlugins(plugin);
     await this.pluginsRepository.save(plugin);
     // const plugin = this.plugins.get(name);
     // if (plugin) {
@@ -181,7 +215,7 @@ export class PluginsManager {
       where: { id: id },
     });
 
-    this.unloadPlugins(plugin.path);
+    await this.unloadPlugin(plugin);
     plugin.isEnable = false;
     await this.pluginsRepository.save(plugin);
     // if (plugin) {
@@ -189,16 +223,23 @@ export class PluginsManager {
     // }
   }
 
-  public unloadPlugin(name: string): void {
-    const plugin = this.plugins.get(name);
+  public unloadPlugin(plugin: Plugins): void {
+    this.plugins[plugin.name].default.cleanUp();
+    delete this.plugins[plugin.name];
+
+    // const plugin = this.plugins.get(name);
     // if (plugin) {
     //   plugin.unload();
     //   this.plugins.delete(name);
     // }
   }
 
+  @channel('plugins:delete')
   public async delete(id: string) {
-    await this.disablePlugin(id);
+    const plugin = await this.pluginsRepository.findOne({
+      where: { id: id },
+    });
+    await this.unloadPlugin(plugin);
     await this.pluginsRepository.delete(id);
   }
 }

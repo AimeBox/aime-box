@@ -13,13 +13,13 @@ export class ViduText2Video extends BaseTool {
   toolKitName: string = 'vidu';
 
   schema = z.object({
-    model: z.enum(['viduq1', 'viduq1.5']).describe('viduq1.5'),
-    style: z.enum(['general', 'anime']).describe('general').optional(),
+    model: z.enum(['viduq1', 'viduq1.5']).default('viduq1.5'),
+    style: z.enum(['general', 'anime']).default('general').optional(),
     prompt: z.string().max(1500),
-    aspect_ratio: z.enum(['16:9', '9:16', '1:1']).describe('16:9').optional(),
+    aspect_ratio: z.enum(['16:9', '9:16', '1:1']).default('16:9').optional(),
     movement_amplitude: z
       .enum(['auto', 'small', 'medium', 'large'])
-      .describe('auto')
+      .default('auto')
       .optional(),
   });
 
@@ -70,7 +70,7 @@ export class ViduImage2Video extends BaseTool {
   toolKitName: string = 'vidu';
 
   schema = z.object({
-    model: z.enum(['viduq1', 'viduq1.5', 'viduq2.0']).describe('viduq1.5'),
+    model: z.enum(['viduq1', 'viduq1.5', 'viduq2.0']).default('viduq1.5'),
     start_image: z
       .string()
       .describe(
@@ -83,12 +83,12 @@ export class ViduImage2Video extends BaseTool {
         'image file suport local file(*.png、*.jpeg、*.jpg、*.webp ),or url',
       ),
     prompt: z.string().max(1500),
-    duration: z.number().describe('duration').optional(),
-    seed: z.number().describe('seed').optional(),
-    aspect_ratio: z.enum(['16:9', '9:16', '1:1']).describe('16:9').optional(),
+    duration: z.number().optional(),
+    seed: z.number().optional(),
+    aspect_ratio: z.enum(['16:9', '9:16', '1:1']).default('16:9').optional(),
     movement_amplitude: z
       .enum(['auto', 'small', 'medium', 'large'])
-      .describe('auto')
+      .default('auto')
       .optional(),
   });
 
@@ -147,15 +147,9 @@ export class ViduText2Audio extends BaseTool {
   toolKitName: string = 'vidu';
 
   schema = z.object({
-    model: z.enum(['audio1.0']).describe('audio1.0'),
+    model: z.enum(['audio1.0']).default('audio1.0'),
     prompt: z.string().max(1500),
-    duration: z
-      .number()
-      .max(10)
-      .min(2)
-      .default(10)
-      .describe('duration')
-      .optional(),
+    duration: z.number().max(10).min(2).default(10).optional(),
   });
 
   configSchema?: FormSchema[] = [
@@ -203,7 +197,7 @@ export class ViduTiming2Audio extends BaseTool {
   toolKitName: string = 'vidu';
 
   schema = z.object({
-    model: z.enum(['audio1.0']).describe('audio1.0'),
+    model: z.enum(['audio1.0']).default('audio1.0'),
     timing_prompts: z.array(
       z.object({
         from: z.number(),
@@ -211,13 +205,7 @@ export class ViduTiming2Audio extends BaseTool {
         prompt: z.string(),
       }),
     ),
-    duration: z
-      .number()
-      .max(10)
-      .min(2)
-      .default(10)
-      .describe('duration')
-      .optional(),
+    duration: z.number().max(10).min(2).default(10).optional(),
   });
 
   configSchema?: FormSchema[] = [
@@ -275,15 +263,19 @@ export class ViduToolKit extends BaseToolKit {
 
   apiKey?: string;
 
+  params?: ViduParameters;
+
   constructor(params?: ViduParameters) {
     super();
     this.apiKey = params?.apiKey;
   }
 
-  tools = [
-    new ViduText2Video(),
-    new ViduImage2Video(),
-    new ViduText2Audio(),
-    new ViduTiming2Audio(),
-  ];
+  getTools(): BaseTool[] {
+    return [
+      new ViduText2Video(this.params),
+      new ViduImage2Video(this.params),
+      new ViduText2Audio(this.params),
+      new ViduTiming2Audio(this.params),
+    ];
+  }
 }

@@ -44,8 +44,6 @@ import Content from '../components/layout/Content';
 import { FaArrowRotateLeft, FaRegMessage } from 'react-icons/fa6';
 import { t } from 'i18next';
 import { ListItem } from '../components/common/ListItem';
-import { cat } from '@huggingface/transformers';
-import { MultiServerMCPClient } from '@langchain/mcp-adapters';
 
 export default function Tools() {
   const [open, setOpen] = useState(false);
@@ -305,6 +303,7 @@ export default function Tools() {
               required: required.includes(x),
               component: 'Select',
               subLabel: tool.schema.properties[x].description,
+              defaultValue: tool.schema.properties[x].default,
               componentProps: {
                 options: tool.schema.properties[x].enum.map((e) => {
                   return { label: e, value: e };
@@ -522,7 +521,7 @@ export default function Tools() {
       <div className="flex flex-row w-full h-full">
         <List
           onSearch={onSearch}
-          width={250}
+          width={300}
           dataLength={tools.length}
           hasMore={false}
           filterTags={['built-in', 'mcp', 'custom']}

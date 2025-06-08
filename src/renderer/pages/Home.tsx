@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import ShowcaseLayout from '../components/layout/ShowcaseLayout';
 import { ScrollArea } from '../components/ui/scroll-area';
 import Content from '../components/layout/Content';
-import { Editor } from '../components/common/Editor';
 import { Document, Page, pdfjs } from 'react-pdf';
 import FileDropZone from '../components/common/FileDropZone';
 

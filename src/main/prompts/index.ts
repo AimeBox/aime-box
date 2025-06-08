@@ -4,8 +4,10 @@ import { Repository, Not } from 'typeorm';
 import { ipcMain } from 'electron';
 import { dbManager } from '../db';
 import { v4 as uuidv4 } from 'uuid';
+import { BaseManager } from '../BaseManager';
+import { channel } from '../ipc/IpcController';
 
-export class PromptsManager {
+export class PromptsManager extends BaseManager {
   public promptsGroups: PromptGroup[] = [];
 
   promptsGroupRepository: Repository<PromptGroup>;
@@ -13,6 +15,7 @@ export class PromptsManager {
   promptsRepository: Repository<Prompt>;
 
   constructor() {
+    super();
     this.promptsGroupRepository =
       dbManager.dataSource.getRepository(PromptGroup);
     this.promptsRepository = dbManager.dataSource.getRepository(Prompt);
@@ -20,34 +23,36 @@ export class PromptsManager {
 
   public async init() {
     if (!ipcMain) return;
-    ipcMain.handle(
-      'prompts:createPrompt',
-      (event, prompt: Prompt, groupId: string | undefined) =>
-        this.createPrompt(prompt, groupId),
-    );
-    ipcMain.handle('prompts:updatePrompt', (event, prompt: Prompt) =>
-      this.updatePrompt(prompt),
-    );
-    ipcMain.handle('prompts:deletePrompt', (event, promptId: string) =>
-      this.deletePrompt(promptId),
-    );
-    ipcMain.handle('prompts:getGroups', (event) => this.getGroups());
-    ipcMain.handle(
-      'prompts:getPrompts',
-      (event, groupId: string | undefined, role: string | undefined) =>
-        this.getPrompts(groupId, role),
-    );
-    ipcMain.handle('prompts:createGroup', (event, group: PromptGroup) =>
-      this.createGroup(group),
-    );
-    ipcMain.handle('prompts:updateGroup', (event, group: PromptGroup) =>
-      this.updateGroup(group),
-    );
-    ipcMain.handle('prompts:deleteGroup', (event, groupId) =>
-      this.deleteGroup(groupId),
-    );
+    this.registerIpcChannels();
+    // ipcMain.handle(
+    //   'prompts:createPrompt',
+    //   (event, prompt: Prompt, groupId: string | undefined) =>
+    //     this.createPrompt(prompt, groupId),
+    // );
+    // ipcMain.handle('prompts:updatePrompt', (event, prompt: Prompt) =>
+    //   this.updatePrompt(prompt),
+    // );
+    // ipcMain.handle('prompts:deletePrompt', (event, promptId: string) =>
+    //   this.deletePrompt(promptId),
+    // );
+    // ipcMain.handle('prompts:getGroups', (event) => this.getGroups());
+    // ipcMain.handle(
+    //   'prompts:getPrompts',
+    //   (event, groupId: string | undefined, role: string | undefined) =>
+    //     this.getPrompts(groupId, role),
+    // );
+    // ipcMain.handle('prompts:createGroup', (event, group: PromptGroup) =>
+    //   this.createGroup(group),
+    // );
+    // ipcMain.handle('prompts:updateGroup', (event, group: PromptGroup) =>
+    //   this.updateGroup(group),
+    // );
+    // ipcMain.handle('prompts:deleteGroup', (event, groupId) =>
+    //   this.deleteGroup(groupId),
+    // );
   }
 
+  @channel('prompts:createPrompt')
   public async createPrompt(prompt: Prompt, groupId: string | undefined) {
     prompt.id = uuidv4();
     prompt.group = await this.promptsGroupRepository.findOne({
@@ -59,6 +64,7 @@ export class PromptsManager {
     return savedPrompt;
   }
 
+  @channel('prompts:updatePrompt')
   public async updatePrompt(prompt: Prompt) {
     const updatedPrompt = await this.promptsRepository.update(
       prompt.id,
@@ -67,16 +73,19 @@ export class PromptsManager {
     return updatedPrompt;
   }
 
+  @channel('prompts:deletePrompt')
   public async deletePrompt(promptId: string) {
     const result = await this.promptsRepository.delete(promptId);
     return result.affected && result.affected > 0;
   }
 
+  @channel('prompts:getGroups')
   public async getGroups() {
     const promptsGroups = await this.promptsGroupRepository.find();
     return promptsGroups;
   }
 
+  @channel('prompts:getPrompts')
   public async getPrompts(
     groupId: string | undefined,
     role: string | undefined,
@@ -95,6 +104,7 @@ export class PromptsManager {
     return prompts;
   }
 
+  @channel('prompts:createGroup')
   public async createGroup(group: Partial<PromptGroup>) {
     // 检查是否存在同名组
     const existingGroup = await this.promptsGroupRepository.findOne({
@@ -109,6 +119,7 @@ export class PromptsManager {
     return savedGroup;
   }
 
+  @channel('prompts:updateGroup')
   public async updateGroup(group: Partial<PromptGroup>) {
     if (!group.id) {
       throw new Error('Group ID is required for update');
@@ -128,6 +139,7 @@ export class PromptsManager {
     });
   }
 
+  @channel('prompts:deleteGroup')
   public async deleteGroup(groupId: number) {
     const result = await this.promptsGroupRepository.delete(groupId);
     return result.affected && result.affected > 0;

@@ -45,6 +45,7 @@ import {
 import tokenCounter from './utils/tokenCounter';
 import { getChatModel } from './llm';
 import { getAssetPath } from './utils/path';
+import { instanceManager } from './instances';
 
 dbManager
   .init()
@@ -59,11 +60,16 @@ dbManager
     await serverManager.init();
     await appManager.init();
     await promptsManager.init();
+    await instanceManager.init();
 
     return true;
   })
   .catch((error) => {
     console.log(error);
+    dialog.showErrorBox(
+      '应用错误',
+      `发生了一个错误: ${error.message}\n ${error.stack}`,
+    );
   });
 
 let tray: Tray | null = null;
@@ -148,7 +154,7 @@ const isDebug =
   process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 if (isDebug) {
-  require('electron-debug')();
+  require('electron-debug').default();
 }
 
 function registerPluginProtocol() {
@@ -230,7 +236,9 @@ const createWindow = async () => {
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
       webSecurity: false,
-      nodeIntegration: true,
+      nodeIntegration: false,
+      spellcheck: false,
+      //contextIsolation: false,
       contextIsolation: true,
     },
   });

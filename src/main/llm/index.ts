@@ -22,6 +22,8 @@ import { ChatDeepSeek } from '@langchain/deepseek';
 import { ChatTogetherAI } from '@langchain/community/chat_models/togetherai';
 import { BaseTool } from '../tools/BaseTool';
 import { MinimaxProvider } from '../providers/MinimaxProvider';
+import { DeepSeekProvider } from '../providers/DeepSeekProvider';
+import { OllamaProvider } from '../providers/OllamaProvider';
 
 export async function getChatModel(
   providerName: string,
@@ -44,15 +46,7 @@ export async function getChatModel(
 
   let llm;
   if (provider?.type === ProviderType.OLLAMA) {
-    llm = new ChatOllama({
-      baseUrl: provider.api_base, // Default value
-      model: model.name, // Default value
-      temperature: options?.temperature,
-      topP: options?.top_p,
-      topK: options?.top_k,
-      streaming: options?.streaming,
-      format: options?.format,
-    });
+    llm = new OllamaProvider({ provider }).getChatModel(model.name, options);
   } else if (
     provider?.type === ProviderType.OPENAI ||
     provider?.type === ProviderType.OPENROUTER ||
@@ -126,13 +120,7 @@ export async function getChatModel(
     // .llm.client.httpAgent =
     //   settingsManager.getHttpAgent();
   } else if (provider?.type === ProviderType.DEEPSEEK) {
-    llm = new ChatDeepSeek({
-      model: model.name,
-      apiKey: provider.api_key,
-      temperature: options?.temperature,
-      maxTokens: options?.maxTokens,
-      streaming: options?.streaming,
-    });
+    llm = new DeepSeekProvider({ provider }).getChatModel(model.name, options);
   } else if (provider?.type === ProviderType.TOGETHERAI) {
     llm = new ChatTogetherAI({
       model: model.name,
@@ -162,7 +150,7 @@ export async function getChatModel(
       //azureOpenAIApiVersion: provider.extend_params.apiVersion, // In Node.js defaults to process.env.AZURE_OPENAI_API_VERSION
     });
   } else if (provider?.type === ProviderType.MINIMAX) {
-    llm = new MinimaxProvider().getChatModel(provider, model.name, options);
+    llm = new MinimaxProvider({ provider }).getChatModel(model.name, options);
   }
   if (tools.length > 0) {
     const llmWithTools = llm.bindTools(tools);

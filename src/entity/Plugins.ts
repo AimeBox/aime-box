@@ -30,4 +30,7 @@ export class Plugins {
 
   @Column()
   isEnable: boolean;
+
+  @Column({ type: 'json', nullable: true })
+  config?: any;
 }

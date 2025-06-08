@@ -6,6 +6,7 @@ import {
   IpcRendererEvent,
   OpenDialogOptions,
   SaveDialogOptions,
+  webUtils,
 } from 'electron';
 import { Chat } from '../entity/Chat';
 import { Providers } from '../entity/Providers';
@@ -20,6 +21,9 @@ import { GlobalSettings } from './settings';
 import { ChatInputAttachment, ChatInputExtend, ChatMode } from '@/types/chat';
 import { Prompt, PromptGroup } from '@/entity/Prompt';
 import { ChatInfo } from './chat';
+import { get } from 'http';
+import { Instances } from '@/entity/Instances';
+import { ProviderInfo } from './providers';
 
 const electronHandler = {
   ipcRenderer: {
@@ -54,6 +58,9 @@ const electronHandler = {
     },
   },
   app: {
+    getPathForFile: (file: File) => {
+      return webUtils.getPathForFile(file);
+    },
     showSaveDialog: (arg: SaveDialogOptions) =>
       ipcRenderer.invoke('app:showSaveDialog', arg),
     showOpenDialog: (
@@ -131,6 +138,8 @@ const electronHandler = {
     },
   },
   chat: {
+    openWorkspace: (chatId: string) =>
+      ipcRenderer.invoke('chat:openWorkspace', chatId),
     getChatPage: (input: {
       filter?: string;
       skip: number;
@@ -242,7 +251,7 @@ const electronHandler = {
   },
   providers: {
     getProviderType: () => ipcRenderer.invoke('providers:getProviderType'),
-    getList: (refresh: boolean = false): Promise<Providers[]> =>
+    getList: (refresh: boolean = false): Promise<ProviderInfo[]> =>
       ipcRenderer.invoke('providers:getProviders', refresh),
     delete: (id: string) => ipcRenderer.invoke('providers:delete', id),
     createOrUpdate: (input: Providers) =>
@@ -257,6 +266,8 @@ const electronHandler = {
     getSTTModels: () => ipcRenderer.invoke('providers:getSTTModels'),
     getWebSearchProviders: () =>
       ipcRenderer.invoke('providers:getWebSearchProviders'),
+    getImageGenerationProviders: () =>
+      ipcRenderer.invoke('providers:getImageGenerationProviders'),
   },
   kb: {
     save(pathOrUrl: string) {
@@ -345,6 +356,8 @@ const electronHandler = {
       ipcRenderer.invoke('tools:addMcp', data),
     deleteMcp: (name: string) => ipcRenderer.invoke('tools:deleteMcp', name),
     refreshMcp: (name: string) => ipcRenderer.invoke('tools:refreshMcp', name),
+    getCodeSandboxSetup: (path: string, chatId?: string) =>
+      ipcRenderer.invoke('tools:getCodeSandboxSetup', path, chatId),
   },
   agents: {
     getList(filter?: string) {
@@ -370,33 +383,13 @@ const electronHandler = {
     },
   },
   plugins: {
-    get(id: String) {
-      const res = ipcRenderer.sendSync('plugins:get', id);
-      return res;
-    },
-    getList() {
-      const res = ipcRenderer.sendSync('plugins:getList');
-      return res;
-    },
-    reload() {
-      ipcRenderer.sendSync('plugins:reload');
-    },
-    setEnable(id: String, enable: boolean) {
-      ipcRenderer.sendSync('plugins:setEnable', id, enable);
-    },
-    import(path: String) {
-      ipcRenderer.sendSync('plugins:import', path);
-    },
-    delete(id: String) {
-      ipcRenderer.sendSync('plugins:delete', id);
-    },
-    callSync(methodName: string, ...args: any[]) {
-      const res = ipcRenderer.sendSync('plugins:callSync', methodName, ...args);
-      return res;
-    },
-    call(methodName: string, ...args: any[]) {
-      ipcRenderer.sendSync('plugins:call', methodName, ...args);
-    },
+    get: (id: string) => ipcRenderer.invoke('plugins:get', id),
+    getList: () => ipcRenderer.invoke('plugins:getList'),
+    delete: (id: string) => ipcRenderer.invoke('plugins:delete', id),
+    reload: (id: string) => ipcRenderer.invoke('plugins:reload', id),
+    setEnable: (id: string, enable: boolean) =>
+      ipcRenderer.invoke('plugins:setEnable', id, enable),
+    import: (path: string) => ipcRenderer.invoke('plugins:import', path),
   },
   explores: {
     getList() {
@@ -422,6 +415,17 @@ const electronHandler = {
       ipcRenderer.invoke('prompts:updateGroup', group),
     deleteGroup: (groupId: string) =>
       ipcRenderer.invoke('prompts:deleteGroup', groupId),
+  },
+  instances: {
+    getList: () => ipcRenderer.invoke('instances:getList'),
+    get: (id: string) => ipcRenderer.invoke('instances:get', id),
+    create: (instance: Instances) =>
+      ipcRenderer.invoke('instances:create', instance),
+    update: (id: string, instance: Instances) =>
+      ipcRenderer.invoke('instances:update', id, instance),
+    delete: (id: string) => ipcRenderer.invoke('instances:delete', id),
+    run: (id: string) => ipcRenderer.invoke('instances:run', id),
+    stop: (id: string) => ipcRenderer.invoke('instances:stop', id),
   },
 };
 

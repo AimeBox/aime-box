@@ -1,5 +1,5 @@
 import { Tool, ToolParams } from '@langchain/core/tools';
-import * as ort from 'onnxruntime-node';
+//import * as ort from 'onnxruntime-node';
 import {
   exec,
   execSync,
@@ -43,61 +43,55 @@ export class RapidOcrTool extends BaseTool {
 
   description: string = 'an ocr tool that accurately extracts text from images';
 
-  private detSession: ort.InferenceSession | null = null;
-
-  private clsSession: ort.InferenceSession | null = null;
-
-  private recSession: ort.InferenceSession | null = null;
-
-  private keys: string[] = [];
+  // private keys: string[] = [];
 
   constructor(params?: RapidOcrToolParameters) {
     super(params);
   }
 
-  private async initializeModels(): Promise<void> {
-    if (process.platform !== 'darwin') return;
+  // private async initializeModels(): Promise<void> {
+  //   if (process.platform !== 'darwin') return;
 
-    try {
-      const modelsPath = path.join(getModelsPath(), 'ocr', 'RapidOCR-darwin');
+  //   try {
+  //     const modelsPath = path.join(getModelsPath(), 'ocr', 'RapidOCR-darwin');
 
-      // 加载检测模型
-      const detModelPath = path.join(
-        modelsPath,
-        'ch_PP-OCRv4_det_server_infer.onnx',
-      );
-      if (!this.detSession && fs.existsSync(detModelPath)) {
-        this.detSession = await ort.InferenceSession.create(detModelPath);
-      }
+  //     // 加载检测模型
+  //     const detModelPath = path.join(
+  //       modelsPath,
+  //       'ch_PP-OCRv4_det_server_infer.onnx',
+  //     );
+  //     if (!this.detSession && fs.existsSync(detModelPath)) {
+  //       this.detSession = await ort.InferenceSession.create(detModelPath);
+  //     }
 
-      // 加载分类模型
-      const clsModelPath = path.join(
-        modelsPath,
-        'ch_ppocr_mobile_v2.0_cls_infer.onnx',
-      );
-      if (!this.clsSession && fs.existsSync(clsModelPath)) {
-        this.clsSession = await ort.InferenceSession.create(clsModelPath);
-      }
+  //     // 加载分类模型
+  //     const clsModelPath = path.join(
+  //       modelsPath,
+  //       'ch_ppocr_mobile_v2.0_cls_infer.onnx',
+  //     );
+  //     if (!this.clsSession && fs.existsSync(clsModelPath)) {
+  //       this.clsSession = await ort.InferenceSession.create(clsModelPath);
+  //     }
 
-      // 加载识别模型
-      const recModelPath = path.join(
-        modelsPath,
-        'ch_PP-OCRv4_rec_server_infer.onnx',
-      );
-      if (!this.recSession && fs.existsSync(recModelPath)) {
-        this.recSession = await ort.InferenceSession.create(recModelPath);
-      }
+  //     // 加载识别模型
+  //     const recModelPath = path.join(
+  //       modelsPath,
+  //       'ch_PP-OCRv4_rec_server_infer.onnx',
+  //     );
+  //     if (!this.recSession && fs.existsSync(recModelPath)) {
+  //       this.recSession = await ort.InferenceSession.create(recModelPath);
+  //     }
 
-      // 加载字典
-      const keysPath = path.join(modelsPath, 'ppocr_keys_v1.txt');
-      if (this.keys.length === 0 && fs.existsSync(keysPath)) {
-        const keysContent = fs.readFileSync(keysPath, 'utf-8');
-        this.keys = keysContent.split('\n').filter((line) => line.trim());
-      }
-    } catch (error) {
-      console.error('Failed to initialize OCR models:', error);
-    }
-  }
+  //     // 加载字典
+  //     const keysPath = path.join(modelsPath, 'ppocr_keys_v1.txt');
+  //     if (this.keys.length === 0 && fs.existsSync(keysPath)) {
+  //       const keysContent = fs.readFileSync(keysPath, 'utf-8');
+  //       this.keys = keysContent.split('\n').filter((line) => line.trim());
+  //     }
+  //   } catch (error) {
+  //     console.error('Failed to initialize OCR models:', error);
+  //   }
+  // }
 
   async _call(
     input: z.infer<typeof this.schema>,
@@ -165,7 +159,7 @@ export class RapidOcrTool extends BaseTool {
       }
     } else if (process.platform === 'darwin') {
       try {
-        await this.initializeModels();
+        //await this.initializeModels();
         await this.drawBoundingBoxes(
           input.filePath,
           '/Users/noah/Desktop/xxx.jpg',

@@ -24,7 +24,7 @@ import {
   FaTrashAlt,
 } from 'react-icons/fa';
 import { FaGear } from 'react-icons/fa6';
-import { Editor, EditorRef } from '@/renderer/components/common/Editor';
+// import { Editor, EditorRef } from '@/renderer/components/common/Editor';
 import { useEffect, useRef, useState } from 'react';
 import { t } from 'i18next';
 import DocumentView from '@/renderer/components/common/DocumentView';
@@ -49,7 +49,7 @@ export default function ChatPlannerContent() {
   const [attachments, setAttachments] = useState<ChatInputAttachment[]>([]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const editorRef = useRef<EditorRef>(null);
+  // const editorRef = useRef<EditorRef>(null);
   const onDelete = async (chatMessage: ChatMessage) => {};
   const onChangeCurrentModel = async (currentModel: string) => {
     await window.electron.db.update('chat', { model: currentModel } as any, {
@@ -74,7 +74,7 @@ export default function ChatPlannerContent() {
       content: chatInputMessage.trim(),
       extend: { attachments: attachments },
     });
-    editorRef.current?.clear();
+    // editorRef.current?.clear();
     setAttachments([]);
   };
   const onCancel = async (chatId: string) => {
@@ -323,18 +323,18 @@ export default function ChatPlannerContent() {
                 <div className="flex flex-col flex-1 h-full">
                   <ChatQuickInput
                     onClick={(text) => {
-                      editorRef.current?.insertText(text);
+                      // editorRef.current?.insertText(text);
                       setChatInputMessage(text);
                     }}
                     className="mb-1"
                   />
                   <ScrollArea className="flex-1 h-full rounded-xl border border-gray-300 border-solid dark:border-gray-700">
-                    <Editor
+                    {/* <Editor
                       ref={editorRef}
                       className={`flex-1 w-full h-full text-sm bg-transparent outline-none resize-none`}
                       value={chatInputMessage}
                       onChange={setChatInputMessage}
-                    />
+                    /> */}
                   </ScrollArea>
                 </div>
               </div>

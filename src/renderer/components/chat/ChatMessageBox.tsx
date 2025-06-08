@@ -18,11 +18,8 @@ import {
   FaTrashAlt,
   FaUser,
 } from 'react-icons/fa';
-import ReactMarkdown from 'react-markdown';
 import dayjs from 'dayjs';
 import { Markdown } from '@/renderer/components/common/Markdown';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeGfm from 'remark-gfm';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/atom-one-dark.css';
 import { LoadingOutlined } from '@ant-design/icons';
@@ -65,6 +62,8 @@ import { JSONTree } from 'react-json-tree';
 import './ChatMessageBox.css';
 import ChatAttachment from './ChatAttachment';
 import { t } from 'i18next';
+import { ChatInputAttachment } from '@/types/chat';
+import { splitContextAndFiles } from '@/renderer/utils/ContentUtils';
 // import 'katex/dist/katex.min.css';
 // import * as prod from 'react/jsx-runtime';
 // import { ProviderIcon } from '../common/ProviderIcon';
@@ -188,7 +187,7 @@ const ChatMessageBox = React.forwardRef(
     const renderToolContent = (value: ChatMessage) => {
       const toolContent = value?.content?.filter((x) => x.type == 'tool_call');
       return (
-        <div>
+        <div className="w-full">
           {toolContent.map((x) => {
             try {
               if (isArray(JSON.parse(x.text))) {
@@ -227,7 +226,7 @@ const ChatMessageBox = React.forwardRef(
                 <div className="user-message">
                   <div className="self-center font-bold mb-0.5 capitalize line-clamp-1 h-10 flex items-center text-gray-700 dark:text-gray-300">
                     {value.role != 'tool' && (
-                      <span className="mr-2 text-lg">
+                      <span className="mr-2 text-lg line-clamp-1 ">
                         {value.role === 'user'
                           ? 'You'
                           : value.name || value.model}{' '}
@@ -259,44 +258,21 @@ const ChatMessageBox = React.forwardRef(
                           value.role == 'user' ? 'items-end' : ''
                         } w-full`}
                       >
-                        {value?.content?.map((x) => {
-                          return (
-                            <>
-                              {x.type == 'text' && (
-                                <div
-                                  className={`${
-                                    value.role == 'user'
-                                      ? 'bg-gray-100 dark:bg-gray-800 p-4 rounded-se-2xl rounded-ss-2xl rounded-es-2xl ml-10 '
-                                      : ''
-                                  }`}
-                                >
-                                  <Markdown value={x.text} key={x} />
-                                </div>
-                              )}
-
-                              {x.type == 'image_url' && (
-                                <div
-                                  className={`overflow-hidden rounded-2xl shadow max-h-[200px] ${value.role == 'user' ? 'ml-10' : ''}`}
-                                  key={x}
-                                >
-                                  <Image
-                                    src={x.image_url.url}
-                                    className="max-h-[200px] object-contain"
-                                    alt=""
-                                  />
-                                </div>
-                              )}
-
-                              {x.type == 'file' && (
-                                <Tag>
-                                  <a href={x.path} key={x}>
-                                    {x.path}
-                                  </a>
-                                </Tag>
-                              )}
-                            </>
-                          );
-                        })}
+                        {value?.content
+                          ?.filter((x) => x.type == 'text')
+                          .map((x) => {
+                            return (
+                              <div
+                                className={`${
+                                  value.role == 'user'
+                                    ? 'bg-gray-100 dark:bg-gray-800 p-4 rounded-se-2xl rounded-ss-2xl rounded-es-2xl ml-[64px] '
+                                    : 'w-full'
+                                }`}
+                              >
+                                <Markdown value={x.text} key={x} />
+                              </div>
+                            );
+                          })}
                       </div>
 
                       {/* {value?.additional_kwargs?.files && (
@@ -491,7 +467,7 @@ const ChatMessageBox = React.forwardRef(
                             }
                             let inputArgs = '';
                             if (
-                              Object.keys(toolCall.args).length == 1 &&
+                              Object.keys(toolCall.args).length > 0 &&
                               isString(
                                 toolCall.args[Object.keys(toolCall.args)[0]],
                               )
@@ -499,34 +475,56 @@ const ChatMessageBox = React.forwardRef(
                               inputArgs =
                                 toolCall.args[Object.keys(toolCall.args)[0]];
                             }
+                            let attachments;
+                            if (toolMessageContent?.text) {
+                              const { attachments: _attachments } =
+                                splitContextAndFiles(toolMessageContent?.text);
+                              attachments = _attachments;
+                            }
+
                             return (
-                              <motion.div
-                                className="flex flex-row gap-2 items-center p-0 px-2 bg-gray-100 rounded-2xl cursor-pointer w-fit"
-                                onClick={() =>
-                                  onToolClick?.(toolCall, toolMessageContent)
-                                }
-                              >
-                                {toolMessage?.status == 'success' && (
-                                  <FaCheckCircle color="green" />
+                              <>
+                                <motion.div
+                                  className="flex flex-row gap-2 items-center p-0 px-2 bg-gray-100 rounded-2xl cursor-pointer w-fit"
+                                  onClick={() =>
+                                    onToolClick?.(toolCall, toolMessageContent)
+                                  }
+                                >
+                                  {toolMessage?.status == 'success' && (
+                                    <FaCheckCircle color="green" />
+                                  )}
+                                  {toolMessage?.status == 'error' && (
+                                    <FaExclamationCircle color="red" />
+                                  )}
+                                  {toolMessage?.status == 'running' && (
+                                    <Spin
+                                      indicator={
+                                        <LoadingOutlined
+                                          style={{ fontSize: 10 }}
+                                          spin
+                                        ></LoadingOutlined>
+                                      }
+                                    />
+                                  )}
+                                  {toolCall.name}{' '}
+                                  <small className="text-xs text-gray-500 max-w-[200px] line-clamp-1 break-all">
+                                    {inputArgs}
+                                  </small>
+                                </motion.div>
+                                {attachments && (
+                                  <div className="flex flex-wrap gap-2 p-1">
+                                    {attachments.map((file) => {
+                                      return (
+                                        <ChatAttachment
+                                          showPreview
+                                          value={file}
+                                          key={file.path}
+                                        ></ChatAttachment>
+                                      );
+                                    })}
+                                  </div>
                                 )}
-                                {toolMessage?.status == 'error' && (
-                                  <FaExclamationCircle color="red" />
-                                )}
-                                {toolMessage?.status == 'running' && (
-                                  <Spin
-                                    indicator={
-                                      <LoadingOutlined
-                                        style={{ fontSize: 10 }}
-                                        spin
-                                      ></LoadingOutlined>
-                                    }
-                                  />
-                                )}
-                                {toolCall.name}{' '}
-                                <small className="text-xs text-gray-500 max-w-[200px] line-clamp-1 break-all">
-                                  {inputArgs}
-                                </small>
-                              </motion.div>
+                              </>
                             );
                           })}
                         </div>

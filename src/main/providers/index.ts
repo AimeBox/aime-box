@@ -26,10 +26,26 @@ import { getProviderModel } from '../utils/providerUtil';
 import { Transformers } from '../utils/transformers';
 import { notificationManager } from '../app/NotificationManager';
 import { ChatBaiduQianfan } from '@langchain/baidu-qianfan';
-import { ChatCompletion } from '@baiducloud/qianfan';
 import { VolcanoEngineProvider } from './VolcanoEngineProvider';
+import { ReplicateProvider } from './ReplicateProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { MinimaxProvider } from './MinimaxProvider';
+import { DeepSeekProvider } from './DeepSeekProvider';
+import { BaseProvider } from './BaseProvider';
+import { AnthropicProvider } from './AnthropicProvider';
+import { isString } from '../utils/is';
+import { OpenAIProvider } from './OpenAIProvider';
+import { AzureOpenAIProvider } from './AzureOpenAIProvider';
+import { OpenrouterProvider } from './OpenrouterProvider';
+import { SiliconflowProvider } from './SiliconflowProvider';
+
+export interface ProviderInfo extends Providers {
+  credits: {
+    totalCredits: number;
+    usedCredits: number;
+    remainingCredits: number;
+  };
+}
 
 export class ProvidersManager {
   repository: Repository<Providers>;
@@ -69,6 +85,9 @@ export class ProvidersManager {
     ipcMain.handle('providers:getWebSearchProviders', (event) =>
       this.getWebSearchProviders(),
     );
+    ipcMain.handle('providers:getImageGenerationProviders', (event) =>
+      this.getImageGenerationProviders(),
+    );
     ipcMain.handle(
       'providers:getDefaultLLM',
       (event) => settingsManager.getSettings()?.defaultLLM,
@@ -94,8 +113,8 @@ export class ProvidersManager {
     const httpProxy = settingsManager.getHttpAgent();
     try {
       if (connection.type === ProviderType.OLLAMA) {
-        const ollama = new OllamaProvider();
-        const list = await ollama.getModelList(connection);
+        const ollama = new OllamaProvider({ provider: connection });
+        const list = await ollama.getModelList();
         return list;
       } else if (
         connection.type === ProviderType.OPENAI ||
@@ -249,112 +268,34 @@ export class ProvidersManager {
           })
           .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection.type === ProviderType.OPENROUTER) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-          },
-        };
-
-        const url = 'https://openrouter.ai/api/v1/models';
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models?.find((z) => z.name == x.id)?.enable || false,
-              input_token: ((x.pricing?.prompt ?? 0) * 1000000).toFixed(2),
-              output_token: ((x.pricing?.completion ?? 0) * 1000000).toFixed(2),
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const openrouter = new OpenrouterProvider({ provider: connection });
+        const list = await openrouter.getModelList();
+        return list;
       } else if (connection.type === ProviderType.SILICONFLOW) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-        const url = 'https://api.siliconflow.cn/v1/models?sub_type=chat';
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models?.find((z) => z.name == x.id)?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const siliconflow = new SiliconflowProvider({ provider: connection });
+        const list = await siliconflow.getModelList();
+        return list;
       } else if (connection.type === ProviderType.DEEPSEEK) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-
-        const url = 'https://api.deepseek.com/models';
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models?.find((z) => z.name == x.id)?.enable || false,
-              input_token:
-                connection.models.find((z) => z.name == x.id)?.input_token || 0,
-              output_token:
-                connection.models.find((z) => z.name == x.id)?.output_token ||
-                0,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const deepSeek = new DeepSeekProvider({ provider: connection });
+        const list = await deepSeek.getModelList();
+        return list;
       } else if (connection.type === ProviderType.AZURE_OPENAI) {
-        //const apiKey = new AzureKeyCredential(connection.api_key);
-        const endpoint = connection.api_base;
-        const apiVersion = connection.config?.apiVersion || '2024-10-21';
-        // const deployment =
-        //   connection.extend_params?.deployment || 'gpt-35-turbo';
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-        const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .filter(
-            (x) => x.capabilities.chat_completion && x.status == 'succeeded',
-          )
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models?.find((z) => z.name == x.id)?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const ollama = new AzureOpenAIProvider({ provider: connection });
+        const list = await ollama.getModelList();
+        return list;
       } else if (connection?.type === ProviderType.VOLCANOENGINE) {
-        const volcanoEngine = new VolcanoEngineProvider();
-        const list = await volcanoEngine.getModelList(connection);
+        const volcanoEngine = new VolcanoEngineProvider({
+          provider: connection,
+        });
+        const list = await volcanoEngine.getModelList();
         return list;
       } else if (connection?.type === ProviderType.MINIMAX) {
-        const minimax = new MinimaxProvider();
-        const list = await minimax.getModelList(connection);
+        const minimax = new MinimaxProvider({ provider: connection });
+        const list = await minimax.getModelList();
+        return list;
+      } else if (connection?.type === ProviderType.REPLICATE) {
+        const replicate = new ReplicateProvider({ provider: connection });
+        const list = await replicate.getModelList();
         return list;
       }
     } catch (e) {
@@ -364,6 +305,39 @@ export class ProvidersManager {
 
     return [];
   };
+
+  public async getProvider(
+    provider: Providers | string,
+  ): Promise<BaseProvider> {
+    let providerObj: Providers;
+    if (isString(provider)) {
+      providerObj = await this.repository.findOneBy({ id: provider });
+    } else {
+      providerObj = provider;
+    }
+    switch (providerObj.type) {
+      case ProviderType.REPLICATE:
+        return new ReplicateProvider({ provider: providerObj });
+      case ProviderType.ANTHROPIC:
+        return new AnthropicProvider({ provider: providerObj });
+      case ProviderType.OLLAMA:
+        return new OllamaProvider({ provider: providerObj });
+      case ProviderType.OPENAI:
+        return new OpenAIProvider({ provider: providerObj });
+      case ProviderType.AZURE_OPENAI:
+        return new AzureOpenAIProvider({ provider: providerObj });
+      case ProviderType.DEEPSEEK:
+        return new DeepSeekProvider({ provider: providerObj });
+      case ProviderType.MINIMAX:
+        return new MinimaxProvider({ provider: providerObj });
+      case ProviderType.OPENROUTER:
+        return new OpenrouterProvider({ provider: providerObj });
+      case ProviderType.SILICONFLOW:
+        return new SiliconflowProvider({ provider: providerObj });
+      default:
+        return undefined;
+    }
+  }
 
   public getProviders = async (
     refresh: boolean = false,
@@ -380,6 +354,17 @@ export class ProvidersManager {
       const all = await this.repository.find();
       for (let i = 0; i < all.length; i++) {
         const connection = all[i];
+        const provider = await this.getProvider(connection);
+
+        if (provider && 'getCredits' in provider) {
+          const credits = await provider.getCredits();
+
+          if (credits) {
+            connection.credits = credits;
+          }
+        }
+
+        //connection.models = provider.;
         connections.push(connection);
       }
 
@@ -511,21 +496,11 @@ export class ProvidersManager {
             models: ['embedding-2', 'text_embedding'],
           });
         } else if (connection?.type === ProviderType.SILICONFLOW) {
-          const options = {
-            method: 'GET',
-            headers: {
-              accept: 'application/json',
-              'content-type': 'application/json',
-              Authorization: `Bearer ${connection.api_key}`,
-            },
-          };
-          const url = 'https://api.siliconflow.cn/v1/models?sub_type=embedding';
-          const res = await fetch(url, options);
-          const models = await res.json();
-
+          const siliconflow = new SiliconflowProvider({ provider: connection });
+          const list = await siliconflow.getEmbeddingModels();
           emb_list.push({
             name: connection.name,
-            models: models.data?.map((x) => x.id) ?? [],
+            models: list,
           });
         } else if (connection?.type === ProviderType.GOOGLE) {
           const options = {
@@ -576,31 +551,19 @@ export class ProvidersManager {
             });
           } catch {}
         } else if (connection?.type === ProviderType.AZURE_OPENAI) {
-          const endpoint = connection.api_base;
-          const apiVersion = connection.config?.apiVersion || '2024-10-21';
-          const options = {
-            method: 'GET',
-            headers: {
-              accept: 'application/json',
-              'content-type': 'application/json',
-              Authorization: `Bearer ${connection.api_key}`,
-            },
-          };
-          const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
-          try {
-            const res = await fetch(url, options);
-            const models = await res.json();
-
-            const emb_models = models.data
-              .filter(
-                (x) => x.capabilities.embeddings && x.status == 'succeeded',
-              )
-              .sort((a, b) => a.id.localeCompare(b.id));
-            emb_list.push({
-              name: connection.name,
-              models: [...new Set(emb_models.map((x) => x.id))],
-            });
-          } catch {}
+          const azureOpenAI = new AzureOpenAIProvider({ provider: connection });
+          const list = await azureOpenAI.getEmbeddingModels();
+          emb_list.push({
+            name: connection.name,
+            models: list,
+          });
+        } else if (connection?.type === ProviderType.REPLICATE) {
+          const replicate = new ReplicateProvider({ provider: connection });
+          const list = await replicate.getEmbeddingModels();
+          emb_list.push({
+            name: connection.name,
+            models: list,
+          });
         }
       } catch {
         continue;
@@ -623,21 +586,11 @@ export class ProvidersManager {
       const connection = connections[index];
       try {
         if (connection?.type === ProviderType.SILICONFLOW) {
-          const options = {
-            method: 'GET',
-            headers: {
-              accept: 'application/json',
-              'content-type': 'application/json',
-              Authorization: `Bearer ${connection.api_key}`,
-            },
-          };
-          const url = 'https://api.siliconflow.cn/v1/models?sub_type=reranker';
-          const res = await fetch(url, options);
-          const models = await res.json();
-
+          const siliconflow = new SiliconflowProvider({ provider: connection });
+          const list = await siliconflow.getRerankerModels();
           emb_list.push({
             name: connection.name,
-            models: models.data?.map((x) => x.id)?.sort() ?? [],
+            models: list,
           });
         }
       } catch {
@@ -662,21 +615,11 @@ export class ProvidersManager {
       const connection = connections[index];
       try {
         if (connection?.type === ProviderType.SILICONFLOW) {
-          const options = {
-            method: 'GET',
-            headers: {
-              accept: 'application/json',
-              'content-type': 'application/json',
-              Authorization: `Bearer ${connection.api_key}`,
-            },
-          };
-          const url = 'https://api.siliconflow.cn/v1/models?sub_type=reranker';
-          const res = await fetch(url, options);
-          const models = await res.json();
-
+          const siliconflow = new SiliconflowProvider({ provider: connection });
+          const list = await siliconflow.getTTSModels();
           emb_list.push({
             name: connection.name,
-            models: models.data?.map((x) => x.id)?.sort() ?? [],
+            models: list ?? [],
           });
         }
       } catch {
@@ -744,6 +687,25 @@ export class ProvidersManager {
       name: 'serpapi',
       models: ['basic'],
     });
+
+    return list;
+  };
+
+  getImageGenerationProviders = async (): Promise<any[]> => {
+    const list = [];
+    const providers = await this.getProviders(false);
+    for (const provider of providers) {
+      const _provider = await this.getProvider(provider);
+      if (_provider) {
+        const models = await _provider.getImageGenerationModels();
+        if (models && models.length > 0) {
+          list.push({
+            name: provider.name,
+            models: models,
+          });
+        }
+      }
+    }
 
     return list;
   };

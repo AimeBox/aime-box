@@ -5,6 +5,7 @@ const foldersToRemove = [
   webpackPaths.distPath,
   webpackPaths.buildPath,
   webpackPaths.dllPath,
+  webpackPaths.srcNodeModulesPath,
 ];
 
 console.log('Removing folders:', foldersToRemove);
