@@ -13,6 +13,7 @@ import { runCommand } from '../utils/exec';
 import { BaseTool } from './BaseTool';
 import { platform } from 'process';
 import { FormSchema } from '@/types/form';
+import { truncateText } from '../utils/common';
 
 export interface TerminalToolParameters extends ToolParams {
   ask_human_input: boolean;
@@ -104,7 +105,7 @@ export class TerminalTool extends BaseTool {
         console.error(err);
         res = err.message;
       }
-      return res;
+      return truncateText(res);
     }
 
     //return null;

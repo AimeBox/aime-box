@@ -136,7 +136,7 @@ export class ManusAgent extends BaseAgent {
 
   maxFailTimes: number;
 
-  workspace?:string;
+  workspace?: string;
 
   constructor(options: {
     provider: string;
@@ -157,8 +157,6 @@ export class ManusAgent extends BaseAgent {
     // next_goal: z.string().describe('Your next goal'),
     // reply: z.string().optional().nullable(),
   });
-
-  
 
   createAgentOutput = (actions: (BaseAction | BaseTool)[]) => {
     if (actions.length > 1) {
@@ -803,7 +801,7 @@ export class ManusAgent extends BaseAgent {
           signal: signal,
         },
       });
-      if(result.tool_calls.length==0){
+      if (result.tool_calls.length == 0) {
         return {
           message: new AIMessage({
             content: ``,
@@ -813,7 +811,7 @@ export class ManusAgent extends BaseAgent {
             thought: '',
             action: HumanFeedbackAction.name,
             action_description: HumanFeedbackAction.description,
-            action_args: {question: result.content },
+            action_args: { question: result.content },
           },
 
           // action: args.action,
@@ -829,7 +827,7 @@ export class ManusAgent extends BaseAgent {
       const modelWithActions = that.model.bindTools([action], {
         tool_choice: 'any',
       });
-      
+
       inputMessages.push(
         new AIMessage(
           `${result.text ? `${result.text}\n` : ''}💭 Thought: ${args.thought}\n🚀 Action: ${args.action}: ${args.action_description}`,
@@ -1000,7 +998,6 @@ export class ManusAgent extends BaseAgent {
             ),
           );
         } else {
-
           inputMessages.push(new HumanMessage(`what next action?`));
         }
       }

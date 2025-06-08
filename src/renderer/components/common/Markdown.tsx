@@ -55,13 +55,14 @@ export function Markdown(props: MarkdownProps) {
   useEffect(() => {
     const { thinkContent, restContent } = splitThinkTag(props?.value);
     const { context, attachments } = splitContextAndFiles(restContent);
+
     setFiles(attachments);
     setThinkContent(thinkContent);
-    setRenderedContent(context);
+    // setRenderedContent(context);
 
     unified()
       .use(remarkParse, { fragment: true })
-      .use(remarkEncodeLinks)
+      //.use(remarkEncodeLinks)
       .use(remarkGfm)
       .use(rehypeMathjax)
       .use(remarkBreaks)
@@ -85,8 +86,8 @@ export function Markdown(props: MarkdownProps) {
 
       .process(context)
       .then((res) => {
-        const content = res.toString();
-        setRenderedContent(content);
+        const _html = res.toString();
+        setRenderedContent(_html);
         return null;
       })
       .catch((err) => {});
@@ -109,8 +110,8 @@ export function Markdown(props: MarkdownProps) {
     return { thinkContent: null, restContent: '' };
   }
 
-  useEffect(() => {}, [renderedContent]);
-  return renderedContent || (files && files.length > 0) ? (
+  // useEffect(() => {}, [renderedContent]);
+  return thinkContent || renderedContent || (files && files.length > 0) ? (
     <>
       {thinkContent && (
         <div className="pl-2 mb-4 italic text-gray-500 whitespace-pre-wrap border-l-4 border-gray-300">
@@ -119,7 +120,7 @@ export function Markdown(props: MarkdownProps) {
       )}
       <div
         className={cn(
-          'overflow-auto w-full text-sm break-all max-w-max break-words prose dark:prose-invert dark prose-hr:m-0 prose-td:whitespace-pre-line min-w-[100%]',
+          'w-full text-sm break-all max-w-max break-words prose dark:prose-invert dark prose-hr:m-0 prose-td:whitespace-pre-line min-w-[100%]',
           props?.className,
         )}
         dangerouslySetInnerHTML={{ __html: renderedContent }}
@@ -132,7 +133,7 @@ export function Markdown(props: MarkdownProps) {
               <ChatAttachment
                 value={file}
                 key={file.path}
-                showImage
+                showPreview
               ></ChatAttachment>
             );
           })}

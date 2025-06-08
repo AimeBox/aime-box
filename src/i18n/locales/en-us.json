@@ -183,6 +183,9 @@
     "localModelManager": "Local Model Manager",
     "defaultModel": "Default Model",
     "showMcpWindows": "Show Mcp Windows",
-    "braveApiKey": "Brave Api Key"
+    "braveApiKey": "Brave Api Key",
+    "instances_manager": "Instances Manager",
+    "instances": "Instances",
+    "instances_create": "Create Instance"
   }
 }

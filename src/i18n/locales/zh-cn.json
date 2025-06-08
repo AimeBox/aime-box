@@ -140,7 +140,10 @@
     "localModelManager": "本地模型管理",
     "defaultModel": "默认模型设置",
     "showMcpWindows": "显示MCP窗口",
-    "braveApiKey": "Brave Api Key"
+    "braveApiKey": "Brave Api Key",
+    "instances_manager": "实例管理",
+    "instances": "实例",
+    "instances_create": "创建实例"
   },
   "knowledgebase": {
     "create_knowledgebase": "创建知识库",

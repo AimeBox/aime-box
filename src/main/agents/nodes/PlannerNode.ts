@@ -63,27 +63,28 @@ export const PlannerAnnotation = {
 
 export const PlanSchema = z.object({
   title: z.string(),
-  outline: z.array(
+  steps: z.array(
     z.object({
       title: z.string(),
-      steps: z.array(
-        z.object({
-          title: z.string(),
-          status: z.enum(['not_started', 'done', 'skip']),
-        }),
-      ),
+      status: z.enum(['not_started', 'done', 'skip']),
     }),
   ),
+  // outline: z.array(
+  //   z.object({
+  //     title: z.string(),
+  //     steps: z.array(
+  //       z.object({
+  //         title: z.string(),
+  //         status: z.enum(['not_started', 'done', 'skip']),
+  //       }),
+  //     ),
+  //   }),
+  // ),
 });
 
 export const CreatePlanSchema = z.object({
   title: z.string(),
-  outline: z.array(
-    z.object({
-      title: z.string(),
-      steps: z.array(z.string()),
-    }),
-  ),
+  steps: z.array(z.string()),
 });
 
 export const UpdatePlanSchema = z.object({
@@ -115,20 +116,19 @@ const renderPlan = (
 ) => {
   let content = `# ${plans.title}\n`;
   let index = 1;
-  for (const outline of plans.outline) {
-    content += `## ${outline.title}\n`;
-    for (const step of outline.steps) {
-      let status = ' ';
-      if (step.status) {
-        if (step.status == 'done') {
-          status = 'x';
-        } else if (step.status == 'skip') {
-          status = '-';
-        }
+  for (const step of plans.steps) {
+    let status = ' ';
+
+    if (step.status) {
+      if (step.status == 'done') {
+        status = 'x';
+      } else if (step.status == 'skip') {
+        status = '-';
       }
-      content += `- ${showIndex && status == ' ' ? `${index}.` : ''} [${status}] ${step.title || step}\n`;
-      index++;
     }
+
+    content += `- ${showIndex && status == ' ' ? `${index}.` : ''} [${status}] ${step.title || step}\n`;
+    index++;
     content += '\n';
   }
   return content;
@@ -289,12 +289,9 @@ export const PlannerNode = (params: {
         );
         plans = {
           ...res.parsed,
-          outline: res.parsed.outline.map((outline) => {
-            const _steps = outline.steps.map((step) => {
-              const _step = { title: step, status: 'not_started' as const };
-              return _step;
-            });
-            return { ...outline, steps: _steps };
+          title: res.parsed.title,
+          steps: res.parsed.steps.map((step) => {
+            return { title: step, status: 'not_started' as const };
           }),
         };
       }
@@ -305,7 +302,7 @@ export const PlannerNode = (params: {
       return {
         plans,
         todo,
-        currentStep: plans.outline[0].steps[0],
+        currentStep: plans.steps[0],
       };
     } else {
       const llmWithTools = llm.bindTools(actions, {

@@ -621,6 +621,10 @@ export class AgentManager {
       await this.addAnp(data);
     } else if (data.type == 'a2a') {
       await this.addA2A(data);
+    } else if (data.type == 'dify') {
+      await this.addDifyAgent(data);
+    } else if (data.type == 'coze') {
+      await this.addCozeAgent(data);
     } else {
       throw new Error('不支持的agent类型');
     }
@@ -675,6 +679,21 @@ export class AgentManager {
     );
     agent.remote_url = data.baseUrl;
     await this.agentRepository.save(agent);
+  }
+
+  public async addCozeAgent(data: { baseUrl: string; apiKey: string }) {}
+
+  public async addDifyAgent(data: { baseUrl: string; apiKey: string }) {
+    const res = await fetch(`${data.baseUrl}/parameters`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${data.apiKey}`,
+      },
+    });
+    if (!res.ok) {
+      throw new Error('');
+    }
+    const json = await res.json();
   }
 }
 

@@ -35,6 +35,7 @@ import { t } from 'i18next';
 import ProviderIcon from '../components/common/ProviderIcon';
 import { ScrollArea } from '../components/ui/scroll-area';
 import Content from '../components/layout/Content';
+import { ProviderInfo } from '@/main/providers';
 
 export default function Connections() {
   const [open, setOpen] = useState(false);
@@ -42,7 +43,7 @@ export default function Connections() {
   const [currentData, setCurrentData] = useState<Providers>(null);
   const [loading, setLoading] = useState(false);
   // const { getAllModels } = useConnection();
-  const [providers, setProviders] = useState<Providers[]>([]);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [providerTypes, setProviderTypes] = useState<
     { key: string; value: string; icon: string }[]
   >([]);
@@ -59,6 +60,7 @@ export default function Connections() {
       setProviderTypes(providerTypes);
 
       const res = await window.electron.providers.getList();
+      console.log(res);
       setProviders(res);
     } catch {
     } finally {
@@ -288,6 +290,11 @@ export default function Connections() {
                             <span className="overflow-hidden text-xs text-ellipsis line-clamp-1">
                               {value.api_base}
                             </span>
+                            {value.credits && (
+                              <span className="text-xs text-gray-500">
+                                ${value.credits.remainingCredits.toFixed(2)}
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-row self-center space-x-1">
                             <Button

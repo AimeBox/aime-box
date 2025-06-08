@@ -36,9 +36,13 @@ function parseMarkdownFileLink(
   md: string,
   type: 'file' | 'folder',
 ): ChatInputAttachment | undefined {
-  const name = md.split(/[/\\]/).pop();
+  let _md = md;
+  if (md.endsWith('/')) {
+    _md = md.substring(0, md.length - 1);
+  }
+  const name = _md.split(/[/\\]/).pop();
 
-  const path = md;
+  const path = _md;
   const ext = `.${name.split('.').pop()}`;
   return {
     name,

@@ -78,8 +78,10 @@ export default function ChatContent() {
       required: true,
       componentProps: {
         options: [
-          { label: t('agents.type_anp'), value: 'anp' },
+          // { label: t('agents.type_anp'), value: 'anp' },
           { label: t('agents.type_a2a'), value: 'a2a' },
+          { label: t('agents.type_dify'), value: 'dify' },
+          { label: t('agents.type_coze'), value: 'coze' },
         ],
       },
     },
@@ -88,6 +90,15 @@ export default function ChatContent() {
       field: 'baseUrl',
       label: t('agents.baseUrl'),
       required: true,
+    },
+    {
+      component: 'Input',
+      field: 'apiKey',
+      label: t('agents.apiKey'),
+      required: true,
+      ifShow: ({ values }) => {
+        return values.type == 'dify' || values.type == 'coze';
+      },
     },
   ] as FormSchema[];
 

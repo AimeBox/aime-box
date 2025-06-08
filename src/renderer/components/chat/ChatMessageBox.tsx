@@ -226,7 +226,7 @@ const ChatMessageBox = React.forwardRef(
                 <div className="user-message">
                   <div className="self-center font-bold mb-0.5 capitalize line-clamp-1 h-10 flex items-center text-gray-700 dark:text-gray-300">
                     {value.role != 'tool' && (
-                      <span className="mr-2 text-lg">
+                      <span className="mr-2 text-lg line-clamp-1 ">
                         {value.role === 'user'
                           ? 'You'
                           : value.name || value.model}{' '}
@@ -258,44 +258,21 @@ const ChatMessageBox = React.forwardRef(
                           value.role == 'user' ? 'items-end' : ''
                         } w-full`}
                       >
-                        {value?.content?.map((x) => {
-                          return (
-                            <>
-                              {x.type == 'text' && (
-                                <div
-                                  className={`${
-                                    value.role == 'user'
-                                      ? 'bg-gray-100 dark:bg-gray-800 p-4 rounded-se-2xl rounded-ss-2xl rounded-es-2xl ml-[64px] '
-                                      : 'w-full'
-                                  }`}
-                                >
-                                  <Markdown value={x.text} key={x} />
-                                </div>
-                              )}
-
-                              {/* {x.type == 'image_url' && (
-                                <div
-                                  className={`overflow-hidden rounded-2xl shadow max-h-[200px] ${value.role == 'user' ? 'ml-10' : ''}`}
-                                  key={x}
-                                >
-                                  <Image
-                                    src={x.image_url.url}
-                                    className="max-h-[200px] object-contain"
-                                    alt=""
-                                  />
-                                </div>
-                              )} */}
-
-                              {x.type == 'file' && (
-                                <Tag>
-                                  <a href={x.path} key={x}>
-                                    {x.path}
-                                  </a>
-                                </Tag>
-                              )}
-                            </>
-                          );
-                        })}
+                        {value?.content
+                          ?.filter((x) => x.type == 'text')
+                          .map((x) => {
+                            return (
+                              <div
+                                className={`${
+                                  value.role == 'user'
+                                    ? 'bg-gray-100 dark:bg-gray-800 p-4 rounded-se-2xl rounded-ss-2xl rounded-es-2xl ml-[64px] '
+                                    : 'w-full'
+                                }`}
+                              >
+                                <Markdown value={x.text} key={x} />
+                              </div>
+                            );
+                          })}
                       </div>
 
                       {/* {value?.additional_kwargs?.files && (
@@ -539,7 +516,7 @@ const ChatMessageBox = React.forwardRef(
                                     {attachments.map((file) => {
                                       return (
                                         <ChatAttachment
-                                          showImage
+                                          showPreview
                                           value={file}
                                           key={file.path}
                                         ></ChatAttachment>

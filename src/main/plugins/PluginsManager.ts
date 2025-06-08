@@ -24,7 +24,7 @@ export class PluginsManager extends BaseManager {
           const plugin = res[index];
           // this.plugins.set(plugin.id, plugin);
           if (plugin.isEnable) {
-             this.loadPlugins(plugin);
+            this.loadPlugins(plugin);
           }
         }
         return null;
@@ -37,8 +37,9 @@ export class PluginsManager extends BaseManager {
 
   @channel('plugins:getList')
   public async getList() {
-    return await this.pluginsRepository.find(); 
+    return await this.pluginsRepository.find();
   }
+
   @channel('plugins:import')
   public async import(directory: string) {
     try {
@@ -57,7 +58,6 @@ export class PluginsManager extends BaseManager {
       data.isEnable = false;
       await this.pluginsRepository.save(data);
       this.loadPlugins(data, pluginModule);
-      
     } catch (e) {
       console.log(e);
     }
@@ -68,12 +68,11 @@ export class PluginsManager extends BaseManager {
     const plugin = await this.pluginsRepository.findOne({
       where: { id: id },
     });
-    
+
     const isEnable = plugin.isEnable;
-    if(!isEnable) return;
+    if (!isEnable) return;
     await this.unloadPlugin(plugin);
-    if(isEnable)
-      await this.loadPlugins(plugin);
+    if (isEnable) await this.loadPlugins(plugin);
   }
 
   @channel('plugins:setEnable')
@@ -81,16 +80,15 @@ export class PluginsManager extends BaseManager {
     const plugin = await this.pluginsRepository.findOne({
       where: { id: id },
     });
-    
+
     plugin.isEnable = isEnable;
-    if(!isEnable) {
+    if (!isEnable) {
       await this.unloadPlugin(plugin);
-    }else{
+    } else {
       await this.loadPlugins(plugin);
     }
     await this.pluginsRepository.save(plugin);
   }
-
 
   public async loadTool(directory: string) {
     try {
@@ -168,9 +166,9 @@ export class PluginsManager extends BaseManager {
     }
   }
 
-  public async loadPlugins(plugin:Plugins, pluginModule?:any) {
-    try{
-      if(!pluginModule){
+  public async loadPlugins(plugin: Plugins, pluginModule?: any) {
+    try {
+      if (!pluginModule) {
         const url = pathToFileURL(path.join(plugin.path, 'index.js')).href;
         // const modulePath = require.resolve(path.join(plugin.path, 'index.js'));
         // const module = await import(modulePath);
@@ -179,19 +177,16 @@ export class PluginsManager extends BaseManager {
           `return import("${url}?v=${Date.now()}")`,
         )();
       }
-      const cache = require.cache;
-      this.plugins[plugin.name] = pluginModule
+      this.plugins[plugin.name] = pluginModule;
       await pluginModule.default.main();
       plugin.isEnable = true;
       await this.pluginsRepository.save(plugin);
       console.log(`Plugin "${plugin.name}:${plugin.version}" import success`);
-
-    }
-    catch(err){
+    } catch (err) {
       console.log(`Plugin "${plugin.name}:${plugin.version}" import fail`);
-      notificationManager.sendNotification(err.message, 'error')
+      notificationManager.sendNotification(err.message, 'error');
     }
-    
+
     // this.loadTool(directory);
     // this.loadExplores(directory);
   }
@@ -220,7 +215,7 @@ export class PluginsManager extends BaseManager {
       where: { id: id },
     });
 
-    await this.unloadPlugins(plugin.path);
+    await this.unloadPlugin(plugin);
     plugin.isEnable = false;
     await this.pluginsRepository.save(plugin);
     // if (plugin) {
@@ -230,7 +225,7 @@ export class PluginsManager extends BaseManager {
 
   public unloadPlugin(plugin: Plugins): void {
     this.plugins[plugin.name].default.cleanUp();
-    delete this.plugins[plugin.name]
+    delete this.plugins[plugin.name];
 
     // const plugin = this.plugins.get(name);
     // if (plugin) {

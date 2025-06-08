@@ -37,6 +37,15 @@ import { isString } from '../utils/is';
 import { OpenAIProvider } from './OpenAIProvider';
 import { AzureOpenAIProvider } from './AzureOpenAIProvider';
 import { OpenrouterProvider } from './OpenrouterProvider';
+import { SiliconflowProvider } from './SiliconflowProvider';
+
+export interface ProviderInfo extends Providers {
+  credits: {
+    totalCredits: number;
+    usedCredits: number;
+    remainingCredits: number;
+  };
+}
 
 export class ProvidersManager {
   repository: Repository<Providers>;
@@ -263,26 +272,9 @@ export class ProvidersManager {
         const list = await openrouter.getModelList();
         return list;
       } else if (connection.type === ProviderType.SILICONFLOW) {
-        const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-        };
-        const url = 'https://api.siliconflow.cn/v1/models?sub_type=chat';
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models?.find((z) => z.name == x.id)?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const siliconflow = new SiliconflowProvider({ provider: connection });
+        const list = await siliconflow.getModelList();
+        return list;
       } else if (connection.type === ProviderType.DEEPSEEK) {
         const deepSeek = new DeepSeekProvider({ provider: connection });
         const list = await deepSeek.getModelList();
@@ -337,10 +329,11 @@ export class ProvidersManager {
       case ProviderType.DEEPSEEK:
         return new DeepSeekProvider({ provider: providerObj });
       case ProviderType.MINIMAX:
-          return new MinimaxProvider({ provider: providerObj });
+        return new MinimaxProvider({ provider: providerObj });
       case ProviderType.OPENROUTER:
         return new OpenrouterProvider({ provider: providerObj });
-        
+      case ProviderType.SILICONFLOW:
+        return new SiliconflowProvider({ provider: providerObj });
       default:
         return undefined;
     }
@@ -361,6 +354,17 @@ export class ProvidersManager {
       const all = await this.repository.find();
       for (let i = 0; i < all.length; i++) {
         const connection = all[i];
+        const provider = await this.getProvider(connection);
+
+        if (provider && 'getCredits' in provider) {
+          const credits = await provider.getCredits();
+
+          if (credits) {
+            connection.credits = credits;
+          }
+        }
+
+        //connection.models = provider.;
         connections.push(connection);
       }
 
@@ -492,21 +496,11 @@ export class ProvidersManager {
             models: ['embedding-2', 'text_embedding'],
           });
         } else if (connection?.type === ProviderType.SILICONFLOW) {
-          const options = {
-            method: 'GET',
-            headers: {
-              accept: 'application/json',
-              'content-type': 'application/json',
-              Authorization: `Bearer ${connection.api_key}`,
-            },
-          };
-          const url = 'https://api.siliconflow.cn/v1/models?sub_type=embedding';
-          const res = await fetch(url, options);
-          const models = await res.json();
-
+          const siliconflow = new SiliconflowProvider({ provider: connection });
+          const list = await siliconflow.getEmbeddingModels();
           emb_list.push({
             name: connection.name,
-            models: models.data?.map((x) => x.id) ?? [],
+            models: list,
           });
         } else if (connection?.type === ProviderType.GOOGLE) {
           const options = {
@@ -592,21 +586,11 @@ export class ProvidersManager {
       const connection = connections[index];
       try {
         if (connection?.type === ProviderType.SILICONFLOW) {
-          const options = {
-            method: 'GET',
-            headers: {
-              accept: 'application/json',
-              'content-type': 'application/json',
-              Authorization: `Bearer ${connection.api_key}`,
-            },
-          };
-          const url = 'https://api.siliconflow.cn/v1/models?sub_type=reranker';
-          const res = await fetch(url, options);
-          const models = await res.json();
-
+          const siliconflow = new SiliconflowProvider({ provider: connection });
+          const list = await siliconflow.getRerankerModels();
           emb_list.push({
             name: connection.name,
-            models: models.data?.map((x) => x.id)?.sort() ?? [],
+            models: list,
           });
         }
       } catch {
@@ -631,21 +615,11 @@ export class ProvidersManager {
       const connection = connections[index];
       try {
         if (connection?.type === ProviderType.SILICONFLOW) {
-          const options = {
-            method: 'GET',
-            headers: {
-              accept: 'application/json',
-              'content-type': 'application/json',
-              Authorization: `Bearer ${connection.api_key}`,
-            },
-          };
-          const url = 'https://api.siliconflow.cn/v1/models?sub_type=reranker';
-          const res = await fetch(url, options);
-          const models = await res.json();
-
+          const siliconflow = new SiliconflowProvider({ provider: connection });
+          const list = await siliconflow.getTTSModels();
           emb_list.push({
             name: connection.name,
-            models: models.data?.map((x) => x.id)?.sort() ?? [],
+            models: list ?? [],
           });
         }
       } catch {

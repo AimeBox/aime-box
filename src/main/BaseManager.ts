@@ -1,7 +1,7 @@
-import { ipcMain } from "electron";
+import { ipcMain } from 'electron';
 
 export abstract class BaseManager {
-
+  constructor() {}
 
   registerIpcChannels() {
     if (!ipcMain) return;

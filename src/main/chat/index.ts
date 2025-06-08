@@ -503,7 +503,10 @@ export class ChatManager {
 
       for (let index = 0; index < chatMessages.length; index++) {
         const chatMessage = chatMessages[index];
-        if (chatMessage.status == ChatStatus.SUCCESS) {
+        if (
+          chatMessage.status == ChatStatus.SUCCESS ||
+          chatMessage.role == 'tool'
+        ) {
           const message = this.toLangchainMessage([chatMessage]);
           messages.push(...message);
         }
@@ -795,6 +798,16 @@ export class ChatManager {
       }
     } catch (err) {
       notificationManager.sendNotification(err.message, 'error');
+      const msgs = await this.chatMessageRepository.find({
+        where: { chatId: chatId, status: ChatStatus.RUNNING },
+      });
+
+      for (const m of msgs) {
+        m.status = ChatStatus.ERROR;
+        m.additional_kwargs['error'] = err.message;
+      }
+      await this.chatMessageRepository.save(msgs);
+
       console.error(err);
     }
     if (chat?.options?.allwaysClear === true) {

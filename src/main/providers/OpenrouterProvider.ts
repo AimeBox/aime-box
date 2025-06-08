@@ -18,13 +18,12 @@ export class OpenrouterProvider extends BaseProvider {
 
   defaultApiBase: string = 'https://openrouter.ai/api/v1';
 
-  httpProxy: HttpsProxyAgent | undefined
+  httpProxy: HttpsProxyAgent | undefined;
 
   constructor(params?: BaseProviderParams) {
     super(params);
     this.httpProxy = settingsManager.getHttpAgent();
   }
-
 
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const options = {
@@ -35,7 +34,7 @@ export class OpenrouterProvider extends BaseProvider {
       },
     };
 
-    const url = this.provider.api_base || this.defaultApiBase + '/models';
+    const url = `${this.provider.api_base || this.defaultApiBase}/models`;
     const res = await fetch(url, options);
     const models = await res.json();
     return models.data
@@ -48,10 +47,43 @@ export class OpenrouterProvider extends BaseProvider {
           output_token: ((x.pricing?.completion ?? 0) * 1000000).toFixed(2),
         };
       })
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async getEmbeddingModels(): Promise<string[]> {
-    return []
+    return [];
+  }
+
+  async getCredits(): Promise<{
+    totalCredits: number;
+    usedCredits: number;
+    remainingCredits: number;
+  }> {
+    try {
+      const options = {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${this.provider.api_key}`,
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+      };
+
+      const url = `${this.provider.api_base || this.defaultApiBase}/credits`;
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        throw new Error(res.statusText);
+      }
+      const json = await res.json();
+      return {
+        totalCredits: json.data.total_credits,
+        usedCredits: json.data.total_usage,
+        remainingCredits: json.data.total_credits - json.data.total_usage,
+      };
+    } catch (err) {
+      console.log(err);
+
+      return undefined;
+    }
   }
 }

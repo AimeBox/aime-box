@@ -6,8 +6,13 @@ import * as fs from 'fs';
 
 export class ExcelLoader extends BaseDocumentLoader {
   filePathOrBlob: string | Blob;
+
   maxRow?: number;
-  constructor(filePathOrBlob: string | Blob, { maxRow = 15}) {
+
+  constructor(
+    filePathOrBlob: string | Blob,
+    { maxRow = 15 }: { maxRow?: number } = {},
+  ) {
     super();
     this.filePathOrBlob = filePathOrBlob;
     this.maxRow = maxRow;
@@ -19,7 +24,7 @@ export class ExcelLoader extends BaseDocumentLoader {
 
   async load(): Promise<Document[]> {
     // let text;
-    let metadata;
+    const metadata = {};
     let wb: xlsx.WorkBook;
     xlsx.set_fs(fs);
     if (this.filePathOrBlob instanceof Blob) {
@@ -28,28 +33,39 @@ export class ExcelLoader extends BaseDocumentLoader {
       wb = xlsx.read(data, { type: 'array' });
     } else {
       wb = xlsx.readFile(this.filePathOrBlob);
-      metadata = { source: this.filePathOrBlob };
+      metadata['source'] = this.filePathOrBlob;
     }
     const docs: Document[] = [];
     for (const sheetName of wb.SheetNames) {
       const worksheet = wb.Sheets[sheetName];
-      const row = worksheet['!rows'];
-      
+
+      let row = worksheet['!rows']?.length;
+      if (row === undefined) {
+        const result = worksheet['!ref'].split(':')[1].match(/\d+$/)?.[0] || '';
+        row = parseInt(result, 10);
+      }
+      metadata['rowCount'] = row;
+
       const data = xlsx.utils.sheet_to_txt(worksheet);
       let pageContent = data;
 
-      if(this.maxRow < 15){
+      if (this.maxRow < 15) {
         this.maxRow = 15;
       }
 
-      if(this.maxRow && data.split('\n').length > this.maxRow){
+      if (this.maxRow && data.split('\n').length > this.maxRow) {
         pageContent = data.split('\n').slice(0, 5).join('\n');
         pageContent += `\n\n...[the data is too large]...\n\n`;
-        pageContent += data.split('\n').slice(data.split('\n').length - 5, data.split('\n').length).join('\n');
+        pageContent += data
+          .split('\n')
+          .slice(data.split('\n').length - 5, data.split('\n').length)
+          .join('\n');
       }
       // debugger;
       // const pageContent = data.map((x) => JSON.stringify(x)).join('\n\n');
-      docs.push(new Document({ id: sheetName, pageContent: pageContent, metadata }));
+      docs.push(
+        new Document({ id: sheetName, pageContent: pageContent, metadata }),
+      );
     }
     return docs;
   }

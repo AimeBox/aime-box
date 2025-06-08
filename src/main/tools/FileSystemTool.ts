@@ -10,6 +10,9 @@ import { TextLoader } from 'langchain/document_loaders/fs/text';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
 import { ImageLoader } from '../loaders/ImageLoader';
+import { filesize } from 'filesize';
+import { fromFile } from 'file-type';
+import { chardet } from 'chardet';
 
 export interface FileWriteParameters extends ToolParams {}
 export interface FileReadParameters extends ToolParams {}
@@ -47,6 +50,10 @@ export class FileWrite extends BaseTool {
     if (workspace) {
       filePath = path.join(workspace, input.path);
     }
+    const dirPath = path.dirname(filePath);
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
     const { mode = 'overwrite' } = input;
     if (mode === 'append') {
       await fs.promises.appendFile(filePath, input.data);
@@ -54,6 +61,48 @@ export class FileWrite extends BaseTool {
       await fs.promises.writeFile(filePath, input.data);
     }
     return `The file was successfully written and saved in:\n<file>${filePath.replaceAll('\\', '/')}</file>`;
+  }
+}
+
+export class FileInfo extends BaseTool {
+  toolKitName?: string = 'file-system';
+
+  name: string = 'file_info';
+
+  description: string = 'get file info';
+
+  schema = z.object({
+    path: z.string().describe('local file path'),
+  });
+
+  constructor(params?: FileReadParameters) {
+    super(params);
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<string> {
+    const workspace = config?.configurable?.workspace;
+    let filePath = input.path;
+    if (workspace) {
+      filePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(workspace, filePath);
+    }
+    const stats = await fs.promises.stat(filePath);
+
+    return JSON.stringify({
+      fullPath: filePath,
+      isFile: stats.isFile(),
+
+      name: path.basename(filePath),
+      size: filesize(stats.size), // 文件大小(字节)
+      createdAt: stats.birthtime, // 创建时间
+      modifiedAt: stats.mtime, // 修改时间
+      //lineCount: lineCount, // 行数
+    });
   }
 }
 
@@ -66,6 +115,7 @@ export class FileRead extends BaseTool {
 
   schema = z.object({
     path: z.string().describe('local file path'),
+    searchText: z.string().optional(),
   });
 
   constructor(params?: FileReadParameters) {
@@ -164,7 +214,8 @@ export class CreateDirectory extends BaseTool {
       for (const path of filePaths) {
         fs.mkdirSync(path, { recursive: true });
       }
-      return `Directory created successfully\n\n<folder>${filePaths.join('\n')}</folder>`;
+      const folders = filePaths.map((x) => `<folder>${x}</folder>`).join('\n');
+      return `Directory created successfully\n\n${folders}`;
     } else {
       return 'No directory to create';
     }
@@ -348,7 +399,19 @@ export class MoveFile extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    fs.renameSync(input.source, input.destination);
+    const workspace = config?.configurable?.workspace;
+    let sourcePath = input.source;
+    let destinationPath = input.destination;
+    if (workspace) {
+      sourcePath = path.isAbsolute(sourcePath)
+        ? sourcePath
+        : path.join(workspace, sourcePath);
+      destinationPath = path.isAbsolute(destinationPath)
+        ? destinationPath
+        : path.join(workspace, destinationPath);
+    }
+
+    fs.renameSync(sourcePath, destinationPath);
     return 'File moved successfully';
   }
 }
@@ -387,6 +450,7 @@ export class FileSystemToolKit extends BaseToolKit {
     return [
       new FileWrite(),
       new FileRead(),
+      new FileInfo(),
       new ListDirectory(),
       new CreateDirectory(),
       new SearchFiles(),

@@ -15,16 +15,30 @@ import {
   FaTrashAlt,
 } from 'react-icons/fa';
 import { Button, Popover, Image } from 'antd';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, useGLTF } from '@react-three/drei';
 
 export interface ChatAttachmentProps {
   value: ChatInputAttachment;
   onDelete?: () => void;
-  showImage?: boolean;
+  showPreview?: boolean;
+}
+
+export function ObjectModel(props: { path: string }) {
+  const { path } = props;
+  // useGLTF.preload(path);
+  try {
+    const { scene } = useGLTF(path); // 替换为您的GLB文件路径
+    return <primitive object={scene} {...props} />;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
 }
 
 export default function ChatAttachment({
   value,
-  showImage = false,
+  showPreview = false,
   onDelete,
 }: ChatAttachmentProps) {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
@@ -53,6 +67,7 @@ export default function ChatAttachment({
     value.ext == '.ogg' ||
     value.ext == '.m4a' ||
     value.ext == '.aac';
+  const is3DObject = value.ext == '.glb' || value.ext == '.gltf';
   const renderIcon = useCallback(() => {
     if (value.type == 'folder') {
       return <FaFolder />;
@@ -77,6 +92,7 @@ export default function ChatAttachment({
     if (!path.startsWith('file://')) {
       path = `file://${path}`;
     }
+
     if (isImage) {
       return (
         <Image
@@ -108,6 +124,29 @@ export default function ChatAttachment({
         </audio>
       );
     }
+
+    if (is3DObject) {
+      return (
+        // <Canvas style={{ height: '300rem' }}>
+        //   <ambientLight />
+        //   <pointLight position={[10, 10, 10]} />
+
+        //   <OrbitControls />
+        // </Canvas>
+        <Canvas
+          style={{ width: '600px', height: '600px' }}
+          className="bg-gray-300 rounded-xl shadow"
+        >
+          {/* 环境光和方向光 */}
+          <ambientLight intensity={0.5} />
+          <directionalLight position={[5, 5, 5]} />
+          <ObjectModel path={path} />
+
+          {/* 轨道控制器 */}
+          <OrbitControls />
+        </Canvas>
+      );
+    }
     return null;
   };
 
@@ -116,9 +155,9 @@ export default function ChatAttachment({
       className="flex flex-col gap-2 items-start "
       style={{ maxWidth: 'min-content' }}
     >
-      {showImage &&
+      {showPreview &&
         value.path &&
-        (isImage || isVideo || isAudio) &&
+        (isImage || isVideo || isAudio || is3DObject) &&
         renderPreview()}
 
       <div

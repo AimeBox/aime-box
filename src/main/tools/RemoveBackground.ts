@@ -46,7 +46,7 @@ export class RemoveBackground extends BaseTool {
     },
   ];
 
-  name = 'remove-background';
+  name = 'remove_background';
 
   description = 'Remove Image Background';
 
@@ -64,12 +64,26 @@ export class RemoveBackground extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     config?: ToolRunnableConfig,
   ): Promise<string> {
+    const workspace = config?.configurable?.workspace;
+    let { pathOrUrl } = input;
+    if (workspace && !isUrl(pathOrUrl)) {
+      pathOrUrl = path.isAbsolute(pathOrUrl)
+        ? pathOrUrl
+        : path.join(workspace, pathOrUrl);
+    }
+
     const buffer = await new Transformers({
       task: 'image-segmentation',
       modelName: this.modelName ?? 'rmbg-1.4',
-    }).rmbg(input.pathOrUrl);
+    }).rmbg(pathOrUrl);
 
-    const filePath = await saveFile(buffer, `${uuidv4()}.png`, config);
-    return `<file>${filePath}</file>`;
+    let savePath;
+    if (input.savePath) {
+      savePath = await saveFile(buffer, input.savePath, config);
+    } else {
+      savePath = await saveFile(buffer, `${uuidv4()}.png`, config);
+    }
+
+    return `<file>${savePath}</file>`;
   }
 }

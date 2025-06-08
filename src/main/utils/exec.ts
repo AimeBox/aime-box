@@ -1,6 +1,7 @@
 import { exec, execFile, execFileSync, spawn } from 'node:child_process';
 import { platform } from 'node:process';
 import iconv from 'iconv-lite';
+import fixPath from 'fix-path';
 
 export const runCommandSync = (command: string) => {
   if (platform == 'win32') {
@@ -41,6 +42,7 @@ export const runCommand = async (
     } else {
       commands.push(command);
     }
+    fixPath();
 
     const child2 = exec(
       commands.join(' '),
@@ -49,7 +51,7 @@ export const runCommand = async (
         windowsHide: false,
         cwd: cwd,
         env: {
-          ...process.env,
+          PATH: process.env.PATH,
         },
       },
       (error, stdout, stderr) => {

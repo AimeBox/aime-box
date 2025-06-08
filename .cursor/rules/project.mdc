@@ -13,4 +13,6 @@ alwaysApply: true
 - typescript
 - antd
 
+由于本项目原因所有使用npm安装依赖时必须使用--save-dev安装
+
 

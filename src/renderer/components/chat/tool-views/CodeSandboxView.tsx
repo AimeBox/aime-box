@@ -79,7 +79,7 @@ export default function CodeSandboxView(props: CodeSandboxViewProps) {
           style={{ height: '100%' }}
         >
           <SandpackLayout style={{ height: '100%' }}>
-            {/* <SandpackFileExplorer style={{ height: '100%' }} hidden /> */}
+            <SandpackFileExplorer style={{ height: '100%' }} />
             <SandpackCodeEditor style={{ height: '100%' }} />
             <SandpackPreview ref={previewRef} style={{ height: '100%' }} />
           </SandpackLayout>

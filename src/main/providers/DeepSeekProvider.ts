@@ -62,4 +62,29 @@ export class DeepSeekProvider extends BaseProvider {
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  async getCredits(): Promise<{
+    totalCredits: number;
+    usedCredits: number;
+    remainingCredits: number;
+  }> {
+    const options = {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${this.provider.api_key}`,
+      },
+    };
+
+    const res = await fetch(`https://api.deepseek.com/user/balance`, options);
+    if (!res.ok) return undefined;
+
+    const data = await res.json();
+    if (!data.is_available) return undefined;
+    return {
+      totalCredits: undefined,
+      usedCredits: undefined,
+      remainingCredits: parseFloat(data.balance_infos[0].total_balance),
+    };
+  }
 }

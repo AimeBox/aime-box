@@ -61,4 +61,12 @@ export abstract class BaseProvider {
   async getImageGenerationModels(): Promise<string[]> {
     return [];
   }
+
+  async getCredits(): Promise<{
+    totalCredits: number;
+    usedCredits: number;
+    remainingCredits: number;
+  }> {
+    return undefined;
+  }
 }
