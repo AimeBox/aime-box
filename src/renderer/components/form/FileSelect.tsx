@@ -17,12 +17,13 @@ interface FileSelectProps {
   onChange?: (value: string[]) => void;
   mode?: 'file' | 'folder';
   accept?: string;
+  maxCount?: number;
 }
 
 interface FileSelectRef {}
 const FileSelect = React.forwardRef(
   (props: FileSelectProps, ref: ForwardedRef<FileSelectRef>) => {
-    const { value, onChange, mode = 'file', accept } = props;
+    const { value, onChange, mode = 'file', accept ,maxCount} = props;
 
     const [fileList, setFileList] = useState<UploadFile[]>([]);
 
@@ -57,6 +58,7 @@ const FileSelect = React.forwardRef(
           openFileDialogOnClick={false}
           fileList={fileList}
           accept={accept}
+          maxCount={maxCount}
           onRemove={(file) => {
             const _fileList = fileList.filter((x) => x.uid !== file.uid);
             setFileList(_fileList);
@@ -64,7 +66,7 @@ const FileSelect = React.forwardRef(
           }}
           iconRender={iconRender}
         >
-          <button
+          {(maxCount === undefined || (maxCount !==undefined && fileList.length < maxCount)) && <button
             style={{ border: 0, background: 'none' }}
             type="button"
             className="flex flex-col justify-center items-center w-full h-full"
@@ -107,7 +109,8 @@ const FileSelect = React.forwardRef(
             <div style={{ marginTop: 8 }}>
               {mode == 'file' ? t('selectFile') : t('selectFolder')}
             </div>
-          </button>
+          </button>}
+          
         </Upload>
       </>
     );

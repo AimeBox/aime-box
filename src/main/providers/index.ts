@@ -38,6 +38,8 @@ import { OpenAIProvider } from './OpenAIProvider';
 import { AzureOpenAIProvider } from './AzureOpenAIProvider';
 import { OpenrouterProvider } from './OpenrouterProvider';
 import { SiliconflowProvider } from './SiliconflowProvider';
+import { BaseManager } from '../BaseManager';
+import { channel } from '../ipc/IpcController';
 
 export interface ProviderInfo extends Providers {
   credits: {
@@ -47,54 +49,62 @@ export interface ProviderInfo extends Providers {
   };
 }
 
-export class ProvidersManager {
+export class ProvidersManager extends BaseManager {
   repository: Repository<Providers>;
 
   connectionsStore: Providers[] | undefined;
 
   constructor() {
+    super();
     this.repository = dbManager.dataSource.getRepository(Providers);
+    
+  }
+
+  public async init() {
     if (!ipcMain) return;
-    ipcMain.handle(
-      'providers:getProviders',
-      (event, refresh: boolean = false) => this.getProviders(refresh),
-    );
-    ipcMain.handle('providers:delete', (event, id: string) =>
-      this.deleteProviders(id),
-    );
-    ipcMain.handle('providers:createOrUpdate', (event, input: Providers) =>
-      this.createOrUpdateProvider(input),
-    );
-    ipcMain.handle('providers:getProviderType', (event) =>
-      this.getProviderType(),
-    );
-    ipcMain.handle('providers:getModels', (event, id: string) =>
-      this.getModels(id),
-    );
+    // ipcMain.handle(
+    //   'providers:getProviders',
+    //   (event, refresh: boolean = false) => this.getProviders(refresh),
+    // );
+    // ipcMain.handle('providers:delete', (event, id: string) =>
+    //   this.deleteProviders(id),
+    // );
+    // ipcMain.handle('providers:createOrUpdate', (event, input: Providers) =>
+    //   this.createOrUpdateProvider(input),
+    // );
+    // ipcMain.handle('providers:getProviderType', (event) =>
+    //   this.getProviderType(),
+    // );
+    // ipcMain.handle('providers:getModels', (event, id: string) =>
+    //   this.getModels(id),
+    // );
 
-    ipcMain.handle('providers:getLLMModels', (event) => this.getLLMModels());
+    //ipcMain.handle('providers:getLLMModels', (event) => this.getLLMModels());
 
-    ipcMain.handle('providers:getEmbeddingModels', (event) =>
-      this.getEmbeddingModels(),
-    );
-    ipcMain.handle('providers:getRerankerModels', (event) =>
-      this.getRerankerModels(),
-    );
-    ipcMain.handle('providers:getTTSModels', (event) => this.getTTSModels());
-    ipcMain.handle('providers:getSTTModels', (event) => this.getSTTModels());
-    ipcMain.handle('providers:getWebSearchProviders', (event) =>
-      this.getWebSearchProviders(),
-    );
-    ipcMain.handle('providers:getImageGenerationProviders', (event) =>
-      this.getImageGenerationProviders(),
-    );
+    // ipcMain.handle('providers:getEmbeddingModels', (event) =>
+    //   this.getEmbeddingModels(),
+    // );
+    // ipcMain.handle('providers:getRerankerModels', (event) =>
+    //   this.getRerankerModels(),
+    // );
+    // ipcMain.handle('providers:getTTSModels', (event) => this.getTTSModels());
+    // ipcMain.handle('providers:getSTTModels', (event) => this.getSTTModels());
+    // ipcMain.handle('providers:getWebSearchProviders', (event) =>
+    //   this.getWebSearchProviders(),
+    // );
+    // ipcMain.handle('providers:getImageGenerationProviders', (event) =>
+    //   this.getImageGenerationProviders(),
+    // );
+    this.getProviders();
     ipcMain.handle(
       'providers:getDefaultLLM',
       (event) => settingsManager.getSettings()?.defaultLLM,
     );
+    this.registerIpcChannels();
   }
 
-  public getProviderType = () => {
+  @channel('providers:getProviderType')
+  public async getProviderType() {
     const list = [];
     Object.keys(ProviderType).forEach((key) => {
       list.push({ key: key, value: ProviderType[key], icon: null });
@@ -102,9 +112,10 @@ export class ProvidersManager {
     return list;
   };
 
-  public getModels = async (
+  @channel('providers:getModels')
+  public async getModels (
     id: string,
-  ): Promise<{ name: string; enable: boolean }[]> => {
+  ): Promise<{ name: string; enable: boolean }[]> {
     const connection: Providers = (await this.getProviders(false)).find(
       (x) => x.id == id,
     );
@@ -339,9 +350,10 @@ export class ProvidersManager {
     }
   }
 
-  public getProviders = async (
+  @channel('providers:getProviders')
+  public async getProviders (
     refresh: boolean = false,
-  ): Promise<Providers[]> => {
+  ): Promise<Providers[]>  {
     if (refresh) this.connectionsStore = undefined;
     if (this.connectionsStore === undefined) {
       const connections: Providers[] = [];
@@ -356,13 +368,18 @@ export class ProvidersManager {
         const connection = all[i];
         const provider = await this.getProvider(connection);
 
-        if (provider && 'getCredits' in provider) {
+        try{
+          if (provider && 'getCredits' in provider) {
           const credits = await provider.getCredits();
 
           if (credits) {
             connection.credits = credits;
           }
         }
+        }catch{
+
+        }
+        
 
         //connection.models = provider.;
         connections.push(connection);
@@ -373,7 +390,8 @@ export class ProvidersManager {
     return this.connectionsStore;
   };
 
-  public deleteProviders = async (id: string) => {
+  @channel('providers:delete')
+  public async deleteProviders (id: string) {
     const provider = await this.repository.findOneBy({ id });
     if (provider) {
       await this.repository.remove(provider);
@@ -381,7 +399,8 @@ export class ProvidersManager {
     }
   };
 
-  public createOrUpdateProvider = async (input: Providers) => {
+  @channel('providers:createOrUpdate')
+  public async createOrUpdateProvider (input: Providers) {
     const name = input.name?.trim().toLowerCase();
     if (name == 'local') {
       throw new Error('"local"无法使用');
@@ -426,7 +445,8 @@ export class ProvidersManager {
     await this.getProviders(true);
   };
 
-  public getLLMModels = async (): Promise<any[]> => {
+  @channel('providers:getLLMModels')
+  public async getLLMModels(): Promise<any[]> {
     return this.connectionsStore
       .map((x) => {
         return {
@@ -437,7 +457,8 @@ export class ProvidersManager {
       .filter((x) => x.models.length > 0);
   };
 
-  public getEmbeddingModels = async (): Promise<any[]> => {
+  @channel('providers:getEmbeddingModels')
+  public async getEmbeddingModels(): Promise<any[]> {
     const connections = await this.getProviders(false);
     const emb_list = [];
     const settings = settingsManager.getSettings();
@@ -572,7 +593,8 @@ export class ProvidersManager {
     return emb_list;
   };
 
-  public getRerankerModels = async (): Promise<any[]> => {
+  @channel('providers:getRerankerModels')
+  public async getRerankerModels(): Promise<any[]> {
     const connections = await this.getProviders(false);
     const emb_list = [];
     const settings = settingsManager.getSettings();
@@ -600,7 +622,8 @@ export class ProvidersManager {
     return emb_list;
   };
 
-  public getTTSModels = async (): Promise<any[]> => {
+  @channel('providers:getTTSModels')
+  public async getTTSModels (): Promise<any[]> {
     const connections = await this.getProviders(false);
     const emb_list = [];
     const settings = settingsManager.getSettings();
@@ -629,7 +652,8 @@ export class ProvidersManager {
     return emb_list;
   };
 
-  public getSTTModels = async (): Promise<any[]> => {
+  @channel('providers:getSTTModels')
+  public async getSTTModels(): Promise<any[]> {
     const connections = await this.getProviders(false);
     const emb_list = [];
     const settings = settingsManager.getSettings();
@@ -665,7 +689,8 @@ export class ProvidersManager {
     return emb_list;
   };
 
-  public getWebSearchProviders = async (): Promise<any[]> => {
+  @channel('providers:getWebSearchProviders')
+  public async getWebSearchProviders(): Promise<any[]> {
     const list = [];
     list.push({
       name: 'searxng',
@@ -691,7 +716,8 @@ export class ProvidersManager {
     return list;
   };
 
-  getImageGenerationProviders = async (): Promise<any[]> => {
+  @channel('providers:getImageGenerationProviders')
+  async getImageGenerationProviders(): Promise<any[]> {
     const list = [];
     const providers = await this.getProviders(false);
     for (const provider of providers) {

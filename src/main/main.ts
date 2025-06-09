@@ -54,7 +54,7 @@ dbManager
     await settingsManager.loadSettings();
     await kbManager.init();
     await toolsManager.init();
-    await providersManager.getProviders();
+    await providersManager.init();
     await agentManager.init();
     await pluginsManager.init();
     await serverManager.init();

@@ -40,10 +40,11 @@ export class PluginsManager extends BaseManager {
     return await this.pluginsRepository.find();
   }
 
-  @channel('plugins:import')
-  public async import(directory: string) {
+  @channel('plugins:create')
+  public async create(input: any) {
     try {
-      const url = pathToFileURL(path.join(directory, 'index.js')).href;
+      const directoryPath = input.directoryPath[0]
+      const url = pathToFileURL(path.join(directoryPath, 'index.js')).href;
       const pluginModule = await Function(
         `return import("${url}?v=${Date.now()}")`,
       )();
@@ -54,13 +55,23 @@ export class PluginsManager extends BaseManager {
       data.author = metadata.author;
       data.version = metadata.version;
       data.description = metadata.description;
-      data.path = directory;
+      data.path = directoryPath;
+      data.config = input.config;
       data.isEnable = false;
       await this.pluginsRepository.save(data);
       this.loadPlugins(data, pluginModule);
     } catch (e) {
       console.log(e);
     }
+  }
+
+  @channel('plugins:update')
+  public async update(id:string,input: any) {
+    const plugin = await this.pluginsRepository.findOne({
+      where: { id: id },
+    });
+    plugin.config = input.config
+    await this.pluginsRepository.save(plugin);
   }
 
   @channel('plugins:reload')
@@ -85,7 +96,11 @@ export class PluginsManager extends BaseManager {
     if (!isEnable) {
       await this.unloadPlugin(plugin);
     } else {
-      await this.loadPlugins(plugin);
+
+      const res = await this.loadPlugins(plugin);
+      if(!res){
+        throw new Error('Plugin init fail')
+      }
     }
     await this.pluginsRepository.save(plugin);
   }
@@ -178,13 +193,16 @@ export class PluginsManager extends BaseManager {
         )();
       }
       this.plugins[plugin.name] = pluginModule;
-      await pluginModule.default.main();
+      await pluginModule.default.main(plugin.config);
       plugin.isEnable = true;
       await this.pluginsRepository.save(plugin);
       console.log(`Plugin "${plugin.name}:${plugin.version}" import success`);
+      return true;
     } catch (err) {
       console.log(`Plugin "${plugin.name}:${plugin.version}" import fail`);
       notificationManager.sendNotification(err.message, 'error');
+      await pluginModule.default.cleanUp();
+      return false;
     }
 
     // this.loadTool(directory);
@@ -224,8 +242,15 @@ export class PluginsManager extends BaseManager {
   }
 
   public unloadPlugin(plugin: Plugins): void {
-    this.plugins[plugin.name].default.cleanUp();
-    delete this.plugins[plugin.name];
+
+    const keys = Object.keys(this.plugins)
+
+
+    if(keys.includes(plugin.name)){
+      this.plugins[plugin.name].default.cleanUp();
+      delete this.plugins[plugin.name];
+    }
+    
 
     // const plugin = this.plugins.get(name);
     // if (plugin) {
@@ -239,7 +264,12 @@ export class PluginsManager extends BaseManager {
     const plugin = await this.pluginsRepository.findOne({
       where: { id: id },
     });
-    await this.unloadPlugin(plugin);
+    try{
+      await this.unloadPlugin(plugin);
+    } catch(err) {
+      console.error(err)
+    }
+    
     await this.pluginsRepository.delete(id);
   }
 }
