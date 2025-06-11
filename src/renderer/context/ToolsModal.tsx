@@ -78,15 +78,15 @@ export const ToolsModal = React.forwardRef(
                 .includes(searchValue.toLocaleLowerCase())),
         );
       }
-      const _toolsInGroup = _tools.reduce((acc, obj) => {
-        const key = obj.toolkit_name;
-        if (!acc[key]) {
-          acc[key] = [];
-        }
-        acc[key].push(obj);
-        return acc;
-      }, {});
-      setToolsInGroup(_toolsInGroup);
+      // const _toolsInGroup = _tools.reduce((acc, obj) => {
+      //   const key = obj.toolkit_name;
+      //   if (!acc[key]) {
+      //     acc[key] = [];
+      //   }
+      //   acc[key].push(obj);
+      //   return acc;
+      // }, {});
+      // setToolsInGroup(_toolsInGroup);
     }, [tools, searchValue]);
 
     const [selectedKey, setSelectedKey] = useState<string>('built-in');
@@ -151,7 +151,71 @@ export const ToolsModal = React.forwardRef(
             </div>
             <ScrollArea className="flex-1 pl-2 my-1 w-full">
               <div className="flex flex-col gap-1">
-                {Object.keys(toolsInGroup).map((key) => {
+                {tools.map((tool) => {
+                  if (tool.type != selectedKey) {
+                    return null;
+                  }
+                  if (tool.is_toolkit) {
+                    return (
+                      <Card
+                        className="w-full"
+                        key={tool.id}
+                        title={tool.id.toLocaleUpperCase()}
+                        classNames={{ body: '!p-2' }}
+                      >
+                        <div className="flex flex-col gap-1">
+                          {tool.tools?.map((tool, index) => {
+                            return (
+                              <Button
+                                key={tool.id}
+                                type="text"
+                                className="flex flex-row justify-between items-center h-16"
+                                onClick={() => {
+                                  onSelect(tool);
+                                }}
+                              >
+                                <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
+                                  <strong>{tool.name.split('@')[0]}</strong>
+
+                                  <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
+                                    {tool.description}
+                                  </small>
+                                </div>
+                                <FaCheck
+                                  color="green"
+                                  className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
+                                />
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </Card>
+                    );
+                  } else {
+                    return (
+                      <Button
+                        key={tool.id}
+                        type="text"
+                        className="flex flex-row justify-between items-center h-16"
+                        onClick={() => {
+                          onSelect(tool);
+                        }}
+                      >
+                        <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
+                          <strong>{tool.name}</strong>
+                          <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
+                            {tool.description}
+                          </small>
+                        </div>
+                        <FaCheck
+                          color="green"
+                          className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
+                        />
+                      </Button>
+                    );
+                  }
+                })}
+                {/* {Object.keys(toolsInGroup).map((key) => {
                   if (toolsInGroup[key].length == 1) {
                     const tool = toolsInGroup[key][0];
                     if (tool.type != selectedKey) {
@@ -217,38 +281,10 @@ export const ToolsModal = React.forwardRef(
                             </div>
                           </Card>
                         )}
-
-                        {/* {grouped[key].map((tool) => {
-                          if (tool.type != selectedKey) {
-                            return null;
-                          }
-                          return (
-                            <Button
-                              key={tool.id}
-                              type="text"
-                              className="flex flex-row justify-between items-center h-16"
-                              onClick={() => {
-                                onSelect(tool);
-                              }}
-                            >
-                              <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
-                                <strong>{tool.name.split('@')[0]}</strong>
-
-                                <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
-                                  {tool.description}
-                                </small>
-                              </div>
-                              <FaCheck
-                                color="green"
-                                className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
-                              />
-                            </Button>
-                          );
-                        })} */}
                       </>
                     );
                   }
-                })}
+                })} */}
               </div>
             </ScrollArea>
           </div>

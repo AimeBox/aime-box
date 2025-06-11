@@ -10,7 +10,9 @@ import exploresManager from '../explores';
 import { BaseManager } from '../BaseManager';
 import { channel } from '../ipc/IpcController';
 import { notificationManager } from '../app/NotificationManager';
-
+import { MessageManager } from '../agents/message_manager';
+import vm, { Script } from 'vm';
+import { createRequire } from 'module';
 export class PluginsManager extends BaseManager {
   private plugins: Map<string, any> = new Map();
 
@@ -43,7 +45,7 @@ export class PluginsManager extends BaseManager {
   @channel('plugins:create')
   public async create(input: any) {
     try {
-      const directoryPath = input.directoryPath[0]
+      const directoryPath = input.directoryPath[0];
       const url = pathToFileURL(path.join(directoryPath, 'index.js')).href;
       const pluginModule = await Function(
         `return import("${url}?v=${Date.now()}")`,
@@ -61,16 +63,17 @@ export class PluginsManager extends BaseManager {
       await this.pluginsRepository.save(data);
       this.loadPlugins(data, pluginModule);
     } catch (e) {
-      console.log(e);
+      notificationManager.sendNotification(e.message, 'error');
+      console.error(e);
     }
   }
 
   @channel('plugins:update')
-  public async update(id:string,input: any) {
+  public async update(id: string, input: any) {
     const plugin = await this.pluginsRepository.findOne({
       where: { id: id },
     });
-    plugin.config = input.config
+    plugin.config = input.config;
     await this.pluginsRepository.save(plugin);
   }
 
@@ -96,10 +99,9 @@ export class PluginsManager extends BaseManager {
     if (!isEnable) {
       await this.unloadPlugin(plugin);
     } else {
-
       const res = await this.loadPlugins(plugin);
-      if(!res){
-        throw new Error('Plugin init fail')
+      if (!res) {
+        return;
       }
     }
     await this.pluginsRepository.save(plugin);
@@ -188,9 +190,55 @@ export class PluginsManager extends BaseManager {
         // const modulePath = require.resolve(path.join(plugin.path, 'index.js'));
         // const module = await import(modulePath);
         // const url = pathToFileURL(path.join(plugin.path, 'index.js')).href;
-        pluginModule = await Function(
-          `return import("${url}?v=${Date.now()}")`,
-        )();
+        const code = fs.readFileSync(
+          path.join(plugin.path, 'index.js'),
+          'utf-8',
+        );
+        // const script = new Script(code);
+        // const ss = script.runInThisContext();
+
+        // pluginModule = await Function(
+        //   `return import("${url}?v=${Date.now()}")`,
+        // )();
+        const modulePath = pathToFileURL(
+          path.resolve(path.join(plugin.path, 'index.js')),
+        ).href;
+        const sandboxModule = { exports: {} };
+
+        const dirname = path.dirname(modulePath);
+        const wrappedCode = `
+(function(exports, require, module, __filename, __dirname) {
+  ${code}
+});
+`;
+
+        const context = {
+          console,
+          __dirname: dirname,
+          __filename: path.join(plugin.path, 'index.js'),
+          require,
+          exports: sandboxModule.exports,
+          module: sandboxModule,
+          fs: fs,
+        };
+        const nodeRequire = createRequire(__filename);
+        const script = new vm.Script(wrappedCode);
+        vm.createContext(context);
+        const resultFunc = vm.runInContext(code, context); // 运行在当前上下文（非沙箱）
+
+        const module = { exports: {} };
+        const result = resultFunc(
+          module.exports,
+          require,
+          module,
+          __filename,
+          __dirname,
+        );
+        console.log(result);
+
+        vm.createContext(context); // 创建沙箱上下文
+        vm.runInContext(code, context);
+        console.log(context);
       }
       this.plugins[plugin.name] = pluginModule;
       await pluginModule.default.main(plugin.config);
@@ -200,8 +248,9 @@ export class PluginsManager extends BaseManager {
       return true;
     } catch (err) {
       console.log(`Plugin "${plugin.name}:${plugin.version}" import fail`);
+      console.error(err.message);
       notificationManager.sendNotification(err.message, 'error');
-      await pluginModule.default.cleanUp();
+      await pluginModule?.default.cleanUp();
       return false;
     }
 
@@ -242,15 +291,12 @@ export class PluginsManager extends BaseManager {
   }
 
   public unloadPlugin(plugin: Plugins): void {
+    const keys = Object.keys(this.plugins);
 
-    const keys = Object.keys(this.plugins)
-
-
-    if(keys.includes(plugin.name)){
+    if (keys.includes(plugin.name)) {
       this.plugins[plugin.name].default.cleanUp();
       delete this.plugins[plugin.name];
     }
-    
 
     // const plugin = this.plugins.get(name);
     // if (plugin) {
@@ -264,12 +310,12 @@ export class PluginsManager extends BaseManager {
     const plugin = await this.pluginsRepository.findOne({
       where: { id: id },
     });
-    try{
+    try {
       await this.unloadPlugin(plugin);
-    } catch(err) {
-      console.error(err)
+    } catch (err) {
+      console.error(err);
     }
-    
+
     await this.pluginsRepository.delete(id);
   }
 }

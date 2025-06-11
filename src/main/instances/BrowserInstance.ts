@@ -17,7 +17,10 @@ export class BrowserInstance extends BaseInstance {
 
   run = async () => {
     const httpProxy = settingsManager.getPorxy();
-    if (this.instances?.config?.userDataPath) {
+    if (
+      this.instances?.config?.userDataPath ||
+      this.instances?.config?.executablePath
+    ) {
       const userDataDir = path.join(getDataPath(), 'User Data');
       this.browser_context = await chromium.launchPersistentContext(
         this.instances?.config?.userDataPath || userDataDir,
@@ -44,6 +47,21 @@ export class BrowserInstance extends BaseInstance {
       this.browser_context = await (
         await chromium.connect(this.instances?.config?.wssUrl)
       ).newContext();
+    } else {
+      const browser = await chromium.launch({
+        headless: false,
+        proxy: httpProxy
+          ? {
+              server: `${httpProxy}`,
+            }
+          : undefined,
+        args: [
+          '--disable-blink-features=AutomationControlled',
+          '--enable-webgl',
+        ],
+        channel: 'msedge',
+      });
+      this.browser_context = await browser.newContext();
     }
     this.browser_context.on('close', (page) => {
       this.eventEmitter.emit('close');

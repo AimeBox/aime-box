@@ -125,6 +125,7 @@ export const ComponentTypes = [
   'AgentSelect',
   'ToolSelect',
   'JsonEditor',
+  'InstanceSelect',
 ] as const;
 
 export type ComponentType = (typeof ComponentTypes)[number];

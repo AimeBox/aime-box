@@ -36,7 +36,7 @@ export class CodeSandbox extends BaseTool {
       .string()
       .describe('The path to the project must be a folder path')
       .default('./'),
-    entry: z.string().default('project enrty eg. "/src/main.js"'),
+    entry: z.string().describe('project enrty eg. "/src/main.js"'),
   });
 
   configSchema?: FormSchema[] = [];

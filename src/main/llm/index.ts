@@ -24,6 +24,9 @@ import { BaseTool } from '../tools/BaseTool';
 import { MinimaxProvider } from '../providers/MinimaxProvider';
 import { DeepSeekProvider } from '../providers/DeepSeekProvider';
 import { OllamaProvider } from '../providers/OllamaProvider';
+import { GoogleProvider } from '../providers/GoogleProvider';
+import { AnthropicProvider } from '../providers/AnthropicProvider';
+import { GroqProvider } from '../providers/GroqProvider';
 
 export async function getChatModel(
   providerName: string,
@@ -86,39 +89,11 @@ export async function getChatModel(
       streaming: options?.streaming,
     });
   } else if (provider?.type === ProviderType.GROQ) {
-    llm = new ChatGroq({
-      modelName: model.name,
-      apiKey: provider.api_key,
-      temperature: options?.temperature,
-      maxTokens: options?.maxTokens,
-      streaming: options?.streaming,
-    }) as ChatGroq;
-    llm.client.httpAgent = settingsManager.getHttpAgent();
-    llm.client.baseURL = provider.api_base;
+    llm = new GroqProvider({ provider }).getChatModel(model.name, options);
   } else if (provider?.type === ProviderType.ANTHROPIC) {
-    llm = new ChatAnthropic({
-      temperature: options?.temperature,
-      model: model.name,
-      apiKey: provider.api_key,
-      topK: options?.top_k,
-      topP: options?.top_p,
-      maxTokens: options?.maxTokens,
-      streaming: options?.streaming,
-    });
-    llm.clientOptions.httpAgent = settingsManager.getHttpAgent();
+    llm = new AnthropicProvider({ provider }).getChatModel(model.name, options);
   } else if (provider?.type === ProviderType.GOOGLE) {
-    llm = new ChatGoogleGenerativeAI({
-      temperature: options?.temperature,
-      model: model.name,
-      apiKey: provider.api_key,
-      topK: options?.top_k,
-      topP: options?.top_p,
-      maxOutputTokens: options?.maxTokens,
-      streaming: options?.streaming,
-    });
-
-    // .llm.client.httpAgent =
-    //   settingsManager.getHttpAgent();
+    llm = new GoogleProvider({ provider }).getChatModel(model.name, options);
   } else if (provider?.type === ProviderType.DEEPSEEK) {
     llm = new DeepSeekProvider({ provider }).getChatModel(model.name, options);
   } else if (provider?.type === ProviderType.TOGETHERAI) {

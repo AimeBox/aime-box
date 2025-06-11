@@ -120,10 +120,8 @@ export default function Tools() {
   ] as FormSchema[];
   const [mcpLoading, setMcpLoading] = useState<boolean>(false);
   const onToolSettingSubmit = (values) => {
-    const res = window.electron.tools.update({
-      toolName: currentTool.name,
-      arg: values,
-    });
+    console.log(values);
+    const res = window.electron.tools.update(currentTool.name, values);
     getTools();
 
     toolSettingModalRef.current.openModal(false);
@@ -143,31 +141,32 @@ export default function Tools() {
 
         toolSettinSchemas.push(schema);
       }
-    } else {
-      Object.keys(tool.parameters).forEach((p) => {
-        if (isString(tool.parameters[p])) {
-          toolSettinSchemas.push({
-            label: p,
-            field: p,
-            component: 'Input',
-          });
-        }
-        if (isNumber(tool.parameters[p])) {
-          toolSettinSchemas.push({
-            label: p,
-            field: p,
-            component: 'InputNumber',
-          });
-        }
-        if (isBoolean(tool.parameters[p])) {
-          toolSettinSchemas.push({
-            label: p,
-            field: p,
-            component: 'Switch',
-          });
-        }
-      });
     }
+    //  else {
+    //   Object.keys(tool.parameters).forEach((p) => {
+    //     if (isString(tool.parameters[p])) {
+    //       toolSettinSchemas.push({
+    //         label: p,
+    //         field: p,
+    //         component: 'Input',
+    //       });
+    //     }
+    //     if (isNumber(tool.parameters[p])) {
+    //       toolSettinSchemas.push({
+    //         label: p,
+    //         field: p,
+    //         component: 'InputNumber',
+    //       });
+    //     }
+    //     if (isBoolean(tool.parameters[p])) {
+    //       toolSettinSchemas.push({
+    //         label: p,
+    //         field: p,
+    //         component: 'Switch',
+    //       });
+    //     }
+    //   });
+    // }
 
     setToolSettinSchemas(toolSettinSchemas);
     setTimeout(() => {
@@ -176,8 +175,8 @@ export default function Tools() {
     });
   };
 
-  const invoke = async (value) => {
-    console.log(value);
+  const invoke = async (toolName, value) => {
+    console.log(toolName, value);
 
     // const _value = {};
     // Object.keys(value.value).forEach((key) => {
@@ -193,7 +192,7 @@ export default function Tools() {
       if (currentTool) {
         isInvoking(true);
         const res = await window.electron.tools.invoke(
-          currentTool.name,
+          toolName,
           value,
           'markdown',
         );
@@ -211,8 +210,8 @@ export default function Tools() {
       if (currentMcp) {
         isInvoking(true);
         const res = await window.electron.tools.invoke(
-          `${value.mcpToolName}`,
-          value.value,
+          `${toolName}`,
+          value,
           'markdown',
         );
         console.log(res);
@@ -276,8 +275,12 @@ export default function Tools() {
       }
       const tool = tools.find((x) => x.name == toolsId);
       console.log(tool);
-      setCurrentTool(tool);
-      setToolInvokeSchemas(converFormSchemas(tool));
+      if (!tool.is_toolkit) {
+        setCurrentTool(tool);
+        setToolInvokeSchemas(converFormSchemas(tool));
+      } else {
+        setCurrentTool(tool);
+      }
     } else {
       setCurrentTool(undefined);
       setToolInvokeSchemas(undefined);
@@ -464,7 +467,7 @@ export default function Tools() {
     }
   };
 
-  const renderToolForm = useMemo(() => {
+  const renderMcpToolForm = useMemo(() => {
     return currentMcp?.tools.map((item, index) => {
       return {
         key: item.name,
@@ -482,18 +485,41 @@ export default function Tools() {
             schemas={converFormSchemas(item)}
             layout="vertical"
             onFinish={async (value) => {
-              await invoke({
-                mcpToolName: item.name,
-                value: {
-                  ...value,
-                },
-              });
+              await invoke(item.name, value);
             }}
           />
         ),
       };
     });
   }, [currentMcp?.tools]);
+
+  const renderToolForm = useMemo(() => {
+    if (!currentTool?.is_toolkit) return [];
+    return currentTool?.tools.map((item, index) => {
+      return {
+        key: item.name,
+        label: (
+          <div className="flex flex-col">
+            <strong>{item.name}</strong>
+            <small>{item.description}</small>
+          </div>
+        ),
+
+        children: (
+          <BasicForm
+            loading={invoking}
+            ref={toolTestFormRef[item.name]}
+            schemas={converFormSchemas(item)}
+            layout="vertical"
+            onFinish={async (value) => {
+              await invoke(item.name, value);
+            }}
+          />
+        ),
+      };
+    });
+  }, [currentTool]);
+
   return (
     <Content>
       <FormModal
@@ -644,24 +670,21 @@ export default function Tools() {
                         </div>
                       </div>
                       <div className="flex flex-col p-4">
-                        <BasicForm
-                          loading={invoking}
-                          ref={toolTestFormRef}
-                          schemas={toolInvokeSchemas}
-                          layout="vertical"
-                          onFinish={async (value) => {
-                            invoke(value);
-                          }}
-                        />
-
-                        {/* <Form
-                  schema={toolInvokeSchemas}
-                  validator={validator}
-                  onSubmit={onOk}
-                  className="dark:text-gray-200"
-                  // style={{ color: 'rgb(229 231 235 / var(--tw-text-opacity))' }}
-                /> */}
-                        {/* <Button onClick={invoke}>invoke</Button> */}
+                        {currentTool.is_toolkit == false && (
+                          <BasicForm
+                            loading={invoking}
+                            ref={toolTestFormRef}
+                            schemas={toolInvokeSchemas}
+                            layout="vertical"
+                            onFinish={async (value) => {
+                              invoke(value);
+                            }}
+                          />
+                        )}
+                        {currentTool.is_toolkit &&
+                          currentTool.tools.length > 0 && (
+                            <Collapse items={renderToolForm}></Collapse>
+                          )}
                       </div>
                     </div>
                   )}
@@ -718,7 +741,7 @@ export default function Tools() {
                       </div>
                       <div className="flex flex-col gap-2 p-4">
                         {currentMcp.tools.length > 0 && (
-                          <Collapse items={renderToolForm}></Collapse>
+                          <Collapse items={renderMcpToolForm}></Collapse>
                         )}
                       </div>
                     </div>

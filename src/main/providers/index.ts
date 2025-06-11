@@ -40,6 +40,8 @@ import { OpenrouterProvider } from './OpenrouterProvider';
 import { SiliconflowProvider } from './SiliconflowProvider';
 import { BaseManager } from '../BaseManager';
 import { channel } from '../ipc/IpcController';
+import { GoogleProvider } from './GoogleProvider';
+import { GroqProvider } from './GroqProvider';
 
 export interface ProviderInfo extends Providers {
   credits: {
@@ -57,7 +59,6 @@ export class ProvidersManager extends BaseManager {
   constructor() {
     super();
     this.repository = dbManager.dataSource.getRepository(Providers);
-    
   }
 
   public async init() {
@@ -110,10 +111,10 @@ export class ProvidersManager extends BaseManager {
       list.push({ key: key, value: ProviderType[key], icon: null });
     });
     return list;
-  };
+  }
 
   @channel('providers:getModels')
-  public async getModels (
+  public async getModels(
     id: string,
   ): Promise<{ name: string; enable: boolean }[]> {
     const connection: Providers = (await this.getProviders(false)).find(
@@ -210,36 +211,13 @@ export class ProvidersManager extends BaseManager {
           })
           .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection.type === ProviderType.GROQ) {
-        const groq = new Groq({
-          baseURL: connection.api_base,
-          apiKey: connection.api_key,
-          httpAgent: httpProxy,
-        });
-        const list = await groq.models.list();
-        return list.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models.find((z) => z.name == x.id)?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const groq = new GroqProvider({ provider: connection });
+        const list = await groq.getModelList();
+        return list;
       } else if (connection.type === ProviderType.ANTHROPIC) {
-        const anthropic = new Anthropic({
-          apiKey: connection.api_key,
-          httpAgent: httpProxy,
-        });
-
-        const data = await anthropic.models.list();
-
-        return data.data.map((x) => {
-          return {
-            name: x.id,
-            enable:
-              connection.models?.find((z) => z.name == x.id)?.enable || false,
-          };
-        });
+        const anthropic = new AnthropicProvider({ provider: connection });
+        const list = await anthropic.getModelList();
+        return list;
       } else if (connection.type === ProviderType.ZHIPU) {
         const models = [
           'GLM-4-0520',
@@ -261,23 +239,9 @@ export class ProvidersManager extends BaseManager {
           };
         });
       } else if (connection?.type === ProviderType.GOOGLE) {
-        const options = {
-          method: 'GET',
-          agent: httpProxy,
-        };
-        const url = `${connection.api_base}/v1beta/models?key=${connection.api_key}`;
-        const res = await fetch(url, options);
-        const data = await res.json();
-        return data.models
-          .map((x) => {
-            return {
-              name: x.name.split('/')[1],
-              enable:
-                connection.models?.find((z) => z.name == x.name.split('/')[1])
-                  ?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const google = new GoogleProvider({ provider: connection });
+        const list = await google.getModelList();
+        return list;
       } else if (connection.type === ProviderType.OPENROUTER) {
         const openrouter = new OpenrouterProvider({ provider: connection });
         const list = await openrouter.getModelList();
@@ -315,7 +279,7 @@ export class ProvidersManager extends BaseManager {
     }
 
     return [];
-  };
+  }
 
   public async getProvider(
     provider: Providers | string,
@@ -351,9 +315,7 @@ export class ProvidersManager extends BaseManager {
   }
 
   @channel('providers:getProviders')
-  public async getProviders (
-    refresh: boolean = false,
-  ): Promise<Providers[]>  {
+  public async getProviders(refresh: boolean = false): Promise<Providers[]> {
     if (refresh) this.connectionsStore = undefined;
     if (this.connectionsStore === undefined) {
       const connections: Providers[] = [];
@@ -368,18 +330,15 @@ export class ProvidersManager extends BaseManager {
         const connection = all[i];
         const provider = await this.getProvider(connection);
 
-        try{
+        try {
           if (provider && 'getCredits' in provider) {
-          const credits = await provider.getCredits();
+            const credits = await provider.getCredits();
 
-          if (credits) {
-            connection.credits = credits;
+            if (credits) {
+              connection.credits = credits;
+            }
           }
-        }
-        }catch{
-
-        }
-        
+        } catch {}
 
         //connection.models = provider.;
         connections.push(connection);
@@ -388,19 +347,19 @@ export class ProvidersManager extends BaseManager {
       this.connectionsStore = connections;
     }
     return this.connectionsStore;
-  };
+  }
 
   @channel('providers:delete')
-  public async deleteProviders (id: string) {
+  public async deleteProviders(id: string) {
     const provider = await this.repository.findOneBy({ id });
     if (provider) {
       await this.repository.remove(provider);
       await this.getProviders(true);
     }
-  };
+  }
 
   @channel('providers:createOrUpdate')
-  public async createOrUpdateProvider (input: Providers) {
+  public async createOrUpdateProvider(input: Providers) {
     const name = input.name?.trim().toLowerCase();
     if (name == 'local') {
       throw new Error('"local"无法使用');
@@ -443,7 +402,7 @@ export class ProvidersManager extends BaseManager {
     }
 
     await this.getProviders(true);
-  };
+  }
 
   @channel('providers:getLLMModels')
   public async getLLMModels(): Promise<any[]> {
@@ -455,7 +414,7 @@ export class ProvidersManager extends BaseManager {
         };
       })
       .filter((x) => x.models.length > 0);
-  };
+  }
 
   @channel('providers:getEmbeddingModels')
   public async getEmbeddingModels(): Promise<any[]> {
@@ -591,7 +550,7 @@ export class ProvidersManager extends BaseManager {
       }
     }
     return emb_list;
-  };
+  }
 
   @channel('providers:getRerankerModels')
   public async getRerankerModels(): Promise<any[]> {
@@ -620,10 +579,10 @@ export class ProvidersManager extends BaseManager {
       }
     }
     return emb_list;
-  };
+  }
 
   @channel('providers:getTTSModels')
-  public async getTTSModels (): Promise<any[]> {
+  public async getTTSModels(): Promise<any[]> {
     const connections = await this.getProviders(false);
     const emb_list = [];
     const settings = settingsManager.getSettings();
@@ -650,7 +609,7 @@ export class ProvidersManager extends BaseManager {
       }
     }
     return emb_list;
-  };
+  }
 
   @channel('providers:getSTTModels')
   public async getSTTModels(): Promise<any[]> {
@@ -687,7 +646,7 @@ export class ProvidersManager extends BaseManager {
       }
     }
     return emb_list;
-  };
+  }
 
   @channel('providers:getWebSearchProviders')
   public async getWebSearchProviders(): Promise<any[]> {
@@ -714,7 +673,7 @@ export class ProvidersManager extends BaseManager {
     });
 
     return list;
-  };
+  }
 
   @channel('providers:getImageGenerationProviders')
   async getImageGenerationProviders(): Promise<any[]> {
@@ -734,7 +693,7 @@ export class ProvidersManager extends BaseManager {
     }
 
     return list;
-  };
+  }
 
   // public async getReranker(providerModel?: string | undefined) {
   //   const _providerModel =

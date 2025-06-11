@@ -104,9 +104,14 @@ export const runAgent = async (
     });
     let _toolCalls = [];
     let _toolStart = [];
-    const _messages = [];
+    const _messages = messages || [];
+
+    const pushMessage = (message: BaseMessage) => {
+      if (!_messages.find((x) => x.id == message.id)) _messages.push(message);
+    };
+
     for await (const { event, tags, data } of eventStream) {
-      // console.log(event, tags, data);
+      console.log(event, tags, data);
       if (tags.includes('ignore')) {
         // console.log(event, tags, data);
         continue;
@@ -117,7 +122,7 @@ export const runAgent = async (
           data.input.messages[0][data.input.messages[0].length - 1];
         if (isHumanMessage(_lastMessage)) {
           await options?.callbacks?.handlerMessageCreated?.(_lastMessage);
-          _messages.push(_lastMessage);
+          pushMessage(_lastMessage);
           const aiMessage = new AIMessage({
             id: uuidv4(),
             content: '',
@@ -129,7 +134,7 @@ export const runAgent = async (
           });
           await options?.callbacks?.handlerMessageCreated?.(aiMessage);
           _lastMessage = aiMessage;
-          _messages.push(aiMessage);
+          pushMessage(aiMessage);
         } else {
           const aiMessage = new AIMessage({
             id: uuidv4(),
@@ -142,7 +147,7 @@ export const runAgent = async (
           });
           await options?.callbacks?.handlerMessageCreated?.(aiMessage);
           _lastMessage = aiMessage;
-          _messages.push(aiMessage);
+          pushMessage(aiMessage);
         }
       } else if (event == 'on_chat_model_stream') {
         //console.log('on_chat_model_stream', data);
@@ -182,7 +187,7 @@ export const runAgent = async (
           });
           await options?.callbacks?.handlerMessageCreated?.(toolMessage);
           _lastMessage = toolMessage;
-          _messages.push(toolMessage);
+          pushMessage(toolMessage);
           _toolStart.push(toolMessage);
         }
       } else if (event == 'on_tool_end') {
@@ -244,7 +249,7 @@ export const runAgent = async (
           for (const msg of data.output.messages) {
             if (isToolMessage(msg)) {
               const _msg = _messages.find(
-                (x) => x.tool_call_id == msg.tool_call_id,
+                (x) => x?.tool_call_id == msg.tool_call_id,
               );
               if (_msg && _msg.status === undefined) {
                 const tooStart = _toolStart.find(
@@ -258,6 +263,26 @@ export const runAgent = async (
                 _msg.additional_kwargs['error'] = msg.content;
 
                 await options?.callbacks?.handlerMessageFinished?.(_msg);
+              } else if (
+                !_msg &&
+                _toolCalls.find((x) => x.id == msg.tool_call_id)
+              ) {
+                debugger;
+                const _msg = new ToolMessage({
+                  id: uuidv4(),
+                  content: '',
+                  tool_call_id: msg.tool_call_id,
+                  name: msg.name,
+                  additional_kwargs: {
+                    provider_type: undefined,
+                    model: msg.name,
+                  },
+                });
+                _msg.status = msg.status || ChatStatus.ERROR;
+                _msg.additional_kwargs['error'] = msg.content;
+                await options?.callbacks?.handlerMessageCreated?.(_msg);
+                await options?.callbacks?.handlerMessageFinished?.(_msg);
+                _toolCalls = _toolCalls.filter((x) => x.id != msg.tool_call_id);
               }
             }
           }

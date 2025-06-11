@@ -16,43 +16,40 @@ export class AzureOpenAIProvider extends BaseProvider {
 
   description: string;
 
-  defaultApiBase: string = 'https://<instance-name>.cognitiveservices.azure.com';
+  defaultApiBase: string =
+    'https://<instance-name>.cognitiveservices.azure.com';
 
-  httpProxy: HttpsProxyAgent | undefined
+  httpProxy: HttpsProxyAgent | undefined;
 
   constructor(params?: BaseProviderParams) {
     super(params);
     this.httpProxy = settingsManager.getHttpAgent();
   }
 
-
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const endpoint = this.provider.api_base;
     const apiVersion = this.provider.config?.apiVersion || '2024-10-21';
     const options = {
-          method: 'GET',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization: `Bearer ${this.provider.api_key}`,
-          },
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: `Bearer ${this.provider.api_key}`,
+      },
+    };
+    const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
+    const res = await fetch(url, options);
+    const models = await res.json();
+    return models.data
+      .filter((x) => x.capabilities.chat_completion && x.status == 'succeeded')
+      .map((x) => {
+        return {
+          name: x.id,
+          enable:
+            this.provider.models?.find((z) => z.name == x.id)?.enable || false,
         };
-        const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
-        const res = await fetch(url, options);
-        const models = await res.json();
-        return models.data
-          .filter(
-            (x) => x.capabilities.chat_completion && x.status == 'succeeded',
-          )
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                this.provider.models?.find((z) => z.name == x.id)?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
-         
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async getEmbeddingModels(): Promise<string[]> {
@@ -67,16 +64,14 @@ export class AzureOpenAIProvider extends BaseProvider {
       },
     };
     const url = `${endpoint}/openai/models?api-version=${apiVersion}`;
-  
-      const res = await fetch(url, options);
-      const models = await res.json();
 
-      const emb_models = models.data
-        .filter(
-          (x) => x.capabilities.embeddings && x.status == 'succeeded',
-        )
-        .sort((a, b) => a.id.localeCompare(b.id));
-      return emb_models
+    const res = await fetch(url, options);
+    const models = await res.json();
+
+    const emb_models: string[] = models.data
+      .filter((x) => x.capabilities.embeddings && x.status == 'succeeded')
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((x) => x.id);
+    return [...new Set(emb_models)];
   }
-
 }

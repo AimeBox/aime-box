@@ -7,6 +7,7 @@ import { BaseManager } from '../BaseManager';
 import { v4 as uuidv4 } from 'uuid';
 import { BrowserInstance } from './BrowserInstance';
 import { BaseInstance } from './BaseInstance';
+import { notificationManager } from '../app/NotificationManager';
 
 export interface InstanceInfo extends Instances {
   status: 'running' | 'stop';
@@ -70,7 +71,7 @@ export class InstanceManager extends BaseManager {
   }
 
   @channel('instances:run')
-  public async run(id: string) {
+  public async run(id: string): Promise<BaseInstance | null> {
     const instance = await this.repository.findOneBy({ id: id });
     if (instance.type === 'browser') {
       try {
@@ -82,9 +83,12 @@ export class InstanceManager extends BaseManager {
           this.instanceInfos.set(id, { ...instance, status: 'stop' });
           this.instances.delete(id);
         });
+        return browserInstance;
       } catch (err) {
         console.error(err);
+        notificationManager.sendNotification(err.message, 'error');
       }
+      return null;
     }
   }
 
@@ -94,6 +98,17 @@ export class InstanceManager extends BaseManager {
     if (instance) {
       await instance.stop();
     }
+  }
+
+  public async getInstance(id: string) {
+    let instance = this.instances.get(id);
+    if (!instance) {
+      instance = await this.run(id);
+      if (!instance) {
+        throw new Error('instance start failed');
+      }
+    }
+    return instance;
   }
 }
 

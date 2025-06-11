@@ -8,6 +8,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
+import { isUrl } from '../utils/is';
+import { saveFile } from '../utils/common';
 
 export interface SpeechToTextParameters extends ToolParams {
   ffmpegPath: string;
@@ -32,7 +34,8 @@ export class SpeechToText extends BaseTool {
 
   name: string = 'speech_to_text';
 
-  description: string = '将音频文件转换为文本,支持wav, mp3';
+  description: string =
+    'convert audio or video file to text, support wav, mp3, mp4';
 
   ffmpegPath: string;
 
@@ -268,18 +271,23 @@ export class SpeechToText extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
-    const ext = path.extname(input.fileOrUrl);
+    let filePath = input.fileOrUrl;
+    if (isUrl(input.fileOrUrl)) {
+      filePath = await this.downloadFile(input.fileOrUrl, config);
+    }
+
+    const ext = path.extname(filePath);
     let wave;
     if (ext.toLowerCase() == '.wav') {
-      wave = this.sherpa_onnx.readWave(input.fileOrUrl, false);
+      wave = this.sherpa_onnx.readWave(filePath, false);
       if (wave.sampleRate != 16000) {
         const outpath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
-        await this.convertTo16kHzWav(input.fileOrUrl, outpath);
+        await this.convertTo16kHzWav(filePath, outpath);
         wave = this.sherpa_onnx.readWave(outpath, false);
       }
     } else {
       const outpath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
-      await this.convertTo16kHzWav(input.fileOrUrl, outpath);
+      await this.convertTo16kHzWav(filePath, outpath);
       wave = this.sherpa_onnx.readWave(outpath, false);
     }
 
@@ -356,7 +364,7 @@ export class SpeechToText extends BaseTool {
       console.log(segments);
     }
 
-    return list.join('\n');
+    return list.join('\n') + `\n<file>${filePath}</file>`;
     // if (
     //   this.model == 'whisper-medium@local' ||
     //   this.model == 'whisper-large-v3@local'
@@ -489,6 +497,12 @@ export class SpeechToText extends BaseTool {
     });
   }
 
+  async downloadFile(url: string, config): Promise<string> {
+    const ext = path.extname(url);
+    const saveFilePath = await saveFile(url, uuidv4() + ext, config);
+    return saveFilePath;
+  }
+
   // convertTo16kHzWav(mp4FilePath, outpath): Promise<Buffer> {
   //   return new Promise((resolve, reject) => {
   //     const passThrough = new PassThrough();
@@ -616,4 +630,7 @@ export class SpeechToText extends BaseTool {
 
   //   return audioChunks;
   // }
+}
+function getTempPath(): string {
+  throw new Error('Function not implemented.');
 }

@@ -28,7 +28,7 @@ import {
 import { FormSchema } from '../../types/form';
 import { isArray, isObject, isString, isUrl } from '../utils/is';
 import * as path from 'path';
-import { SocialMediaSearch } from './SocialMediaSearch';
+import { RedNoteToolkit, SocialMediaSearch } from './SocialMediaSearch';
 import { FileToText } from './FileToText';
 import { NodejsVM } from './NodejsVM';
 import { Vectorizer } from './VectorizerAI';
@@ -105,6 +105,7 @@ export interface ToolInfo extends Tools {
   officialLink?: string | undefined;
   configSchema?: FormSchema[] | undefined;
   tags?: string[] | undefined;
+  tools: ToolInfo[];
 }
 
 export interface McpServerInfo extends McpServers {
@@ -129,25 +130,27 @@ export class ToolsManager extends BaseManager {
     try {
       const parent = Object.getPrototypeOf(ClassType);
       if (parent?.name == BaseToolKit.name) {
+        let toolKit: BaseToolKit = Reflect.construct(ClassType, []);
         let toolKitEntity = await this.toolRepository.findOne({
-          where: { name: ClassType.name },
+          where: { name: toolKit.name, is_toolkit: true },
         });
-
         if (!toolKitEntity) {
           toolKitEntity = new Tools(
-            ClassType.name,
-            ClassType.description,
+            toolKit.name,
+            toolKit.description,
             'built-in',
           );
           toolKitEntity.enabled = true;
-          toolKitEntity.toolkit_name = ClassType.name;
-          await this.toolRepository.save(toolKitEntity);
+          toolKitEntity.toolkit_name = toolKit.name;
         }
+        toolKitEntity.is_toolkit = true;
+        await this.toolRepository.save(toolKitEntity);
+
         const toolkitConfig = toolKitEntity.config ?? {};
 
-        const toolKit: BaseToolKit = Reflect.construct(ClassType, [
-          toolkitConfig,
-        ]);
+        toolKit = Reflect.construct(ClassType, [toolkitConfig]);
+
+        const toolKit_tools = [];
 
         for (const tool of toolKit.getTools()) {
           this.builtInToolsClassType.push({
@@ -161,17 +164,18 @@ export class ToolsManager extends BaseManager {
             ts = new Tools(tool.name, tool.description, 'built-in');
             ts.enabled = false;
             ts.toolkit_name = tool.toolKitName || tool.name;
-
+            ts.is_toolkit = false;
             await this.toolRepository.save(ts);
           } else {
             ts.description = tool.description;
+            ts.is_toolkit = false;
             await this.toolRepository.save(ts);
             const vj = ts.config ?? {};
           }
           if (this.tools.find((x) => x.name == ts.name)) {
             this.tools = this.tools.filter((x) => x.name != ts.name);
           }
-          this.tools.push({
+          toolKit_tools.push({
             ...ts,
             id: ts.name,
             //parameters: params,
@@ -182,6 +186,24 @@ export class ToolsManager extends BaseManager {
             configSchema: tool.configSchema,
           } as ToolInfo);
         }
+        let params;
+
+        if (toolKit.configSchema) {
+          params = {};
+          toolKit.configSchema.forEach((item) => {
+            params[item.field] = toolkitConfig[item.field] || item.defaultValue;
+          });
+        }
+        this.tools.push({
+          ...toolKitEntity,
+          id: toolKit.name,
+          parameters: params,
+          status: 'success',
+          toolkit_name: toolKit.name,
+          officialLink: toolKit.officialLink,
+          configSchema: toolKit.configSchema,
+          tools: toolKit_tools,
+        } as ToolInfo);
       } else {
         let ts;
         let tool: BaseTool = Reflect.construct(ClassType, []);
@@ -196,11 +218,13 @@ export class ToolsManager extends BaseManager {
         if (!ts) {
           ts = new Tools(tool.name, tool.description, 'built-in');
           ts.enabled = false;
+          ts.is_toolkit = false;
           ts.toolkit_name = tool.toolKitName || tool.name;
 
           await this.toolRepository.save(ts);
         } else {
           ts.description = tool.description;
+          ts.is_toolkit = false;
           await this.toolRepository.save(ts);
           const vj = ts.config ?? {};
           if (tool.configSchema) {
@@ -351,13 +375,30 @@ export class ToolsManager extends BaseManager {
           },
         );
       } else if (tool.type == 'built-in') {
-        const params = config || tool.config ? [tool.config] : [];
-        const baseTool = Reflect.construct(
-          this.builtInToolsClassType.find((x) => x.name == tool.name).classType,
-          params,
-        ) as BaseTool;
+        const toolkit = this.tools.find(
+          (x) => x.tools?.find((t) => t.id == tool.name) && x.is_toolkit,
+        );
 
-        return baseTool;
+        if (!toolkit) {
+          const params = config || tool.config ? [tool.config] : [];
+          const baseTool = Reflect.construct(
+            this.builtInToolsClassType.find((x) => x.name == tool.name)
+              .classType,
+            params,
+          ) as BaseTool;
+
+          return baseTool;
+        } else {
+          const _tool = toolkit.tools.find((x) => x.id == tool.name);
+          const params = config || toolkit.config ? [toolkit.config] : [];
+          const baseTool = Reflect.construct(
+            this.builtInToolsClassType.find((x) => x.name == tool.name)
+              .classType,
+            params,
+          ) as BaseTool;
+
+          return baseTool;
+        }
       }
     } catch (err) {
       console.error('buildTool error', err);
@@ -558,6 +599,8 @@ export class ToolsManager extends BaseManager {
     await this.registerTool(ReplicateToolkit);
     await this.registerTool(ViduToolKit);
     await this.registerTool(CodeSandbox);
+
+    await this.registerTool(RedNoteToolkit);
   };
 
   @channel('tools:update')
@@ -1040,7 +1083,8 @@ export class ToolsManager extends BaseManager {
         } else {
           const ext = path.extname(fullPath);
           if (['.png', '.jpg', '.jpeg'].includes(ext)) {
-            //fileMap[relPath] = fs.readFileSync(fullPath, 'base64');
+            fileMap[relPath] =
+              `<image x="20" y="20" width="100" height="80" href="file://${relPath}" />`;
           } else {
             fileMap[relPath] = fs.readFileSync(fullPath, 'utf-8');
           }
