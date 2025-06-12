@@ -94,7 +94,9 @@ export default function FileView(props: FileViewProps) {
             <Radio.Button value="code">Code</Radio.Button>
           </Radio.Group>
           {mode == 'preview' && <Markdown value={data} />}
-          {mode == 'code' && <Markdown value={`\`\`\`md\n${data}\n\`\`\``} />}
+          {mode == 'code' && (
+            <pre className="break-all p-2 whitespace-pre-wrap">{data}</pre>
+          )}
         </div>
       )}
       {extension == 'code' && (

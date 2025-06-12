@@ -10,6 +10,9 @@ import { ChatOptions } from '@/entity/Chat';
 import { OpenAI } from 'openai';
 import settingsManager from '../settings';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import fs from 'fs';
+import FormData from 'form-data';
+import fetch from 'node-fetch';
 
 export class SiliconflowProvider extends BaseProvider {
   name: string = ProviderType.SILICONFLOW;
@@ -87,10 +90,48 @@ export class SiliconflowProvider extends BaseProvider {
         Authorization: `Bearer ${this.provider.api_key}`,
       },
     };
+    const url = `${this.provider.api_base || this.defaultApiBase}/models?sub_type=text-to-speech`;
+    const res = await fetch(url, options);
+    const models = await res.json();
+    return models.data?.map((x) => x.id) ?? [];
+  }
+
+  async getSTTModels(): Promise<string[]> {
+    const options = {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        Authorization: `Bearer ${this.provider.api_key}`,
+      },
+    };
     const url = `${this.provider.api_base || this.defaultApiBase}/models?sub_type=speech-to-text`;
     const res = await fetch(url, options);
     const models = await res.json();
     return models.data?.map((x) => x.id) ?? [];
+  }
+
+  async transcriptions(modelName: string, filePath: string): Promise<string> {
+    const form = new FormData();
+    form.append('model', modelName);
+    form.append('file', fs.createReadStream(filePath));
+
+    const options = {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.provider.api_key}`,
+        'Content-Type': 'multipart/form-data',
+      },
+      body: form,
+    };
+
+    const res = await fetch(
+      `${this.provider.api_base || this.defaultApiBase}/audio/transcriptions`,
+      options,
+    );
+    if (!res.ok) throw new Error(`${res.statusText}`);
+    const data = await res.json();
+    return data.text;
   }
 
   async getCredits(): Promise<{

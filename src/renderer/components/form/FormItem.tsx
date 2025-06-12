@@ -22,6 +22,7 @@ import FileSelect from './FileSelect';
 import AgentSelect from '../agents/AgentSelect';
 import ToolSelect from '../tools/ToolSelect';
 import JsonEditor from './JsonEditor';
+import InstanceSelect from './InstanceSelect';
 
 export interface FormItemProps {
   schema: FormSchema;
@@ -137,6 +138,9 @@ const FormModal = forwardRef((props: FormItemProps, ref) => {
         )}
         {props.schema.component === 'JsonEditor' && (
           <JsonEditor {...props.schema.componentProps}></JsonEditor>
+        )}
+        {props.schema.component === 'InstanceSelect' && (
+          <InstanceSelect {...props.schema.componentProps}></InstanceSelect>
         )}
       </Form.Item>
     )

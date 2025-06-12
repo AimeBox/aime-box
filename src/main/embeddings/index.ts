@@ -53,7 +53,8 @@ export async function getEmbeddingModel(
     return emb;
   } else if (
     provider?.type === ProviderType.OPENAI ||
-    provider?.type === ProviderType.SILICONFLOW
+    provider?.type === ProviderType.SILICONFLOW ||
+    provider?.type === ProviderType.AZURE_OPENAI
   ) {
     const emb = new OpenAIEmbeddings({
       model: model,

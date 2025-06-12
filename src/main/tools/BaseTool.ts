@@ -37,6 +37,8 @@ export abstract class BaseToolKit extends LangchainBaseToolkit {
 
   description?: string;
 
+  officialLink?: string;
+
   configSchema?: FormSchema[] = [];
 
   tools: BaseTool[] = [];

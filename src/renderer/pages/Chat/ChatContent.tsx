@@ -653,12 +653,18 @@ export default function ChatContent() {
                               onChange={(e) => {
                                 setChatInputMessage(e.target.value);
                               }}
-                              onPressEnter={(e) => {
-                                if (!e.shiftKey) {
+                              onKeyPress={(e) => {
+                                if (e.key == 'Enter' && !e.shiftKey) {
                                   e.preventDefault();
                                   onChat();
                                 }
                               }}
+                              // onPressEnter={(e) => {
+                              //   if (!e.shiftKey) {
+                              //     e.preventDefault();
+                              //     onChat();
+                              //   }
+                              // }}
                             ></Input.TextArea>
                             {/* <FileDropZone></FileDropZone> */}
                           </div>

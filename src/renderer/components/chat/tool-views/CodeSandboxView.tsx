@@ -39,23 +39,23 @@ export default function CodeSandboxView(props: CodeSandboxViewProps) {
     const getSandboxSetup = async (toolCall) => {
       const path = toolCall?.args?.path;
       const entry = toolCall?.args?.entry;
-
       const sandboxSetup = await window.electron.tools.getCodeSandboxSetup(
         path,
         chatId,
       );
+      console.log(sandboxSetup);
       for (const filePath of Object.keys(sandboxSetup.files)) {
         const ext = filePath.split('.').pop();
-        if (ext == 'png') {
-          const binaryString = atob(sandboxSetup.files[filePath]);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          sandboxSetup.files[filePath] = new Blob([bytes], {
-            type: 'image/png',
-          });
-        }
+        // if (ext == 'png') {
+        //   const binaryString = atob(sandboxSetup.files[filePath]);
+        //   const bytes = new Uint8Array(binaryString.length);
+        //   for (let i = 0; i < binaryString.length; i++) {
+        //     bytes[i] = binaryString.charCodeAt(i);
+        //   }
+        //   sandboxSetup.files[filePath] = new Blob([bytes], {
+        //     type: 'image/png',
+        //   });
+        // }
       }
       setFiles(sandboxSetup.files);
       const client = previewRef.current?.getClient();

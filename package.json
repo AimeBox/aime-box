@@ -295,7 +295,8 @@
       "**/node_modules/sharp/**/*",
       "**/node_modules/@img/**/*",
       "**/node_modules/undici/**/*",
-      "**/node_modules/sherpa-onnx-node/**/*"
+      "**/node_modules/sherpa-onnx-node/**/*",
+      "**/node_modules/playwright/**/*"
     ],
     "files": [
       "dist",

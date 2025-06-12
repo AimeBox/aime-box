@@ -325,10 +325,8 @@ const electronHandler = {
       filter: string | undefined = undefined,
     ): Promise<McpServerInfo[]> =>
       ipcRenderer.invoke('tools:getMcpList', filter),
-    update(input) {
-      const res = ipcRenderer.sendSync('tools:update', input);
-      return res;
-    },
+    update: (toolName, args) =>
+      ipcRenderer.invoke('tools:update', toolName, args),
     invoke: (
       toolName: string,
       args: any,
@@ -390,6 +388,9 @@ const electronHandler = {
     setEnable: (id: string, enable: boolean) =>
       ipcRenderer.invoke('plugins:setEnable', id, enable),
     import: (path: string) => ipcRenderer.invoke('plugins:import', path),
+    create: (data: any) => ipcRenderer.invoke('plugins:create', data),
+    update: (id: string, data: any) =>
+      ipcRenderer.invoke('plugins:update', id, data),
   },
   explores: {
     getList() {

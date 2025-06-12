@@ -47,6 +47,9 @@ export class Tools {
 
   @Column({ nullable: true })
   mcp_id?: string;
+
+  @Column({ default: false })
+  is_toolkit: boolean;
 }
 
 @Entity('mcp_servers')

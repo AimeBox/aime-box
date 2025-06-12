@@ -39,6 +39,7 @@ export const ToolsModal = React.forwardRef(
   (props: ToolsModalProps, ref: ForwardedRef<ToolsModalPropsRef>) => {
     const [loading, setLoading] = useState(false);
     const [tools, setTools] = useState<ToolInfo[]>([]);
+    const [filterTools, setFilterTools] = useState<ToolInfo[]>([]);
     const [searchValue, setSearchValue] = useState<string>('');
     const [toolsInGroup, setToolsInGroup] = useState<
       Record<string, ToolInfo[]>
@@ -54,8 +55,10 @@ export const ToolsModal = React.forwardRef(
     const getTools = async () => {
       setLoading(true);
       try {
+        setSearchValue(undefined);
         const tools = await window.electron.tools.getList();
         setTools(tools);
+        setFilterTools(tools);
       } catch (e) {
         console.error(e);
         message.error(e.message);
@@ -67,26 +70,50 @@ export const ToolsModal = React.forwardRef(
     useEffect(() => {
       let _tools = tools;
       if (searchValue) {
-        _tools = tools.filter(
-          (x) =>
-            x.name
-              .toLocaleLowerCase()
-              .includes(searchValue.toLocaleLowerCase()) ||
-            (x.description &&
-              x.description
+        _tools = tools.filter((x) => {
+          if (!x.is_toolkit) {
+            return (
+              x.name
                 .toLocaleLowerCase()
-                .includes(searchValue.toLocaleLowerCase())),
-        );
+                .includes(searchValue.toLocaleLowerCase()) ||
+              (x.description &&
+                x.description
+                  .toLocaleLowerCase()
+                  .includes(searchValue.toLocaleLowerCase()))
+            );
+          } else {
+            return (
+              x.name
+                .toLocaleLowerCase()
+                .includes(searchValue.toLocaleLowerCase()) ||
+              (x.description &&
+                x.description
+                  .toLocaleLowerCase()
+                  .includes(searchValue.toLocaleLowerCase())) ||
+              x?.tools?.some(
+                (t) =>
+                  t.name
+                    .toLocaleLowerCase()
+                    .includes(searchValue.toLocaleLowerCase()) ||
+                  (t.description &&
+                    t.description.toLocaleLowerCase().includes(searchValue)),
+              )
+            );
+          }
+        });
+        setFilterTools(_tools);
+      } else {
+        setFilterTools(tools);
       }
-      const _toolsInGroup = _tools.reduce((acc, obj) => {
-        const key = obj.toolkit_name;
-        if (!acc[key]) {
-          acc[key] = [];
-        }
-        acc[key].push(obj);
-        return acc;
-      }, {});
-      setToolsInGroup(_toolsInGroup);
+      // const _toolsInGroup = _tools.reduce((acc, obj) => {
+      //   const key = obj.toolkit_name;
+      //   if (!acc[key]) {
+      //     acc[key] = [];
+      //   }
+      //   acc[key].push(obj);
+      //   return acc;
+      // }, {});
+      // setToolsInGroup(_toolsInGroup);
     }, [tools, searchValue]);
 
     const [selectedKey, setSelectedKey] = useState<string>('built-in');
@@ -101,10 +128,27 @@ export const ToolsModal = React.forwardRef(
       } else {
         _selectedTools = [...selectedTools, tool];
       }
+      // debugger;
 
       setSelectedTools(_selectedTools);
       props.onSelect?.(_selectedTools);
       //onChange(_selectedTools);
+    };
+
+    const onSelectAll = (tool: ToolInfo) => {
+      if (!tool.is_toolkit) {
+        return;
+      }
+
+      for (const _tool of tool.tools) {
+        if (selectedTools.map((x) => x.id).includes(_tool.id)) {
+          continue;
+        }
+        selectedTools.push(_tool);
+      }
+
+      setSelectedTools(selectedTools);
+      props.onSelect?.(selectedTools);
     };
 
     return (
@@ -151,12 +195,57 @@ export const ToolsModal = React.forwardRef(
             </div>
             <ScrollArea className="flex-1 pl-2 my-1 w-full">
               <div className="flex flex-col gap-1">
-                {Object.keys(toolsInGroup).map((key) => {
-                  if (toolsInGroup[key].length == 1) {
-                    const tool = toolsInGroup[key][0];
-                    if (tool.type != selectedKey) {
-                      return null;
-                    }
+                {filterTools.map((tool) => {
+                  if (tool.type != selectedKey) {
+                    return null;
+                  }
+                  if (tool.is_toolkit) {
+                    return (
+                      <Card
+                        className="w-full"
+                        key={tool.id}
+                        title={
+                          <div className="flex flex-row justify-between items-center">
+                            {tool.id}
+                            {/* <Button
+                              variant="outlined"
+                              onClick={() => onSelectAll(tool)}
+                            >
+                              select all
+                            </Button> */}
+                          </div>
+                        }
+                        classNames={{ body: '!p-2' }}
+                      >
+                        <div className="flex flex-col gap-1">
+                          {tool.tools?.map((_tool, index) => {
+                            return (
+                              <Button
+                                key={_tool.id}
+                                type="text"
+                                className="flex flex-row justify-between items-center h-16"
+                                onClick={() => {
+                                  onSelect(_tool);
+                                }}
+                              >
+                                <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
+                                  <strong>{_tool.name.split('@')[0]}</strong>
+
+                                  <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
+                                    {_tool.description}
+                                  </small>
+                                </div>
+                                <FaCheck
+                                  color="green"
+                                  className={`${selectedTools.some((x) => x.id === _tool.id) ? 'opacity-100' : 'opacity-0'}`}
+                                />
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </Card>
+                    );
+                  } else {
                     return (
                       <Button
                         key={tool.id}
@@ -177,75 +266,6 @@ export const ToolsModal = React.forwardRef(
                           className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
                         />
                       </Button>
-                    );
-                  } else {
-                    return (
-                      <>
-                        {toolsInGroup[key].filter((x) => x.type == selectedKey)
-                          .length > 0 && (
-                          <Card
-                            className="w-full"
-                            key={key}
-                            title={key.toLocaleUpperCase()}
-                            classNames={{ body: '!p-2' }}
-                          >
-                            <div className="flex flex-col gap-1">
-                              {toolsInGroup[key].map((tool, index) => {
-                                return (
-                                  <Button
-                                    key={tool.id}
-                                    type="text"
-                                    className="flex flex-row justify-between items-center h-16"
-                                    onClick={() => {
-                                      onSelect(tool);
-                                    }}
-                                  >
-                                    <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
-                                      <strong>{tool.name.split('@')[0]}</strong>
-
-                                      <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
-                                        {tool.description}
-                                      </small>
-                                    </div>
-                                    <FaCheck
-                                      color="green"
-                                      className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
-                                    />
-                                  </Button>
-                                );
-                              })}
-                            </div>
-                          </Card>
-                        )}
-
-                        {/* {grouped[key].map((tool) => {
-                          if (tool.type != selectedKey) {
-                            return null;
-                          }
-                          return (
-                            <Button
-                              key={tool.id}
-                              type="text"
-                              className="flex flex-row justify-between items-center h-16"
-                              onClick={() => {
-                                onSelect(tool);
-                              }}
-                            >
-                              <div className="flex overflow-hidden flex-col flex-1 justify-start items-start whitespace-nowrap text-ellipsis">
-                                <strong>{tool.name.split('@')[0]}</strong>
-
-                                <small className="text-left text-gray-500 whitespace-pre-line line-clamp-1">
-                                  {tool.description}
-                                </small>
-                              </div>
-                              <FaCheck
-                                color="green"
-                                className={`${selectedTools.some((x) => x.id === tool.id) ? 'opacity-100' : 'opacity-0'}`}
-                              />
-                            </Button>
-                          );
-                        })} */}
-                      </>
                     );
                   }
                 })}

@@ -1,4 +1,4 @@
-import { Tool, ToolParams } from '@langchain/core/tools';
+import { Tool, ToolParams, ToolRunnableConfig } from '@langchain/core/tools';
 import { z } from 'zod';
 
 import {
@@ -8,6 +8,7 @@ import {
   firefox,
   webkit,
   Response,
+  Page,
 } from 'playwright';
 import settingsManager from '../settings';
 import iconv from 'iconv-lite';
@@ -19,9 +20,13 @@ import * as cheerio from 'cheerio';
 
 import * as vm from 'vm';
 import { getDataPath } from '../utils/path';
-import { BaseTool } from './BaseTool';
+import { BaseTool, BaseToolKit } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import { t } from 'i18next';
+import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
+import { instanceManager } from '../instances';
+import { BrowserInstance } from '../instances/BrowserInstance';
+import { isUrl } from '../utils/is';
 
 // const getUserDataPath = (...paths: string[]): string => {
 //   return path.join(
@@ -36,47 +41,6 @@ export interface SocialMediaSearchParameters extends ToolParams {
   chromeInstancePath: string;
 }
 
-interface XHSNoteItem {
-  id: string;
-  model_type: string;
-  note_card: {
-    corner_tag_info?: {
-      type?: string;
-      text?: string;
-    }[];
-    user: {
-      avatar: string;
-      user_id: string;
-      nickname: string;
-      nick_name: string;
-    };
-    interact_info: {
-      collected_count?: string;
-      comment_count?: string;
-      liked?: boolean;
-      liked_count?: string;
-      shared_count?: string;
-    };
-    cover: {
-      height: number;
-      width: number;
-      url_default: string;
-      url_pre: string;
-    };
-    image_list: Array<{
-      width: number;
-      height: number;
-      info_list: Array<{
-        image_scene: string;
-        url: string;
-      }>;
-    }>;
-    type: string;
-    display_title?: string;
-  };
-  xsec_token: string;
-}
-
 export class SocialMediaSearch extends BaseTool {
   schema = z.object({
     platform: z
@@ -84,8 +48,8 @@ export class SocialMediaSearch extends BaseTool {
       .describe(
         'xhs: 小红书 ,bilibili: 哔哩哔哩,douyin: 抖音, kuaishou: 快搜, tiktok: Tiktok, twitter: 推特',
       ),
-    keyword: z.optional(z.string()),
-    url: z.optional(z.string()).describe('网址连接'),
+    keyword: z.string().optional(),
+    url: z.string().optional().describe('网址连接'),
     //count: z.number().default(10),
   });
 
@@ -212,25 +176,6 @@ export class SocialMediaSearch extends BaseTool {
     // }
   }
 
-  async xhs_note_to_markdown(data: { note: any; comments: any }) {
-    let text = '<note>\n';
-
-    text += `### 标题:${data.note.title}\n`;
-    text += `### 内容\n${data.note.desc}\n`;
-    text += `### 图片\n${data.note.imageList.map((x) => `![](${x.urlDefault})`).join('\n')}\n`;
-    if (data.note.video) {
-      const stream = Object.values(data.note.video.media.stream);
-      const item = stream.find((x: any[]) => x.length > 0);
-      const video_url = item[0].backupUrls[0];
-      text += `### 视频\n[${video_url}](${video_url})\n`;
-    }
-
-    // text += `### 标签\n${data.note.tagList.map((x) => `#${x.name}`).join(' ')}`;
-
-    text += `\n</note>`;
-    return text;
-  }
-
   async xhs_search_item_to_markdown(data: XHSNoteItem[]) {
     let text = '';
 
@@ -243,7 +188,17 @@ export class SocialMediaSearch extends BaseTool {
         ? `### Title:\n${item.note_card.display_title}\n`
         : '';
       text += `### Image\n![](${item.note_card.cover.url_pre})\n`;
-      text += `### Interact: ${item.note_card.interact_info.liked_count} likes, ${item.note_card.interact_info.comment_count} comments,${item.note_card.interact_info.collected_count} collected, ${item.note_card.interact_info.shared_count} shares\n`;
+      text += `### Type: ${item.note_card.type}\n`;
+      text += `### Likes: ${item.note_card.interact_info.liked_count}\n`;
+      if (item.note_card.interact_info.comment_count) {
+        text += `### Comments: ${item.note_card.interact_info.comment_count} comments\n`;
+      }
+      if (item.note_card.interact_info.collected_count) {
+        text += `### Collected: ${item.note_card.interact_info.collected_count} collected\n`;
+      }
+      if (item.note_card.interact_info.shared_count) {
+        text += `### Shared: ${item.note_card.interact_info.shared_count} shared\n`;
+      }
       text += `\n\n---\n`;
     }
 
@@ -273,28 +228,6 @@ export class SocialMediaSearch extends BaseTool {
     await browser_context.close();
     if (need_login) return true;
     return false;
-  }
-
-  async xhs_try_login() {
-    const browser_context = await chromium.launchPersistentContext(
-      this.userDataDir,
-      {
-        channel: 'msedge',
-        headless: false,
-        proxy: this.httpProxy
-          ? {
-              server: `${this.httpProxy}`,
-            }
-          : undefined,
-        args: ['--disable-blink-features=AutomationControlled'],
-      },
-    );
-    const page = await browser_context.newPage();
-    await page.goto('https://www.xiaohongshu.com/explore');
-    await page.waitForResponse(
-      'https://edith.xiaohongshu.com/api/sns/web/v2/user/me',
-    );
-    await browser_context.close();
   }
 
   async xhs_search(
@@ -347,63 +280,6 @@ export class SocialMediaSearch extends BaseTool {
       await browser_context.close();
       return [];
     }
-  }
-
-  async xhs_post_detail(browser_context: BrowserContext, url: string) {
-    const page = await browser_context.newPage();
-    let note = null;
-    let comments = null;
-    page.on('response', async (response: Response) => {
-      //console.log(response.url());
-      const url = new URL(response.url());
-      const status = response.status();
-      // if (url.href.includes('comment/page?')) {
-      //   const data = await response.json();
-      //   console.log(data);
-      // }
-
-      if (url.href.includes('/explore/')) {
-        const data = await response.text();
-
-        const $ = cheerio.load(data);
-
-        $('script').each((index, element) => {
-          const scriptContent = $(element).html();
-          const myVarMatch = scriptContent.match(/window.__INITIAL_STATE__/);
-          if (myVarMatch) {
-            const text = scriptContent.substring(
-              scriptContent.indexOf('=') + 1,
-            );
-            let sandbox = { info: undefined };
-            vm.createContext(sandbox); // 创建隔离的沙箱环境
-            vm.runInContext('var info = ' + text, sandbox);
-            note = sandbox.info.note;
-            note = note.noteDetailMap[note.currentNoteId].note;
-            console.log('note:', note);
-          }
-        });
-        //console.log(data);
-      } else if (url.href.includes('comment/page?')) {
-        const data = await response.json();
-        //console.log(data.data.comments);
-        comments = data.data.comments;
-      }
-    });
-    await page.goto(url);
-    await page.waitForResponse(async (response) => {
-      if (note && comments) {
-        // const data = await response.json();
-        // //console.log(data.data.comments);
-        // comments = data.data.comments;
-        return true;
-      } else {
-        return false;
-      }
-    });
-
-    page.close();
-    console.log(note);
-    return { note, comments };
   }
 
   async bilibili(browser_context: BrowserContext, keyword: string) {

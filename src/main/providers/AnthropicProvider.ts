@@ -5,10 +5,10 @@ import { ChatOptions } from '@/entity/Chat';
 import { getEnvironmentVariable } from '@langchain/core/utils/env';
 import Anthropic from '@anthropic-ai/sdk';
 import { ChatAnthropic } from '@langchain/anthropic';
+import settingsManager from '../settings';
 
 export class AnthropicProvider extends BaseProvider {
-  
-  name: string = ProviderType.DEEPSEEK;
+  name: string = ProviderType.ANTHROPIC;
 
   description: string;
 
@@ -29,23 +29,28 @@ export class AnthropicProvider extends BaseProvider {
       maxTokens: options?.maxTokens,
       streaming: options?.streaming,
     });
+    llm.clientOptions.httpAgent = settingsManager.getHttpAgent();
+    llm.clientOptions.baseURL = this.provider.api_base || this.defaultApiBase;
     return llm;
   }
 
-  async getModelList(): Promise<{ name: string; enable: boolean; }[]> {
+  async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const anthropic = new Anthropic({
       apiKey: this.provider.api_key,
-      // httpAgent: httpProxy,
+      httpAgent: settingsManager.getHttpAgent(),
+      baseURL: this.provider.api_base || this.defaultApiBase,
     });
 
     const data = await anthropic.models.list();
 
-    return data.data.map((x) => {
-      return {
-        name: x.id,
-        enable:
-          this.provider.models?.find((z) => z.name == x.id)?.enable || false,
-      };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+    return data.data
+      .map((x) => {
+        return {
+          name: x.id,
+          enable:
+            this.provider.models?.find((z) => z.name == x.id)?.enable || false,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 }

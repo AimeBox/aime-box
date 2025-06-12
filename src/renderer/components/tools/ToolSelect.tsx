@@ -21,18 +21,18 @@ const ToolSelect = React.forwardRef(
       list.push(...builtInTools);
       const mcpTools = tools.filter((x) => x.type == 'mcp');
 
-      const toolkitNames = [
-        ...new Set(mcpTools.map((tool) => tool.toolkit_name)),
-      ];
-      toolkitNames.forEach((toolkitName) => {
-        const mcpToolsByToolkit = mcpTools.filter(
-          (x) => x.toolkit_name == toolkitName,
-        );
-        list.push({
-          name: toolkitName,
-          tools: mcpToolsByToolkit,
-        });
-      });
+      // const toolkitNames = [
+      //   ...new Set(mcpTools.map((tool) => tool.toolkit_name)),
+      // ];
+      // toolkitNames.forEach((toolkitName) => {
+      //   const mcpToolsByToolkit = mcpTools.filter(
+      //     (x) => x.toolkit_name == toolkitName,
+      //   );
+      //   list.push({
+      //     name: toolkitName,
+      //     tools: mcpToolsByToolkit,
+      //   });
+      // });
       console.log(list);
       setTools(list);
     };

@@ -7,6 +7,7 @@ import { BaseManager } from '../BaseManager';
 import { v4 as uuidv4 } from 'uuid';
 import { BrowserInstance } from './BrowserInstance';
 import { BaseInstance } from './BaseInstance';
+import { notificationManager } from '../app/NotificationManager';
 
 export interface InstanceInfo extends Instances {
   status: 'running' | 'stop';
@@ -70,7 +71,7 @@ export class InstanceManager extends BaseManager {
   }
 
   @channel('instances:run')
-  public async run(id: string) {
+  public async run(id: string): Promise<void> {
     const instance = await this.repository.findOneBy({ id: id });
     if (instance.type === 'browser') {
       try {
@@ -84,6 +85,7 @@ export class InstanceManager extends BaseManager {
         });
       } catch (err) {
         console.error(err);
+        notificationManager.sendNotification(err.message, 'error');
       }
     }
   }
@@ -91,9 +93,19 @@ export class InstanceManager extends BaseManager {
   @channel('instances:stop')
   public async stop(id: string) {
     const instance = this.instances.get(id);
-    if (instance) {
-      await instance.stop();
+    await instance?.stop();
+  }
+
+  public async getInstance(id: string) {
+    let instance = this.instances.get(id);
+    if (!instance) {
+      await this.run(id);
+      instance = this.instances.get(id);
+      if (!instance) {
+        throw new Error('instance start failed');
+      }
     }
+    return instance;
   }
 }
 

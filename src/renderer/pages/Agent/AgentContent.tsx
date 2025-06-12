@@ -278,18 +278,18 @@ export default function ChatContent() {
                           remoteAgentModalRef.current.openModal(true);
                         },
                       },
-                      {
-                        label: 'Add Coze Agent',
-                        key: 'coze',
-                      },
-                      {
-                        label: 'Add Dify Agent',
-                        key: 'dify',
-                      },
-                      {
-                        label: 'Import',
-                        key: 'import',
-                      },
+                      // {
+                      //   label: 'Add Coze Agent',
+                      //   key: 'coze',
+                      // },
+                      // {
+                      //   label: 'Add Dify Agent',
+                      //   key: 'dify',
+                      // },
+                      // {
+                      //   label: 'Import',
+                      //   key: 'import',
+                      // },
                     ],
                   }}
                   onClick={() => onCreate()}

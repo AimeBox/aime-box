@@ -31,9 +31,13 @@ export const jsonSchemaToZod = (schema: any) => {
     } else {
       validator = schema.type === 'integer' ? z.number().int() : z.number();
       if (schema.minimum !== undefined)
-        validator = validator.gte(schema.minimum);
+        validator = validator.min(schema.minimum, {
+          message: `minimum must be greater than or equal to ${schema.minimum}`,
+        });
       if (schema.maximum !== undefined)
-        validator = validator.lte(schema.maximum);
+        validator = validator.max(schema.maximum, {
+          message: `maximum must be less than or equal to ${schema.maximum}`,
+        });
     }
 
     if (schema.description) validator = validator.describe(schema.description);

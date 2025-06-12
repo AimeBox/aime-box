@@ -38,6 +38,10 @@ import { OpenAIProvider } from './OpenAIProvider';
 import { AzureOpenAIProvider } from './AzureOpenAIProvider';
 import { OpenrouterProvider } from './OpenrouterProvider';
 import { SiliconflowProvider } from './SiliconflowProvider';
+import { BaseManager } from '../BaseManager';
+import { channel } from '../ipc/IpcController';
+import { GoogleProvider } from './GoogleProvider';
+import { GroqProvider } from './GroqProvider';
 
 export interface ProviderInfo extends Providers {
   credits: {
@@ -47,64 +51,72 @@ export interface ProviderInfo extends Providers {
   };
 }
 
-export class ProvidersManager {
+export class ProvidersManager extends BaseManager {
   repository: Repository<Providers>;
 
   connectionsStore: Providers[] | undefined;
 
   constructor() {
+    super();
     this.repository = dbManager.dataSource.getRepository(Providers);
+  }
+
+  public async init() {
     if (!ipcMain) return;
-    ipcMain.handle(
-      'providers:getProviders',
-      (event, refresh: boolean = false) => this.getProviders(refresh),
-    );
-    ipcMain.handle('providers:delete', (event, id: string) =>
-      this.deleteProviders(id),
-    );
-    ipcMain.handle('providers:createOrUpdate', (event, input: Providers) =>
-      this.createOrUpdateProvider(input),
-    );
-    ipcMain.handle('providers:getProviderType', (event) =>
-      this.getProviderType(),
-    );
-    ipcMain.handle('providers:getModels', (event, id: string) =>
-      this.getModels(id),
-    );
+    // ipcMain.handle(
+    //   'providers:getProviders',
+    //   (event, refresh: boolean = false) => this.getProviders(refresh),
+    // );
+    // ipcMain.handle('providers:delete', (event, id: string) =>
+    //   this.deleteProviders(id),
+    // );
+    // ipcMain.handle('providers:createOrUpdate', (event, input: Providers) =>
+    //   this.createOrUpdateProvider(input),
+    // );
+    // ipcMain.handle('providers:getProviderType', (event) =>
+    //   this.getProviderType(),
+    // );
+    // ipcMain.handle('providers:getModels', (event, id: string) =>
+    //   this.getModels(id),
+    // );
 
-    ipcMain.handle('providers:getLLMModels', (event) => this.getLLMModels());
+    //ipcMain.handle('providers:getLLMModels', (event) => this.getLLMModels());
 
-    ipcMain.handle('providers:getEmbeddingModels', (event) =>
-      this.getEmbeddingModels(),
-    );
-    ipcMain.handle('providers:getRerankerModels', (event) =>
-      this.getRerankerModels(),
-    );
-    ipcMain.handle('providers:getTTSModels', (event) => this.getTTSModels());
-    ipcMain.handle('providers:getSTTModels', (event) => this.getSTTModels());
-    ipcMain.handle('providers:getWebSearchProviders', (event) =>
-      this.getWebSearchProviders(),
-    );
-    ipcMain.handle('providers:getImageGenerationProviders', (event) =>
-      this.getImageGenerationProviders(),
-    );
+    // ipcMain.handle('providers:getEmbeddingModels', (event) =>
+    //   this.getEmbeddingModels(),
+    // );
+    // ipcMain.handle('providers:getRerankerModels', (event) =>
+    //   this.getRerankerModels(),
+    // );
+    // ipcMain.handle('providers:getTTSModels', (event) => this.getTTSModels());
+    // ipcMain.handle('providers:getSTTModels', (event) => this.getSTTModels());
+    // ipcMain.handle('providers:getWebSearchProviders', (event) =>
+    //   this.getWebSearchProviders(),
+    // );
+    // ipcMain.handle('providers:getImageGenerationProviders', (event) =>
+    //   this.getImageGenerationProviders(),
+    // );
+    this.getProviders();
     ipcMain.handle(
       'providers:getDefaultLLM',
       (event) => settingsManager.getSettings()?.defaultLLM,
     );
+    this.registerIpcChannels();
   }
 
-  public getProviderType = () => {
+  @channel('providers:getProviderType')
+  public async getProviderType() {
     const list = [];
     Object.keys(ProviderType).forEach((key) => {
       list.push({ key: key, value: ProviderType[key], icon: null });
     });
     return list;
-  };
+  }
 
-  public getModels = async (
+  @channel('providers:getModels')
+  public async getModels(
     id: string,
-  ): Promise<{ name: string; enable: boolean }[]> => {
+  ): Promise<{ name: string; enable: boolean }[]> {
     const connection: Providers = (await this.getProviders(false)).find(
       (x) => x.id == id,
     );
@@ -199,36 +211,13 @@ export class ProvidersManager {
           })
           .sort((a, b) => a.name.localeCompare(b.name));
       } else if (connection.type === ProviderType.GROQ) {
-        const groq = new Groq({
-          baseURL: connection.api_base,
-          apiKey: connection.api_key,
-          httpAgent: httpProxy,
-        });
-        const list = await groq.models.list();
-        return list.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models.find((z) => z.name == x.id)?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const groq = new GroqProvider({ provider: connection });
+        const list = await groq.getModelList();
+        return list;
       } else if (connection.type === ProviderType.ANTHROPIC) {
-        const anthropic = new Anthropic({
-          apiKey: connection.api_key,
-          httpAgent: httpProxy,
-        });
-
-        const data = await anthropic.models.list();
-
-        return data.data.map((x) => {
-          return {
-            name: x.id,
-            enable:
-              connection.models?.find((z) => z.name == x.id)?.enable || false,
-          };
-        });
+        const anthropic = new AnthropicProvider({ provider: connection });
+        const list = await anthropic.getModelList();
+        return list;
       } else if (connection.type === ProviderType.ZHIPU) {
         const models = [
           'GLM-4-0520',
@@ -250,23 +239,9 @@ export class ProvidersManager {
           };
         });
       } else if (connection?.type === ProviderType.GOOGLE) {
-        const options = {
-          method: 'GET',
-          agent: httpProxy,
-        };
-        const url = `${connection.api_base}/v1beta/models?key=${connection.api_key}`;
-        const res = await fetch(url, options);
-        const data = await res.json();
-        return data.models
-          .map((x) => {
-            return {
-              name: x.name.split('/')[1],
-              enable:
-                connection.models?.find((z) => z.name == x.name.split('/')[1])
-                  ?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const google = new GoogleProvider({ provider: connection });
+        const list = await google.getModelList();
+        return list;
       } else if (connection.type === ProviderType.OPENROUTER) {
         const openrouter = new OpenrouterProvider({ provider: connection });
         const list = await openrouter.getModelList();
@@ -304,14 +279,17 @@ export class ProvidersManager {
     }
 
     return [];
-  };
+  }
 
   public async getProvider(
     provider: Providers | string,
   ): Promise<BaseProvider> {
     let providerObj: Providers;
     if (isString(provider)) {
-      providerObj = await this.repository.findOneBy({ id: provider });
+      providerObj = await this.repository.findOneBy([
+        { id: provider },
+        { name: provider },
+      ]);
     } else {
       providerObj = provider;
     }
@@ -339,9 +317,8 @@ export class ProvidersManager {
     }
   }
 
-  public getProviders = async (
-    refresh: boolean = false,
-  ): Promise<Providers[]> => {
+  @channel('providers:getProviders')
+  public async getProviders(refresh: boolean = false): Promise<Providers[]> {
     if (refresh) this.connectionsStore = undefined;
     if (this.connectionsStore === undefined) {
       const connections: Providers[] = [];
@@ -356,13 +333,15 @@ export class ProvidersManager {
         const connection = all[i];
         const provider = await this.getProvider(connection);
 
-        if (provider && 'getCredits' in provider) {
-          const credits = await provider.getCredits();
+        try {
+          if (provider && 'getCredits' in provider) {
+            const credits = await provider.getCredits();
 
-          if (credits) {
-            connection.credits = credits;
+            if (credits) {
+              connection.credits = credits;
+            }
           }
-        }
+        } catch {}
 
         //connection.models = provider.;
         connections.push(connection);
@@ -371,17 +350,19 @@ export class ProvidersManager {
       this.connectionsStore = connections;
     }
     return this.connectionsStore;
-  };
+  }
 
-  public deleteProviders = async (id: string) => {
+  @channel('providers:delete')
+  public async deleteProviders(id: string) {
     const provider = await this.repository.findOneBy({ id });
     if (provider) {
       await this.repository.remove(provider);
       await this.getProviders(true);
     }
-  };
+  }
 
-  public createOrUpdateProvider = async (input: Providers) => {
+  @channel('providers:createOrUpdate')
+  public async createOrUpdateProvider(input: Providers) {
     const name = input.name?.trim().toLowerCase();
     if (name == 'local') {
       throw new Error('"local"无法使用');
@@ -424,9 +405,10 @@ export class ProvidersManager {
     }
 
     await this.getProviders(true);
-  };
+  }
 
-  public getLLMModels = async (): Promise<any[]> => {
+  @channel('providers:getLLMModels')
+  public async getLLMModels(): Promise<any[]> {
     return this.connectionsStore
       .map((x) => {
         return {
@@ -435,9 +417,10 @@ export class ProvidersManager {
         };
       })
       .filter((x) => x.models.length > 0);
-  };
+  }
 
-  public getEmbeddingModels = async (): Promise<any[]> => {
+  @channel('providers:getEmbeddingModels')
+  public async getEmbeddingModels(): Promise<any[]> {
     const connections = await this.getProviders(false);
     const emb_list = [];
     const settings = settingsManager.getSettings();
@@ -570,9 +553,10 @@ export class ProvidersManager {
       }
     }
     return emb_list;
-  };
+  }
 
-  public getRerankerModels = async (): Promise<any[]> => {
+  @channel('providers:getRerankerModels')
+  public async getRerankerModels(): Promise<any[]> {
     const connections = await this.getProviders(false);
     const emb_list = [];
     const settings = settingsManager.getSettings();
@@ -598,9 +582,10 @@ export class ProvidersManager {
       }
     }
     return emb_list;
-  };
+  }
 
-  public getTTSModels = async (): Promise<any[]> => {
+  @channel('providers:getTTSModels')
+  public async getTTSModels(): Promise<any[]> {
     const connections = await this.getProviders(false);
     const emb_list = [];
     const settings = settingsManager.getSettings();
@@ -627,9 +612,10 @@ export class ProvidersManager {
       }
     }
     return emb_list;
-  };
+  }
 
-  public getSTTModels = async (): Promise<any[]> => {
+  @channel('providers:getSTTModels')
+  public async getSTTModels(): Promise<any[]> {
     const connections = await this.getProviders(false);
     const emb_list = [];
     const settings = settingsManager.getSettings();
@@ -650,22 +636,22 @@ export class ProvidersManager {
     });
 
     for (let index = 0; index < connections.length; index++) {
-      const connection = connections[index];
-      try {
-        if (connection.type == ProviderType.OPENAI) {
+      const provider = await this.getProvider(connections[index]);
+      if (provider) {
+        const models = await provider.getSTTModels();
+        if (models && models.length > 0) {
           emb_list.push({
-            name: connection.name,
-            models: ['whisper-1'],
+            name: connections[index].name,
+            models: models,
           });
         }
-      } catch {
-        continue;
       }
     }
     return emb_list;
-  };
+  }
 
-  public getWebSearchProviders = async (): Promise<any[]> => {
+  @channel('providers:getWebSearchProviders')
+  public async getWebSearchProviders(): Promise<any[]> {
     const list = [];
     list.push({
       name: 'searxng',
@@ -689,9 +675,10 @@ export class ProvidersManager {
     });
 
     return list;
-  };
+  }
 
-  getImageGenerationProviders = async (): Promise<any[]> => {
+  @channel('providers:getImageGenerationProviders')
+  async getImageGenerationProviders(): Promise<any[]> {
     const list = [];
     const providers = await this.getProviders(false);
     for (const provider of providers) {
@@ -708,7 +695,7 @@ export class ProvidersManager {
     }
 
     return list;
-  };
+  }
 
   // public async getReranker(providerModel?: string | undefined) {
   //   const _providerModel =

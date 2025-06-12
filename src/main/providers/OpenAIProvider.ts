@@ -10,6 +10,7 @@ import { ChatOptions } from '@/entity/Chat';
 import { OpenAI } from 'openai';
 import settingsManager from '../settings';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import fs from 'fs';
 
 export class OpenAIProvider extends BaseProvider {
   name: string = ProviderType.OPENAI;
@@ -17,13 +18,13 @@ export class OpenAIProvider extends BaseProvider {
   description: string;
 
   defaultApiBase: string = 'https://api.openai.com/v1';
-  httpProxy: HttpsProxyAgent | undefined
+
+  httpProxy: HttpsProxyAgent | undefined;
 
   constructor(params?: BaseProviderParams) {
     super(params);
     this.httpProxy = settingsManager.getHttpAgent();
   }
-
 
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const openai = new OpenAI({
@@ -52,8 +53,34 @@ export class OpenAIProvider extends BaseProvider {
 
     const list = await openai.models.list();
     return list.data
-        .filter((x) => x.id.startsWith('text-'))
-        .map((x) => x.id)
-        .sort()
+      .filter((x) => x.id.startsWith('text-'))
+      .map((x) => x.id)
+      .sort();
+  }
+
+  async transcriptions(modelName: string, filePath: string): Promise<string> {
+    const openai = new OpenAI({
+      baseURL: this.provider.api_base,
+      apiKey: this.provider.api_key,
+      httpAgent: this.httpProxy,
+    });
+    const res = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(filePath),
+      model: modelName,
+    });
+    return res.text;
+  }
+
+  async getSTTModels(): Promise<string[]> {
+    const openai = new OpenAI({
+      baseURL: this.provider.api_base,
+      apiKey: this.provider.api_key,
+      httpAgent: this.httpProxy,
+    });
+    const models = (await openai.models.list()).data;
+    return models
+      .filter((x) => x.id.startsWith('whisper-') || x.id.includes('transcribe'))
+      .map((x) => x.id)
+      .sort();
   }
 }

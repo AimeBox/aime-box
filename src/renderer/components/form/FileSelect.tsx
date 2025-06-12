@@ -17,12 +17,13 @@ interface FileSelectProps {
   onChange?: (value: string[]) => void;
   mode?: 'file' | 'folder';
   accept?: string;
+  maxCount?: number;
 }
 
 interface FileSelectRef {}
 const FileSelect = React.forwardRef(
   (props: FileSelectProps, ref: ForwardedRef<FileSelectRef>) => {
-    const { value, onChange, mode = 'file', accept } = props;
+    const { value, onChange, mode = 'file', accept, maxCount } = props;
 
     const [fileList, setFileList] = useState<UploadFile[]>([]);
 
@@ -48,22 +49,24 @@ const FileSelect = React.forwardRef(
       );
     };
     return (
-      <>
-        <Upload
-          name="avatar"
-          listType="picture-card"
-          className="avatar-uploader"
-          showUploadList
-          openFileDialogOnClick={false}
-          fileList={fileList}
-          accept={accept}
-          onRemove={(file) => {
-            const _fileList = fileList.filter((x) => x.uid !== file.uid);
-            setFileList(_fileList);
-            onChange?.(_fileList.map((x) => x.uid));
-          }}
-          iconRender={iconRender}
-        >
+      <Upload
+        name="avatar"
+        listType="picture-card"
+        className="avatar-uploader"
+        showUploadList
+        openFileDialogOnClick={false}
+        fileList={fileList}
+        accept={accept}
+        maxCount={maxCount}
+        onRemove={(file) => {
+          const _fileList = fileList.filter((x) => x.uid !== file.uid);
+          setFileList(_fileList);
+          onChange?.(_fileList.map((x) => x.uid));
+        }}
+        iconRender={iconRender}
+      >
+        {(maxCount === undefined ||
+          (maxCount !== undefined && fileList.length < maxCount)) && (
           <button
             style={{ border: 0, background: 'none' }}
             type="button"
@@ -108,8 +111,8 @@ const FileSelect = React.forwardRef(
               {mode == 'file' ? t('selectFile') : t('selectFolder')}
             </div>
           </button>
-        </Upload>
-      </>
+        )}
+      </Upload>
     );
   },
 );
