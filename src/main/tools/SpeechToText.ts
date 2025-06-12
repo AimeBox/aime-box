@@ -10,6 +10,8 @@ import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import { isUrl } from '../utils/is';
 import { saveFile } from '../utils/common';
+import providersManager from '../providers';
+import { getProviderModel } from '../utils/providerUtil';
 
 export interface SpeechToTextParameters extends ToolParams {
   ffmpegPath: string;
@@ -278,18 +280,33 @@ export class SpeechToText extends BaseTool {
 
     const ext = path.extname(filePath);
     let wave;
+    let outpath = filePath;
     if (ext.toLowerCase() == '.wav') {
       wave = this.sherpa_onnx.readWave(filePath, false);
       if (wave.sampleRate != 16000) {
-        const outpath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
+        outpath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
         await this.convertTo16kHzWav(filePath, outpath);
-        wave = this.sherpa_onnx.readWave(outpath, false);
       }
     } else {
-      const outpath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
+      outpath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
       await this.convertTo16kHzWav(filePath, outpath);
-      wave = this.sherpa_onnx.readWave(outpath, false);
     }
+
+    if (!this.model.includes('@local')) {
+      const { modelName, provider: providerName } = getProviderModel(
+        this.model,
+      );
+      const provider = await providersManager.getProvider(providerName);
+      if (!provider) {
+        throw new Error(`provider ${this.model} not found`);
+      }
+      if ('transcriptions' in provider) {
+        const text = await provider.transcriptions(modelName, outpath);
+        return text;
+      }
+    }
+
+    wave = this.sherpa_onnx.readWave(outpath, false);
 
     const recognizer = this.createRecognizer(input.language);
     const vad = this.createVad(wave.sampleRate);

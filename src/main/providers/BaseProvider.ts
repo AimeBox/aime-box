@@ -62,6 +62,10 @@ export abstract class BaseProvider {
     return [];
   }
 
+  async getSTTModels(): Promise<string[]> {
+    return undefined;
+  }
+
   async getCredits(): Promise<{
     totalCredits: number;
     usedCredits: number;

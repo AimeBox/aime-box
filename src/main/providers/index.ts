@@ -286,7 +286,10 @@ export class ProvidersManager extends BaseManager {
   ): Promise<BaseProvider> {
     let providerObj: Providers;
     if (isString(provider)) {
-      providerObj = await this.repository.findOneBy({ id: provider });
+      providerObj = await this.repository.findOneBy([
+        { id: provider },
+        { name: provider },
+      ]);
     } else {
       providerObj = provider;
     }
@@ -633,16 +636,15 @@ export class ProvidersManager extends BaseManager {
     });
 
     for (let index = 0; index < connections.length; index++) {
-      const connection = connections[index];
-      try {
-        if (connection.type == ProviderType.OPENAI) {
+      const provider = await this.getProvider(connections[index]);
+      if (provider) {
+        const models = await provider.getSTTModels();
+        if (models && models.length > 0) {
           emb_list.push({
-            name: connection.name,
-            models: ['whisper-1'],
+            name: connections[index].name,
+            models: models,
           });
         }
-      } catch {
-        continue;
       }
     }
     return emb_list;

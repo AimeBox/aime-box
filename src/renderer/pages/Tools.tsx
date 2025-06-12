@@ -683,7 +683,7 @@ export default function Tools() {
                             schemas={toolInvokeSchemas}
                             layout="vertical"
                             onFinish={async (value) => {
-                              invoke(value);
+                              invoke(currentTool.name, value);
                             }}
                           />
                         )}
