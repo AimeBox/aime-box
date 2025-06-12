@@ -21,6 +21,7 @@ import {
   FaSpinner,
   FaToggleOff,
   FaToggleOn,
+  FaToolbox,
   FaTrash,
 } from 'react-icons/fa';
 import { McpServerInfo, ToolInfo } from '../../main/tools';
@@ -593,7 +594,12 @@ export default function Tools() {
                   <ListItem
                     active={currentTool?.name == item.name}
                     key={item.name}
-                    title={item.name}
+                    title={
+                      <div className="flex flex-row gap-1 items-center">
+                        {item.is_toolkit ? <FaToolbox /> : null}
+                        {item.name}
+                      </div>
+                    }
                     subTitle={<small>{item.description}</small>}
                     href={`/tools?id=${item.name}`}
                     // onClick={() => {

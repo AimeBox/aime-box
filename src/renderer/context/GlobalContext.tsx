@@ -125,7 +125,20 @@ export function GlobalContextProvider({
         open: async (selectToolNames: string[]) => {
           setIsToolModalOpen(true);
           const tools = await window.electron.tools.getList();
-          setSelectedTools(tools.filter((t) => selectToolNames.includes(t.id)));
+          const selected_tools = tools
+            .filter((t) => !t.is_toolkit)
+            .filter((x) => selectToolNames.includes(x.id));
+
+          for (const toolkit of tools.filter((x) => x.is_toolkit)) {
+            const selected_tools_toolkit = toolkit.tools.filter((x) =>
+              selectToolNames.includes(x.id),
+            );
+            if (selected_tools_toolkit.length > 0) {
+              selected_tools.push(...selected_tools_toolkit);
+            }
+          }
+
+          setSelectedTools(selected_tools);
         },
         close: () => {
           setIsToolModalOpen(false);

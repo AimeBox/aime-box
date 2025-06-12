@@ -28,7 +28,7 @@ import {
 import { FormSchema } from '../../types/form';
 import { isArray, isObject, isString, isUrl } from '../utils/is';
 import * as path from 'path';
-import { RedNoteToolkit, SocialMediaSearch } from './SocialMediaSearch';
+import { SocialMediaSearch } from './SocialMediaSearch';
 import { FileToText } from './FileToText';
 import { NodejsVM } from './NodejsVM';
 import { Vectorizer } from './VectorizerAI';
@@ -96,6 +96,7 @@ import { getDataPath } from '../utils/path';
 import { BaseManager } from '../BaseManager';
 import { channel } from '../ipc/IpcController';
 import { ErrorTest } from './ErrorTest';
+import { RedNoteToolkit } from './RedNoteToolkit';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -1084,7 +1085,10 @@ export class ToolsManager extends BaseManager {
           const ext = path.extname(fullPath);
           if (['.png', '.jpg', '.jpeg'].includes(ext)) {
             fileMap[relPath] =
-              `<image x="20" y="20" width="100" height="80" href="file://${relPath}" />`;
+              `<svg width="500" height="500" xmlns="http://www.w3.org/2000/svg">
+  <image href="file://${fullPath}" x="0" y="0" height="200" width="200"/>
+</svg>
+`;
           } else {
             fileMap[relPath] = fs.readFileSync(fullPath, 'utf-8');
           }

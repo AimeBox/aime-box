@@ -71,7 +71,7 @@ export class InstanceManager extends BaseManager {
   }
 
   @channel('instances:run')
-  public async run(id: string): Promise<BaseInstance | null> {
+  public async run(id: string): Promise<void> {
     const instance = await this.repository.findOneBy({ id: id });
     if (instance.type === 'browser') {
       try {
@@ -83,27 +83,24 @@ export class InstanceManager extends BaseManager {
           this.instanceInfos.set(id, { ...instance, status: 'stop' });
           this.instances.delete(id);
         });
-        return browserInstance;
       } catch (err) {
         console.error(err);
         notificationManager.sendNotification(err.message, 'error');
       }
-      return null;
     }
   }
 
   @channel('instances:stop')
   public async stop(id: string) {
     const instance = this.instances.get(id);
-    if (instance) {
-      await instance.stop();
-    }
+    await instance?.stop();
   }
 
   public async getInstance(id: string) {
     let instance = this.instances.get(id);
     if (!instance) {
-      instance = await this.run(id);
+      await this.run(id);
+      instance = this.instances.get(id);
       if (!instance) {
         throw new Error('instance start failed');
       }
