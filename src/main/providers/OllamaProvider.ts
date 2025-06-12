@@ -15,7 +15,6 @@ export class OllamaProvider extends BaseProvider {
 
   defaultApiBase: string = 'http://localhost:11434';
 
-
   constructor(params?: BaseProviderParams) {
     super(params);
   }
@@ -33,6 +32,13 @@ export class OllamaProvider extends BaseProvider {
     return llm;
   }
 
+  getEmbeddings(modelName: string): Embeddings {
+    const emb = new OllamaEmbeddings({
+      baseUrl: provider.api_base, // Default value
+      model: model,
+    });
+    return emb;
+  }
 
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const ollama = new Ollama({

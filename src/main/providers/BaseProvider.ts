@@ -37,6 +37,18 @@ export abstract class BaseProvider {
     return llm;
   }
 
+  getEmbeddings(modelName: string): Embeddings {
+    const model = new OpenAIEmbeddings({
+      model: modelName,
+      apiKey: this.provider.api_key,
+      configuration: {
+        baseURL: this.provider.api_base,
+        httpAgent: settingsManager.getHttpAgent(),
+      },
+    });
+    return model;
+  }
+
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const openai = new OpenAI({
       baseURL: this.provider.api_base,

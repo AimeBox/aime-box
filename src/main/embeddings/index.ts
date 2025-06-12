@@ -44,6 +44,7 @@ export async function getEmbeddingModel(
     });
     return emb;
   }
+  const provider = await providersManager.getProvider(providerName);
 
   if (provider?.type === ProviderType.OLLAMA) {
     const emb = new OllamaEmbeddings({
@@ -53,7 +54,6 @@ export async function getEmbeddingModel(
     return emb;
   } else if (
     provider?.type === ProviderType.OPENAI ||
-    provider?.type === ProviderType.SILICONFLOW ||
     provider?.type === ProviderType.AZURE_OPENAI
   ) {
     const emb = new OpenAIEmbeddings({
@@ -72,7 +72,17 @@ export async function getEmbeddingModel(
     const emb = new ZhipuAIEmbeddings({ apiKey: provider.api_key });
     return emb;
   } else if (provider?.type === ProviderType.TOGETHERAI) {
-    const emb = new TogetherAIEmbeddings({ apiKey: provider.api_key });
+    const emb = new TogetherAIEmbeddings({
+      apiKey: provider.api_key,
+      model: model,
+    });
+    return emb;
+  } else if (provider?.type === ProviderType.SILICONFLOW) {
+    const emb = new SiliconflowEmbeddings({
+      modelName: model,
+      apiKey: provider.api_key,
+      baseURL: provider.api_base,
+    });
     return emb;
   }
   throw new Error();

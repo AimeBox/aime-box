@@ -28,6 +28,15 @@ export class SiliconflowProvider extends BaseProvider {
     this.httpProxy = settingsManager.getHttpAgent();
   }
 
+  getEmbeddings(modelName: string): Embeddings {
+    const emb = new SiliconflowEmbeddings({
+      modelName: modelName,
+      apiKey: this.provider.api_key,
+      baseURL: this.provider.api_base,
+    });
+    return emb;
+  }
+
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const options = {
       method: 'GET',
