@@ -173,6 +173,9 @@ export default function InstancesManager() {
               <span className="overflow-hidden text-xs text-ellipsis line-clamp-1 mt-1">
                 {instance?.config?.executablePath}
               </span>
+              <span className="overflow-hidden text-xs text-ellipsis line-clamp-1 mt-1">
+                {instance?.config?.userDataPath}
+              </span>
             </div>
             <div className="flex flex-row self-center space-x-1 items-center">
               {/* <Switch
@@ -211,6 +214,7 @@ export default function InstancesManager() {
                   setCurrentInstance(instance);
                 }}
               ></Button> */}
+
               <Popconfirm
                 title="Delete the item?"
                 onConfirm={() => onDelete(instance)}
@@ -218,6 +222,7 @@ export default function InstancesManager() {
                 cancelText="No"
               >
                 <Button
+                  disabled={instance.static}
                   icon={<FaTrashAlt />}
                   shape="round"
                   type="text"

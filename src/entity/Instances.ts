@@ -10,15 +10,12 @@ import {
   Index,
 } from 'typeorm';
 
-
 export enum InstanceType {
   BROWSER = 'browser',
 }
 
-
 @Entity('instances')
 export class Instances {
-
   @PrimaryColumn()
   id!: string;
 
@@ -32,13 +29,10 @@ export class Instances {
   @Column({ type: 'json', nullable: true })
   config?: any;
 
+  @Column({ default: false })
+  static: boolean = false;
 
-  constructor(
-    id: string,
-    name: string,
-    type: InstanceType,
-    config: any,
-  ) {
+  constructor(id: string, name: string, type: InstanceType, config: any) {
     this.id = id || uuidv4();
     this.name = name;
     this.type = type;

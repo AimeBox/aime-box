@@ -185,6 +185,9 @@ export default function Connections() {
         form.setFieldsValue({
           api_base: 'https://api.minimax.chat/v1',
           api_key: 'NULL',
+          config: {
+            groupId: '',
+          },
         });
       } else if (changedFields[0].value === 'replicate') {
         form.setFieldsValue({
@@ -393,7 +396,6 @@ export default function Connections() {
               />
             </Form.Item>
           )}
-
           <Form.Item<Providers>
             label="API Base URL"
             name="api_base"
@@ -418,7 +420,18 @@ export default function Connections() {
             form.getFieldValue('type') === 'azure_openai') && (
             <Form.Item<Providers>
               label="API Version"
+              required
               name={['config', 'apiVersion']}
+            >
+              <Input />
+            </Form.Item>
+          )}
+          {(formTypeValue === 'minimax' ||
+            form.getFieldValue('type') === 'minimax') && (
+            <Form.Item<Providers>
+              label="Group ID"
+              required
+              name={['config', 'groupId']}
             >
               <Input />
             </Form.Item>

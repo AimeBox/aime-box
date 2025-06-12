@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { dbManager } from '../db';
-import { Instances } from '../../entity/Instances';
+import { Instances, InstanceType } from '../../entity/Instances';
 import { Repository } from 'typeorm';
 import { channel } from '../ipc/IpcController';
 import { BaseManager } from '../BaseManager';
@@ -8,6 +8,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { BrowserInstance } from './BrowserInstance';
 import { BaseInstance } from './BaseInstance';
 import { notificationManager } from '../app/NotificationManager';
+import path from 'path';
+import { getDataPath } from '../utils/path';
 
 export interface InstanceInfo extends Instances {
   status: 'running' | 'stop';
@@ -20,6 +22,8 @@ export class InstanceManager extends BaseManager {
 
   instances: Map<string, BaseInstance> = new Map();
 
+  DEFAULT_BROWSER_INSTANCE_ID = 'default_browser';
+
   constructor() {
     super();
     this.repository = dbManager.dataSource.getRepository(Instances);
@@ -28,10 +32,34 @@ export class InstanceManager extends BaseManager {
   public async init() {
     if (!ipcMain) return;
     this.registerIpcChannels();
+    await this.createDefaultInstance();
     const _instances = await this.repository.find();
     _instances.forEach((instance) => {
       this.instanceInfos.set(instance.id, { ...instance, status: 'stop' });
     });
+  }
+
+  async createDefaultInstance() {
+    let instance = await this.repository.findOneBy({
+      id: this.DEFAULT_BROWSER_INSTANCE_ID,
+    });
+    if (!instance) {
+      instance = new Instances(
+        this.DEFAULT_BROWSER_INSTANCE_ID,
+        'Default Browser',
+        InstanceType.BROWSER,
+        {
+          userDataPath: path.join(
+            getDataPath(),
+            'instances',
+            this.DEFAULT_BROWSER_INSTANCE_ID,
+          ),
+        },
+      );
+    }
+    instance.static = true;
+
+    await this.repository.save(instance);
   }
 
   @channel('instances:get')
@@ -106,6 +134,12 @@ export class InstanceManager extends BaseManager {
       }
     }
     return instance;
+  }
+
+  public async getBrowserInstance(id?: string): Promise<BrowserInstance> {
+    return (await this.getInstance(
+      id || this.DEFAULT_BROWSER_INSTANCE_ID,
+    )) as BrowserInstance;
   }
 }
 

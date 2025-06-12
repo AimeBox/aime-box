@@ -11,6 +11,8 @@ import { OpenAI } from 'openai';
 import settingsManager from '../settings';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import fs from 'fs';
+import { OpenAIEmbeddings } from '@langchain/openai';
+import { Embeddings } from '@langchain/core/embeddings';
 
 export class OpenAIProvider extends BaseProvider {
   name: string = ProviderType.OPENAI;
@@ -21,18 +23,32 @@ export class OpenAIProvider extends BaseProvider {
 
   httpProxy: HttpsProxyAgent | undefined;
 
+  openaiClient: OpenAI;
+
   constructor(params?: BaseProviderParams) {
     super(params);
     this.httpProxy = settingsManager.getHttpAgent();
-  }
-
-  async getModelList(): Promise<{ name: string; enable: boolean }[]> {
-    const openai = new OpenAI({
+    this.openaiClient = new OpenAI({
       baseURL: this.provider.api_base,
       apiKey: this.provider.api_key,
       httpAgent: this.httpProxy,
     });
-    const models = (await openai.models.list()).data;
+  }
+
+  getEmbeddings(modelName: string): Embeddings {
+    const emb = new OpenAIEmbeddings({
+      model: modelName,
+      apiKey: this.provider.api_key,
+      configuration: {
+        baseURL: this.provider.api_base,
+        httpAgent: settingsManager.getHttpAgent(),
+      },
+    });
+    return emb;
+  }
+
+  async getModelList(): Promise<{ name: string; enable: boolean }[]> {
+    const models = (await this.openaiClient.models.list()).data;
     return models
       .map((x) => {
         return {
@@ -45,13 +61,7 @@ export class OpenAIProvider extends BaseProvider {
   }
 
   async getEmbeddingModels(): Promise<string[]> {
-    const openai = new OpenAI({
-      baseURL: this.provider.api_base,
-      apiKey: this.provider.api_key,
-      httpAgent: this.httpProxy,
-    });
-
-    const list = await openai.models.list();
+    const list = await this.openaiClient.models.list();
     return list.data
       .filter((x) => x.id.startsWith('text-'))
       .map((x) => x.id)
@@ -59,27 +69,38 @@ export class OpenAIProvider extends BaseProvider {
   }
 
   async transcriptions(modelName: string, filePath: string): Promise<string> {
-    const openai = new OpenAI({
-      baseURL: this.provider.api_base,
-      apiKey: this.provider.api_key,
-      httpAgent: this.httpProxy,
-    });
-    const res = await openai.audio.transcriptions.create({
+    const res = await this.openaiClient.audio.transcriptions.create({
       file: fs.createReadStream(filePath),
       model: modelName,
     });
     return res.text;
   }
 
-  async getSTTModels(): Promise<string[]> {
-    const openai = new OpenAI({
-      baseURL: this.provider.api_base,
-      apiKey: this.provider.api_key,
-      httpAgent: this.httpProxy,
+  async speech(modelName: string, text: string): Promise<Buffer> {
+    const wav = await this.openaiClient.audio.speech.create({
+      model: modelName,
+      voice: 'coral',
+      input: text,
+      instructions: 'Speak in a cheerful and positive tone.',
+      response_format: 'wav',
     });
-    const models = (await openai.models.list()).data;
+
+    const buffer = Buffer.from(await wav.arrayBuffer());
+    return buffer;
+  }
+
+  async getSTTModels(): Promise<string[]> {
+    const models = (await this.openaiClient.models.list()).data;
     return models
       .filter((x) => x.id.startsWith('whisper-') || x.id.includes('transcribe'))
+      .map((x) => x.id)
+      .sort();
+  }
+
+  async getTTSModels(): Promise<string[]> {
+    const models = (await this.openaiClient.models.list()).data;
+    return models
+      .filter((x) => x.id.startsWith('tts'))
       .map((x) => x.id)
       .sort();
   }

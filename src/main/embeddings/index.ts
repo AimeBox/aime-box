@@ -29,6 +29,7 @@ import { ProviderType, Providers } from '../../entity/Providers';
 import { ChatOptions } from '../../entity/Chat';
 import { Embeddings, EmbeddingsParams } from '@langchain/core/embeddings';
 import { HuggingFaceTransformersEmbeddings } from './HuggingFaceTransformersEmbeddings';
+import { SiliconflowEmbeddings } from './SiliconflowEmbeddings';
 
 export async function getEmbeddingModel(
   providerName: string,
@@ -44,7 +45,7 @@ export async function getEmbeddingModel(
     });
     return emb;
   }
-  const provider = await providersManager.getProvider(providerName);
+  // const provider = await providersManager.getProvider(providerName);
 
   if (provider?.type === ProviderType.OLLAMA) {
     const emb = new OllamaEmbeddings({

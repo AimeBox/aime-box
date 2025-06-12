@@ -667,7 +667,11 @@ export class ToolsManager extends BaseManager {
               attachment.ext == '.flac' ||
               attachment.ext == '.m4a'
             ) {
-              text += `\n![](file:///${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+              if (attachment.ext == 'mp3' || attachment.ext == '.wav') {
+                text += `\n[](file:///${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+              } else {
+                text += `\n![](file:///${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
+              }
             } else {
               text += `\n[${attachment.name}](${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
             }

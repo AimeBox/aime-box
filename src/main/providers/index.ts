@@ -599,12 +599,12 @@ export class ProvidersManager extends BaseManager {
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
       try {
-        if (connection?.type === ProviderType.SILICONFLOW) {
-          const siliconflow = new SiliconflowProvider({ provider: connection });
-          const list = await siliconflow.getTTSModels();
+        const p = await this.getProvider(connection);
+        const models = await p?.getTTSModels();
+        if (models && models.length > 0) {
           emb_list.push({
             name: connection.name,
-            models: list ?? [],
+            models: models ?? [],
           });
         }
       } catch {

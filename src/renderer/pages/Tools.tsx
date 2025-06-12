@@ -595,7 +595,7 @@ export default function Tools() {
                     active={currentTool?.name == item.name}
                     key={item.name}
                     title={
-                      <div className="flex flex-row gap-1 items-center">
+                      <div className="flex flex-row gap-1 items-center whitespace-nowrap line-clamp-1">
                         {item.is_toolkit ? <FaToolbox /> : null}
                         {item.name}
                       </div>

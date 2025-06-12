@@ -101,7 +101,7 @@ const get_xhs_page = (browser_context: BrowserContext): Page => {
 };
 
 export interface RedNoteParameters extends ToolParams {
-  instancId: string;
+  instancId?: string;
 }
 
 export class RedNoteSearchTool extends BaseTool {
@@ -125,12 +125,11 @@ export class RedNoteSearchTool extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
-    const instance = await instanceManager.getInstance(this.instancId);
+    const instance = await instanceManager.getBrowserInstance(this.instancId);
     if (!instance) {
       throw new Error('instance not found');
     }
-    const browser_instance = instance as BrowserInstance;
-    const { browser_context } = browser_instance;
+    const { browser_context } = instance;
     const outputs = [];
     let page = get_xhs_page(browser_context);
     if (!page) page = await browser_context.newPage();
@@ -185,6 +184,7 @@ export class RedNoteSearchTool extends BaseTool {
     };
     try {
       const list = await calwer();
+      page.removeAllListeners();
       console.log(list);
       //await browser_context.close();
       return list;
@@ -296,7 +296,7 @@ export class RedNoteDetailTool extends BaseTool {
       }
     });
 
-    page.close();
+    // page.close();
     console.log(note, comments);
     return { note, comments };
   }
@@ -306,12 +306,11 @@ export class RedNoteDetailTool extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
-    const instance = await instanceManager.getInstance(this.instancId);
+    const instance = await instanceManager.getBrowserInstance(this.instancId);
     if (!instance) {
       throw new Error('instance not found');
     }
-    const browser_instance = instance as BrowserInstance;
-    const { browser_context } = browser_instance;
+    const { browser_context } = instance;
     const outputs = [];
     let page = get_xhs_page(browser_context);
     if (!page) page = await browser_context.newPage();
@@ -368,12 +367,11 @@ export class RedNotePublishTool extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
-    const instance = await instanceManager.getInstance(this.instancId);
+    const instance = await instanceManager.getBrowserInstance(this.instancId);
     if (!instance) {
       throw new Error('instance not found');
     }
-    const browser_instance = instance as BrowserInstance;
-    const { browser_context } = browser_instance;
+    const { browser_context } = instance;
     const outputs = [];
     let page = get_xhs_page(browser_context);
     if (!page) page = await browser_context.newPage();
@@ -398,6 +396,9 @@ export class RedNoteToolkit extends BaseToolKit {
       label: t('tools.instancId'),
       field: 'instancId',
       component: 'InstanceSelect',
+      componentProps: {
+        allowClear: true,
+      },
     },
   ];
 
