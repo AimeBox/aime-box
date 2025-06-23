@@ -59,6 +59,7 @@ export const PlannerAnnotation = {
   task: Annotation<string>,
   plans: Annotation<z.infer<typeof PlanSchema>>,
   currentStep: Annotation<string>,
+  current_step_index: Annotation<number>,
 };
 
 export const PlanSchema = z.object({
@@ -320,61 +321,30 @@ export const PlannerNode = (params: {
           if (tool_call.name == 'update_steps') {
             const { actions } = args;
             const { plans } = state;
-            const new_plans: z.infer<typeof PlanSchema> = {
+            const new_plans = {
               ...plans,
             };
 
-            const getStep = (index: number) => {
-              let stepIndex = 1;
-              for (let i = 0; i < plans.outline.length; i++) {
-                const steps = plans.outline[i].steps;
-                for (let j = 0; j < steps.length; j++) {
-                  if (steps[j].status == 'done' || steps[j].status == 'skip') {
-                    stepIndex += 1;
-                    continue;
-                  }
-                  if (stepIndex == index) {
-                    return {
-                      outlineIndex: i,
-                      stepIndex: j,
-                    };
-                  }
-                  stepIndex += 1;
-                }
-              }
-              return null;
-            };
             console.log(actions);
             if (isArray(actions.update_status)) {
               for (const action of actions.update_status) {
-                const step = getStep(action.index);
-                if (step) {
-                  new_plans.outline[step.outlineIndex].steps[
-                    step.stepIndex
-                  ].status = action.status;
-                }
+                const { index, status } = action;
+                new_plans.steps[index].status = status;
               }
             }
             if (isArray(actions.update_title)) {
               for (const action of actions.update_title) {
-                const step = getStep(action.index);
-                if (step) {
-                  new_plans.outline[step.outlineIndex].steps[
-                    step.stepIndex
-                  ].title = action.title;
-                }
+                const { index, title } = action;
+                new_plans.steps[index].title = title;
               }
             }
             if (isArray(actions.insert_step)) {
               for (const action of actions.insert_step) {
-                const step = getStep(action.index);
-                if (step) {
-                  new_plans.outline[step.outlineIndex].steps.splice(
-                    step.stepIndex,
-                    0,
-                    { title: action.title, status: 'not_started' as const },
-                  );
-                }
+                const { index, title } = action;
+                new_plans.steps.splice(index, 0, {
+                  title: title,
+                  status: 'not_started' as const,
+                });
               }
             }
             const todo = renderPlan(new_plans, true);
@@ -382,16 +352,10 @@ export const PlannerNode = (params: {
             toolMessage.content = todo;
             await callBack?.(toolMessage, 'end');
 
-            let currentStep;
-            for (let i = 0; i < new_plans.outline.length; i++) {
-              const { steps } = new_plans.outline[i];
-              for (let j = 0; j < steps.length; j++) {
-                if (steps[j].status == 'not_started') {
-                  currentStep = steps[j];
-                  break;
-                }
-              }
-            }
+            let currentStep = new_plans.steps.find(
+              (x) => x.status == 'not_started',
+            ).title;
+
             return {
               plans: new_plans,
               todo,

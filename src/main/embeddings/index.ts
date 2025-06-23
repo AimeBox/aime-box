@@ -45,7 +45,15 @@ export async function getEmbeddingModel(
     });
     return emb;
   }
-  // const provider = await providersManager.getProvider(providerName);
+  const _provider = await providersManager.getProvider(providerName);
+
+  const emb = _provider?.getEmbeddings(model);
+
+  if (emb) {
+    return emb;
+  }
+
+  throw new Error(`embedding model "${model}" not found`);
 
   if (provider?.type === ProviderType.OLLAMA) {
     const emb = new OllamaEmbeddings({
@@ -53,10 +61,7 @@ export async function getEmbeddingModel(
       model: model,
     });
     return emb;
-  } else if (
-    provider?.type === ProviderType.OPENAI ||
-    provider?.type === ProviderType.AZURE_OPENAI
-  ) {
+  } else if (provider?.type === ProviderType.OPENAI) {
     const emb = new OpenAIEmbeddings({
       model: model,
       apiKey: provider.api_key,

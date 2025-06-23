@@ -5,6 +5,7 @@ import { getDataPath } from '../utils/path';
 import { BrowserContext, chromium } from 'playwright';
 import settingsManager from '../settings';
 import { EventEmitter } from 'events';
+import fs from 'fs';
 
 export class BrowserInstance extends BaseInstance {
   browser_context: BrowserContext;
@@ -35,7 +36,7 @@ export class BrowserInstance extends BaseInstance {
             '--disable-blink-features=AutomationControlled',
             '--enable-webgl',
           ],
-          channel: 'msedge',
+          // channel: 'msedge',
           executablePath: this.instances?.config?.executablePath,
         },
       );
@@ -74,6 +75,14 @@ export class BrowserInstance extends BaseInstance {
     if (this.browser_context) {
       await this.browser_context.close();
       this.eventEmitter.emit('close');
+    }
+  };
+
+  clear = async () => {
+    if (this.instances?.config?.userDataPath) {
+      await fs.promises.rmdir(this.instances?.config?.userDataPath, {
+        recursive: true,
+      });
     }
   };
 

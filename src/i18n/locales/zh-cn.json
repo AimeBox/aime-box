@@ -177,7 +177,8 @@
     "agents": "AI助手",
     "parameters": "参数",
     "quit": "退出",
-    "search": "搜索"
+    "search": "搜索",
+    "add_remote_agent": "添加远程助手"
   },
   "agents": {
     "name": "名称",
@@ -195,7 +196,10 @@
     "recursionLimit": "递归限制",
     "type_a2a": "A2A",
     "type_anp": "ANP",
-    "baseUrl": "Base Url"
+    "baseUrl": "Base Url",
+    "type_dify": "Dify",
+    "type_coze": "Coze",
+    "apiKey": "ApiKey"
   },
   "sidebar": {
     "settings": "设置",

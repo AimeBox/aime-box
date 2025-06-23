@@ -300,10 +300,9 @@ export class SpeechToText extends BaseTool {
       if (!provider) {
         throw new Error(`provider ${this.model} not found`);
       }
-      if ('transcriptions' in provider) {
-        const text = await provider.transcriptions(modelName, outpath);
-        return text;
-      }
+      const text = await provider.transcriptions(modelName, outpath);
+      if (!text) throw new Error(`file "${outpath}" transcriptions failed`);
+      return text;
     }
 
     wave = this.sherpa_onnx.readWave(outpath, false);

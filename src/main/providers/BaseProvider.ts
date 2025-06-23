@@ -42,7 +42,11 @@ export abstract class BaseProvider {
     return undefined;
   }
 
-  async speech(modelName: string, text: string): Promise<Buffer> {
+  async speech(modelName: string, text: string, config?: any): Promise<Buffer> {
+    return undefined;
+  }
+
+  async transcriptions(modelName: string, filePath: string): Promise<string> {
     return undefined;
   }
 

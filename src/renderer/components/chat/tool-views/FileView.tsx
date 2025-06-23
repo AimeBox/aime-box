@@ -23,7 +23,7 @@ export default function FileView(props: FileViewProps) {
   const [mode, setMode] = useState<'preview' | 'code'>('preview');
   const [ext, setExt] = useState<string>('');
   const extension = useMemo(() => {
-    const ext = toolCall.args.path.split('.').pop().toLowerCase();
+    const ext = toolCall.args?.path?.split('.').pop().toLowerCase();
     if (ext == 'html') {
       return 'html';
     }
@@ -47,9 +47,11 @@ export default function FileView(props: FileViewProps) {
 
   return (
     <div className="flex flex-col gap-2 items-start">
-      <a href={toolCall.args.path} target="_blank" rel="noreferrer">
-        {toolCall.args.path}
-      </a>
+      {toolCall.args?.path && (
+        <a href={toolCall.args.path} target="_blank" rel="noreferrer">
+          {toolCall.args.path}
+        </a>
+      )}
       {extension == 'html' && (
         <div className="h-full w-full">
           <Radio.Group
@@ -102,7 +104,11 @@ export default function FileView(props: FileViewProps) {
       {extension == 'code' && (
         <Markdown className="" value={`\`\`\`${ext}\n${data}\n\`\`\``} />
       )}
-      {extension == 'text' && toolCall.args.data}
+      {extension == 'text' && (
+        <pre className="break-all p-2 whitespace-pre-wrap">
+          {toolCall.args.data}
+        </pre>
+      )}
       {content?.text && <ResponseCard value={content.text} />}
 
       {/* <pre className="text-xs break-all whitespace-pre-wrap mt-2 bg-gray-100 p-2 rounded-md"></pre> */}

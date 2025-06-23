@@ -102,9 +102,7 @@ export class TextToSpeech extends BaseTool {
         const buffer = await provider.speech(modelName, input.text);
         if (buffer) {
           const savePath = await saveFile(buffer, `${uuidv4()}.wav`, config);
-          appManager.sendEvent('play-audio', {
-            filename: `file://${savePath}`,
-          });
+          await appManager.playAudio(savePath);
           return `<file>${savePath}</file>`;
         }
       }

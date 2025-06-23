@@ -80,8 +80,8 @@ export default function ChatContent() {
         options: [
           // { label: t('agents.type_anp'), value: 'anp' },
           { label: t('agents.type_a2a'), value: 'a2a' },
-          { label: t('agents.type_dify'), value: 'dify' },
-          { label: t('agents.type_coze'), value: 'coze' },
+          // { label: t('agents.type_dify'), value: 'dify' },
+          // { label: t('agents.type_coze'), value: 'coze' },
         ],
       },
     },
@@ -272,7 +272,7 @@ export default function ChatContent() {
                   menu={{
                     items: [
                       {
-                        label: 'Add Remote Agent',
+                        label: t('common.add_remote_agent'),
                         key: 'remoteAgent',
                         onClick: () => {
                           remoteAgentModalRef.current.openModal(true);

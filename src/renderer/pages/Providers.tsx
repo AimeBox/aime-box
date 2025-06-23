@@ -80,7 +80,6 @@ export default function Connections() {
         content: 'success',
       });
     } catch (errorInfo) {
-      debugger;
       messageApi.open({
         type: 'error',
         content: errorInfo.message,
@@ -183,7 +182,7 @@ export default function Connections() {
         });
       } else if (changedFields[0].value === 'minimax') {
         form.setFieldsValue({
-          api_base: 'https://api.minimax.chat/v1',
+          api_base: 'https://api.minimaxi.com/v1',
           api_key: 'NULL',
           config: {
             groupId: '',

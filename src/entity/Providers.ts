@@ -18,6 +18,7 @@ export enum ProviderType {
   VOLCANOENGINE = 'volcanoengine',
   MINIMAX = 'minimax',
   REPLICATE = 'replicate',
+  ELEVENLABS = 'elevenlabs',
 }
 
 @Entity('providers')

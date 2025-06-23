@@ -58,6 +58,8 @@ export class OllamaProvider extends BaseProvider {
   }
 
   async getEmbeddingModels(): Promise<string[]> {
-    return [];
+    const localOllama = new Ollama();
+    const list = await localOllama.list();
+    return list.models.map((x) => x.name).sort();
   }
 }

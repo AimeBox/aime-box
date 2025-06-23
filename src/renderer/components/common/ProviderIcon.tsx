@@ -17,8 +17,7 @@ import azureOpenaiIcon from '../../../../assets/model-logos/azure_openai.png';
 import volcanoEngineIcon from '../../../../assets/model-logos/volcanoengine.png';
 import minimaxIcon from '../../../../assets/model-logos/minimax.png';
 import replicateIcon from '../../../../assets/model-logos/replicate.png';
-
-
+import elevenlabsIcon from '../../../../assets/model-logos/elevenlabs.png';
 
 import { pathToFileURL } from 'url';
 import { cn } from '@/lib/utils';
@@ -46,6 +45,7 @@ const logos = {
   volcanoengine: volcanoEngineIcon,
   minimax: minimaxIcon,
   replicate: replicateIcon,
+  elevenlabs: elevenlabsIcon,
 };
 // eslint-disable-next-line react/function-component-definition
 const ProviderIcon: React.FC<ProviderIconProps> = ({

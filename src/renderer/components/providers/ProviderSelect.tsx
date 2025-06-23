@@ -14,6 +14,8 @@ interface ProviderSelectProps extends SelectProps<any> {
     | 'embedding'
     | 'websearch'
     | 'image_generation';
+  selectMode?: 'models' | 'providers';
+  providerType?: string;
 }
 
 interface ProviderSelectRef {
@@ -22,54 +24,74 @@ interface ProviderSelectRef {
 const ProviderSelect = React.forwardRef(
   (props: ProviderSelectProps, ref: ForwardedRef<ProviderSelectRef>) => {
     const [providers, setProviders] = useState<any[]>([]);
-    const getProviders = async () => {
-      let res;
-      if (props.type == 'llm')
-        res = await window.electron.providers.getLLMModels();
-      else if (props.type == 'reranker')
-        res = await window.electron.providers.getRerankerModels();
-      else if (props.type == 'tts')
-        res = await window.electron.providers.getTTSModels();
-      else if (props.type == 'stt')
-        res = await window.electron.providers.getSTTModels();
-      else if (props.type == 'embedding')
-        res = await window.electron.providers.getEmbeddingModels();
-      else if (props.type == 'websearch')
-        res = await window.electron.providers.getWebSearchProviders();
-      else if (props.type == 'image_generation')
-        res = await window.electron.providers.getImageGenerationProviders();
+    const selectMode = props.selectMode || 'models';
+    let options = [];
+    const getData = async () => {
+      if (selectMode == 'models') {
+        let res;
+        if (props.type == 'llm')
+          res = await window.electron.providers.getLLMModels();
+        else if (props.type == 'reranker')
+          res = await window.electron.providers.getRerankerModels();
+        else if (props.type == 'tts')
+          res = await window.electron.providers.getTTSModels();
+        else if (props.type == 'stt')
+          res = await window.electron.providers.getSTTModels();
+        else if (props.type == 'embedding')
+          res = await window.electron.providers.getEmbeddingModels();
+        else if (props.type == 'websearch')
+          res = await window.electron.providers.getWebSearchProviders();
+        else if (props.type == 'image_generation')
+          res = await window.electron.providers.getImageGenerationProviders();
 
-      const options = res.map((x) => {
-        const options = x.models.map((o) => {
+        options = res.map((x) => {
+          const options = x.models.map((o) => {
+            return {
+              label: <span>{o}</span>,
+              value: `${o}@${x.name}`,
+            };
+          });
           return {
-            label: <span>{o}</span>,
-            value: `${o}@${x.name}`,
+            label: <span>{x.name}</span>,
+            title: x.name,
+            options,
           };
         });
-        return {
-          label: <span>{x.name}</span>,
-          title: x.name,
-          options,
-        };
-      });
+      } else if (selectMode == 'providers') {
+        let res = await window.electron.providers.getList();
+        if (props.providerType) {
+          res = res.filter((x) => x.type == props.providerType);
+        }
+        options = res.map((x) => {
+          return {
+            label: <span>{x.name}</span>,
+            title: x.name,
+            value: x.id,
+          };
+        });
+      }
 
       setProviders(options);
     };
     useEffect(() => {
-      getProviders();
+      getData();
     }, []);
 
     return (
       <Select
         {...props}
         showSearch
-        labelRender={(props) => {
-          return <div>{props?.value}</div>;
+        labelRender={(item) => {
+          if (selectMode == 'models') return <div>{item?.value}</div>;
+          else if (selectMode == 'providers') {
+            return <div>{item?.label}</div>;
+          }
+          return '';
         }}
         onSearch={(v) => {
           return providers.map((x) => {
-            const options = x.options
-              .filter((m) => m.value.toLowerCase().includes(v.toLowerCase()))
+            const options = x?.options
+              ?.filter((m) => m.value.toLowerCase().includes(v.toLowerCase()))
               .map((o) => {
                 return {
                   label: <span>{o.label}</span>,

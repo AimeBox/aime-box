@@ -270,15 +270,7 @@ export default function ChatContent() {
     setCurrentChat(res);
   };
   const onClearChatMessages = async () => {
-    window.electron.db.delete('chat_message', {
-      chatId: currentChat.id,
-    });
-    window.electron.db.delete('langgraph_checkpoints', {
-      thread_id: currentChat.id,
-    });
-    window.electron.db.delete('langgraph_writes', {
-      thread_id: currentChat.id,
-    });
+    await window.electron.chat.clearChat(currentChat.id);
     closeCanvas();
     const res = await window.electron.chat.getChat(currentChat.id);
     setCurrentChat(res);
@@ -507,12 +499,13 @@ export default function ChatContent() {
                                       : currentChat?.chatMessages?.filter(
                                           (x) =>
                                             x.role == 'tool' &&
-                                            x.content.some(
+                                            x.content?.some(
                                               (y) =>
-                                                y.type == 'tool_call' &&
-                                                chatMessage.tool_calls
-                                                  ?.map((t) => t.id)
-                                                  .includes(y.tool_call_id),
+                                                y?.type == 'tool_call' &&
+                                                chatMessage?.tool_calls
+                                                  ?.filter((x) => x?.id)
+                                                  .map((t) => t?.id)
+                                                  .includes(y?.tool_call_id),
                                             ),
                                         );
 
@@ -808,7 +801,7 @@ export default function ChatContent() {
                   onClose={() => closeCanvas()}
                   value={canvasViewValue}
                   toolName={canvasViewValue?.toolCall?.name}
-                  toolCall={canvasViewValue?.toolCall}
+                  // toolCall={canvasViewValue?.toolCall}
                   chatId={currentChat?.id}
                 />
               </div>

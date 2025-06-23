@@ -10,6 +10,8 @@ import { BaseInstance } from './BaseInstance';
 import { notificationManager } from '../app/NotificationManager';
 import path from 'path';
 import { getDataPath } from '../utils/path';
+import { chromePath } from 'chrome-paths';
+import { getEdgePath } from 'edge-paths';
 
 export interface InstanceInfo extends Instances {
   status: 'running' | 'stop';
@@ -43,20 +45,31 @@ export class InstanceManager extends BaseManager {
     let instance = await this.repository.findOneBy({
       id: this.DEFAULT_BROWSER_INSTANCE_ID,
     });
+    const userDataPath = path.join(
+      getDataPath(),
+      'instances',
+      this.DEFAULT_BROWSER_INSTANCE_ID,
+    );
+
+    const executablePath = chromePath?.chrome || getEdgePath();
     if (!instance) {
       instance = new Instances(
         this.DEFAULT_BROWSER_INSTANCE_ID,
         'Default Browser',
         InstanceType.BROWSER,
         {
-          userDataPath: path.join(
-            getDataPath(),
-            'instances',
-            this.DEFAULT_BROWSER_INSTANCE_ID,
-          ),
+          executablePath: executablePath,
+          userDataPath: userDataPath,
         },
       );
     }
+    if (!instance?.config?.executablePath || !instance?.config?.userDataPath) {
+      instance.config = {
+        executablePath: executablePath,
+        userDataPath: userDataPath,
+      };
+    }
+
     instance.static = true;
 
     await this.repository.save(instance);
@@ -89,11 +102,21 @@ export class InstanceManager extends BaseManager {
       ...instance,
     });
     this.instanceInfos.set(_instance.id, { ..._instance, status: 'stop' });
-    return _instance;
+    // return _instance;
   }
 
   @channel('instances:delete')
   public async delete(id: string) {
+    let instance = this.instances.get(id);
+    if (instance) {
+      await instance.stop();
+    } else {
+      const _instance = await this.repository.findOneBy({ id: id });
+      instance = new BrowserInstance({ instances: _instance });
+    }
+    this.instances.delete(id);
+    await instance.clear();
+
     await this.repository.delete(id);
     this.instanceInfos.delete(id);
   }

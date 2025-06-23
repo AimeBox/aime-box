@@ -46,11 +46,6 @@ export default function AgentConfigDrawer(props: AgentConfigDrawerProps) {
     [],
   );
 
-  // const onChange = (value: Record<string, any>) => {
-  //   //console.log(value);
-  //   props?.onChange?.(value);
-  // };
-
   const onFinish = async (config: Record<string, any>) => {
     const data = { ...value, config: config };
     try {

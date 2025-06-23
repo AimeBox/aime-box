@@ -38,24 +38,24 @@ import { isUrl } from '../utils/is';
 // };
 
 export interface SocialMediaSearchParameters extends ToolParams {
-  chromeInstancePath: string;
+  instancId: string;
 }
 
 export class SocialMediaSearch extends BaseTool {
+  toolKitName?: string = 'social_media_toolkit';
+
+  name: string = 'social_media_search';
+
+  description: string = 'search social media post';
+
   schema = z.object({
     platform: z
       .enum(['xhs', 'bilibili', 'douyin', 'kuaishou', 'tiktok', 'twitter'])
       .describe(
         'xhs: 小红书 ,bilibili: 哔哩哔哩,douyin: 抖音, kuaishou: 快搜, tiktok: Tiktok, twitter: 推特',
       ),
-    keyword: z.string().optional(),
-    url: z.string().optional().describe('网址连接'),
-    //count: z.number().default(10),
+    keyword: z.string(),
   });
-
-  name: string = 'social_media_search';
-
-  description: string = 'search social media post';
 
   userDataDir: string;
 
@@ -63,41 +63,21 @@ export class SocialMediaSearch extends BaseTool {
 
   outputFormat: 'json' | 'markdown' = 'json';
 
-  configSchema?: FormSchema[] = [
-    {
-      label: t('tools.chromeInstancePath'),
-      field: 'chromeInstancePath',
-      component: 'Input',
-    },
-  ];
-
-  chromeInstancePath?: string;
+  instancId: string;
 
   constructor(params: SocialMediaSearchParameters) {
     super();
-    const { chromeInstancePath } = params ?? {};
-    this.userDataDir = path.join(getDataPath(), 'User Data');
-    this.chromeInstancePath = chromeInstancePath;
+    const { instancId } = params ?? {};
+    this.instancId = instancId;
   }
 
   async getBrowserContext(): Promise<BrowserContext> {
-    const browser_context = await chromium.launchPersistentContext(
-      this.userDataDir,
-      {
-        channel: 'msedge',
-        headless: false,
-        devtools: true,
-        proxy: {
-          server: this.httpProxy,
-        },
-        args: ['--disable-blink-features=AutomationControlled'],
-      },
-    ); // Or 'firefox' or 'webkit'.
+    const instance = await instanceManager.getBrowserInstance(this.instancId);
+    if (!instance) {
+      throw new Error(`Instance ${this.instancId} not found`);
+    }
+    const { browser_context } = instance;
     return browser_context;
-    // chromium.launchPersistentContext()
-    const msbrowser = await chromium.connectOverCDP('http://localhost:9222');
-    const defaultContext = msbrowser.contexts()[0];
-    return defaultContext;
   }
 
   async _call(
@@ -136,44 +116,14 @@ export class SocialMediaSearch extends BaseTool {
         return this.xhs_search_item_to_markdown(res);
       }
     } else if (input.platform === 'bilibili') {
-      const browser_context = await chromium.launchPersistentContext(
-        this.userDataDir,
-        {
-          channel: 'msedge',
-          headless: false,
-          proxy: this.httpProxy
-            ? {
-                server: `${this.httpProxy}`,
-              }
-            : undefined,
-          args: ['--disable-blink-features=AutomationControlled'],
-        },
-      );
+      const browser_context = await this.getBrowserContext();
       const res = await this.bilibili(browser_context, input.keyword);
       return JSON.stringify(res);
     } else if (input.platform === 'twitter') {
-      const browser_context = await chromium.launchPersistentContext(
-        this.userDataDir,
-        {
-          channel: 'msedge',
-          headless: false,
-
-          proxy: this.httpProxy
-            ? {
-                server: `${this.httpProxy}`,
-              }
-            : undefined,
-          args: ['--disable-blink-features=AutomationControlled'],
-        },
-      );
+      const browser_context = await this.getBrowserContext();
       res = await this.twitter(browser_context, input.keyword);
-      //await browser_context.close();
     }
-
     return res;
-    // } catch (e) {
-    //   throw e;
-    // }
   }
 
   async xhs_search_item_to_markdown(data: XHSNoteItem[]) {
@@ -401,5 +351,92 @@ export class SocialMediaSearch extends BaseTool {
     console.log(list);
     await browser_context.close();
     return JSON.stringify(list);
+  }
+}
+
+export class SocialMediaDetail extends BaseTool {
+  toolKitName?: string = 'social_media_toolkit';
+
+  name: string = 'social_media_detail';
+
+  description: string = 'get social media post detail';
+
+  schema = z.object({
+    platform: z
+      .enum(['xhs', 'bilibili', 'douyin', 'kuaishou', 'tiktok', 'twitter'])
+      .describe(
+        'xhs: 小红书 ,bilibili: 哔哩哔哩,douyin: 抖音, kuaishou: 快搜, tiktok: Tiktok, twitter: 推特',
+      ),
+    url: z.string(),
+  });
+
+  instancId: string;
+
+  constructor(params: SocialMediaSearchParameters) {
+    super();
+    const { instancId } = params ?? {};
+    this.instancId = instancId;
+  }
+
+  async getBrowserContext(): Promise<BrowserContext> {
+    const instance = await instanceManager.getBrowserInstance(this.instancId);
+    if (!instance) {
+      throw new Error(`Instance ${this.instancId} not found`);
+    }
+    const { browser_context } = instance;
+    return browser_context;
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<any> {
+    if (input.platform == 'xhs') {
+    } else if (input.platform == 'bilibili') {
+    } else if (input.platform == 'twitter') {
+    }
+
+    return '';
+  }
+
+  async getTwitter(url: string) {
+    const browser_context = await this.getBrowserContext();
+    if (!(url.startsWith('https://x.com/') && url.includes('/status/')))
+      throw new Error('url input is not twitter url');
+    const page = await browser_context.newPage();
+    await page.goto(url);
+    await page.waitForLoadState();
+    const content = await page.content();
+    const $ = cheerio.load(content);
+    return $;
+  }
+}
+
+export class SocialMediaToolkit extends BaseToolKit {
+  name: string = 'social_media_toolkit';
+
+  configSchema?: FormSchema[] = [
+    {
+      label: t('tools.instancId'),
+      field: 'instancId',
+      component: 'InstanceSelect',
+      componentProps: {
+        allowClear: true,
+      },
+    },
+  ];
+
+  //instancId: string;
+
+  constructor(params: SocialMediaSearchParameters) {
+    super(params);
+  }
+
+  getTools(): BaseTool[] {
+    return [
+      new SocialMediaSearch(this.params),
+      new SocialMediaDetail(this.params),
+    ];
   }
 }

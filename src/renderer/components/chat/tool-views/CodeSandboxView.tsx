@@ -39,6 +39,9 @@ export default function CodeSandboxView(props: CodeSandboxViewProps) {
     const getSandboxSetup = async (toolCall) => {
       const path = toolCall?.args?.path;
       const entry = toolCall?.args?.entry;
+      if (!path) {
+        return;
+      }
       const sandboxSetup = await window.electron.tools.getCodeSandboxSetup(
         path,
         chatId,

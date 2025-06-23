@@ -354,7 +354,8 @@ export class KnowledgeBaseManager {
     try {
       const embeddings = await this.getEmbeddings(kb);
       await embeddings.embedQuery('embedding test');
-    } catch {
+    } catch (err) {
+      console.error(err);
       notificationManager.sendNotification('embedding fail', 'error');
       return;
     }

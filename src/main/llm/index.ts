@@ -28,6 +28,8 @@ import { GoogleProvider } from '../providers/GoogleProvider';
 import { AnthropicProvider } from '../providers/AnthropicProvider';
 import { GroqProvider } from '../providers/GroqProvider';
 import { AzureOpenAIProvider } from '../providers/AzureOpenAIProvider';
+import { TongyiProvider } from '../providers/TongyiProvider';
+import { TogetherProvider } from '../providers/TogetherProvider';
 
 export async function getChatModel(
   providerName: string,
@@ -72,14 +74,7 @@ export async function getChatModel(
       streaming: options?.streaming,
     });
   } else if (provider?.type === ProviderType.TONGYI) {
-    llm = new ChatAlibabaTongyi({
-      modelName: model.name,
-      alibabaApiKey: provider.api_key,
-      topP: options?.top_p,
-      topK: options?.top_k,
-      temperature: options?.temperature,
-      maxTokens: options?.maxTokens,
-    });
+    llm = new TongyiProvider({ provider }).getChatModel(model.name, options);
   } else if (provider?.type === ProviderType.ZHIPU) {
     llm = new ChatZhipuAI({
       modelName: model.name,
@@ -98,14 +93,7 @@ export async function getChatModel(
   } else if (provider?.type === ProviderType.DEEPSEEK) {
     llm = new DeepSeekProvider({ provider }).getChatModel(model.name, options);
   } else if (provider?.type === ProviderType.TOGETHERAI) {
-    llm = new ChatTogetherAI({
-      model: model.name,
-      apiKey: provider.api_key,
-      temperature: options?.temperature,
-      maxTokens: options?.maxTokens,
-      streaming: options?.streaming,
-      topP: options?.top_p,
-    });
+    llm = new TogetherProvider({ provider }).getChatModel(model.name, options);
   } else if (provider?.type === ProviderType.AZURE_OPENAI) {
     llm = new AzureOpenAIProvider({ provider }).getChatModel(
       model.name,

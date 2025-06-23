@@ -3,7 +3,6 @@ import { chunkArray } from '@langchain/core/utils/chunk_array';
 import { app } from 'electron';
 // import transformers from '@huggingface/transformers';
 import path from 'path';
-import { getModelsPath } from '../utils/path';
 import {
   AutoProcessor,
   AutoTokenizer,

@@ -208,6 +208,7 @@ const electronHandler = {
       );
       return res;
     },
+    clearChat: (chatId: string) => ipcRenderer.invoke('chat:clear', chatId),
     splitMultiLine(msg: string): string[] {
       const res = ipcRenderer.sendSync('chat:split-multi-line', { msg });
       return res;

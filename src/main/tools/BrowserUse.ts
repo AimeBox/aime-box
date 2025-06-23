@@ -22,6 +22,8 @@ import { dialog } from 'electron';
 import settingsManager from '../settings';
 import os from 'os';
 import path from 'path';
+import InstancesManager from '@/renderer/pages/Settings/InstancesManager';
+import { instanceManager } from '../instances';
 
 export interface BrowserUseParameters extends ToolParams {
   model: string;
@@ -119,6 +121,8 @@ export class BrowserUseTool extends BaseTool {
         temperature: 0,
       });
     }
+    const instances = await instanceManager.getBrowserInstance();
+    console.log(instances);
     const browser = new Browser({
       chromeInstancePath: this.chromeInstancePath,
       // userDataDir: this.userDataDir,

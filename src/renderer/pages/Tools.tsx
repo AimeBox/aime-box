@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -45,11 +45,16 @@ import Content from '../components/layout/Content';
 import { FaArrowRotateLeft, FaRegMessage } from 'react-icons/fa6';
 import { t } from 'i18next';
 import { ListItem } from '../components/common/ListItem';
+import ChatToolView from '../components/chat/ChatToolView';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function Tools() {
   const [open, setOpen] = useState(false);
   const [tools, setTools] = useState<ToolInfo[]>([]);
-  const [invoking, isInvoking] = useState<boolean>(false);
+  //const [invoking, isInvoking] = useState<boolean>(false);
+  const [invoking, isInvoking] = useState<Record<string, boolean>>({});
+  const [toolCallOpen, setToolCallOpen] = useState(true);
+
   const toolSettingModalRef = useRef(null);
   const toolTestFormRef = useRef(null);
   const navigate = useNavigate();
@@ -68,6 +73,7 @@ export default function Tools() {
     undefined,
   );
   const addMcpModalRef = useRef<FormModalRef>(null);
+  const [toolCall, setToolCall] = useState<any>();
   const mcpSchemas = [
     {
       label: 'Name',
@@ -120,10 +126,10 @@ export default function Tools() {
     },
   ] as FormSchema[];
   const [mcpLoading, setMcpLoading] = useState<boolean>(false);
-  const onToolSettingSubmit = (values) => {
+  const onToolSettingSubmit = async (values) => {
     console.log(values);
-    const res = window.electron.tools.update(currentTool.name, values);
-    getTools();
+    const res = await window.electron.tools.update(currentTool.name, values);
+    await getTools();
 
     toolSettingModalRef.current.openModal(false);
   };
@@ -143,31 +149,6 @@ export default function Tools() {
         toolSettinSchemas.push(schema);
       }
     }
-    //  else {
-    //   Object.keys(tool.parameters).forEach((p) => {
-    //     if (isString(tool.parameters[p])) {
-    //       toolSettinSchemas.push({
-    //         label: p,
-    //         field: p,
-    //         component: 'Input',
-    //       });
-    //     }
-    //     if (isNumber(tool.parameters[p])) {
-    //       toolSettinSchemas.push({
-    //         label: p,
-    //         field: p,
-    //         component: 'InputNumber',
-    //       });
-    //     }
-    //     if (isBoolean(tool.parameters[p])) {
-    //       toolSettinSchemas.push({
-    //         label: p,
-    //         field: p,
-    //         component: 'Switch',
-    //       });
-    //     }
-    //   });
-    // }
 
     setToolSettinSchemas(toolSettinSchemas);
     setTimeout(() => {
@@ -178,20 +159,11 @@ export default function Tools() {
 
   const invoke = async (toolName, value) => {
     console.log(toolName, value);
-
-    // const _value = {};
-    // Object.keys(value.value).forEach((key) => {
-    //   if (isString(value.value[key])) {
-    //     _value[key] = value.value[key].trim();
-    //   } else if (isObject(value.value[key])) {
-    //     _value[key] = JSON.stringify(value.value[key]);
-    //   }
-    // });
-    // console.log(_value);
     let output: string | string[] = '';
     if (selectedFilterTag == 'built-in') {
       if (currentTool) {
-        isInvoking(true);
+        isInvoking({ ...invoking, [toolName]: true });
+        setToolCall({ id: uuidv4(), args: value, name: toolName });
         const res = await window.electron.tools.invoke(
           toolName,
           value,
@@ -209,7 +181,7 @@ export default function Tools() {
       }
     } else if (selectedFilterTag == 'mcp') {
       if (currentMcp) {
-        isInvoking(true);
+        isInvoking({ ...invoking, [toolName]: true });
         const res = await window.electron.tools.invoke(
           `${toolName}`,
           value,
@@ -224,7 +196,8 @@ export default function Tools() {
       }
     }
     setInvokeOutput(output);
-    isInvoking(false);
+    delete invoking[toolName];
+    isInvoking(invoking);
   };
   const toolInvokeHandle = (res: any) => {
     let output: string | string[] = '';
@@ -237,7 +210,7 @@ export default function Tools() {
       output = res?.toString() || '';
     }
     setInvokeOutput(output);
-    isInvoking(false);
+    // isInvoking(false);
   };
 
   const getTools = async () => {
@@ -254,6 +227,7 @@ export default function Tools() {
 
   useEffect(() => {
     getTools();
+    setToolCall(undefined);
     window.electron.ipcRenderer.on('tools:invokeAsync', toolInvokeHandle);
     window.electron.ipcRenderer.on('tools:mcp-updated', (data) => {
       getMcps();
@@ -287,6 +261,7 @@ export default function Tools() {
       setToolInvokeSchemas(undefined);
     }
     setInvokeOutput(undefined);
+    setToolCall(undefined);
   }, [location]);
 
   const converFormSchemas = (tool: ToolInfo): FormSchema[] => {
@@ -467,6 +442,12 @@ export default function Tools() {
       message.error(err.message);
     }
   };
+  const getLoading = useCallback(
+    (toolName) => {
+      return invoking[toolName];
+    },
+    [invoking],
+  );
 
   const renderMcpToolForm = useMemo(() => {
     return currentMcp?.tools.map((item, index) => {
@@ -481,7 +462,7 @@ export default function Tools() {
 
         children: (
           <BasicForm
-            loading={invoking}
+            loading={getLoading(item.name)}
             ref={toolTestFormRef[item.name]}
             schemas={converFormSchemas(item)}
             layout="vertical"
@@ -508,7 +489,7 @@ export default function Tools() {
 
         children: (
           <BasicForm
-            loading={invoking}
+            loading={getLoading(item.name)}
             ref={toolTestFormRef[item.name]}
             schemas={converFormSchemas(item)}
             layout="vertical"
@@ -678,7 +659,7 @@ export default function Tools() {
                       <div className="flex flex-col p-4">
                         {currentTool.is_toolkit == false && (
                           <BasicForm
-                            loading={invoking}
+                            loading={getLoading(currentTool.name)}
                             ref={toolTestFormRef}
                             schemas={toolInvokeSchemas}
                             layout="vertical"
@@ -758,7 +739,23 @@ export default function Tools() {
           </Splitter.Panel>
           <Splitter.Panel min={360}>
             <ScrollArea className="w-full h-full" dir="ltr">
-              <div
+              {toolCall && (
+                <ChatToolView
+                  open={toolCallOpen}
+                  toolName={currentTool?.name || ''}
+                  value={{
+                    title: currentTool?.name || '',
+                    toolCall: toolCall,
+                    content: {
+                      tool_call_id: toolCall?.id,
+                      type: 'tool_call',
+                      text: invokeOutput,
+                    },
+                  }}
+                ></ChatToolView>
+              )}
+
+              {/* <div
                 className="flex flex-col h-full"
                 style={{ wordBreak: 'break-all' }}
               >
@@ -772,12 +769,11 @@ export default function Tools() {
                   )}
                   {isString(invokeOutput) && (
                     <>
-                      {/* <pre>{invokeOutput}</pre> */}
                       <ResponseCard value={invokeOutput} />
                     </>
                   )}
                 </div>
-              </div>
+              </div> */}
             </ScrollArea>
           </Splitter.Panel>
         </Splitter>
