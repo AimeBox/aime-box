@@ -115,13 +115,15 @@ export default function ChatAttachment({
     }
     if (isAudio) {
       return (
-        <audio
-          src={path}
-          className="w-[30rem] object-contain rounded-full border border-solid border-gray-200 dark:border-gray-700 shadow-sm"
-          controls
-        >
-          <track kind="captions" />
-        </audio>
+        <div className="w-full">
+          <audio
+            src={path}
+            className="object-contain rounded-full border border-solid border-gray-200 dark:border-gray-700 shadow-sm"
+            controls
+          >
+            <track kind="captions" />
+          </audio>
+        </div>
       );
     }
 

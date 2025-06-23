@@ -58,7 +58,6 @@ import ProviderIcon from '../common/ProviderIcon';
 import { ResponseCard } from '../common/ResponseCard';
 import { ScrollArea } from '../ui/scroll-area';
 import JSONPretty from 'react-json-pretty';
-import { JSONTree } from 'react-json-tree';
 import './ChatMessageBox.css';
 import ChatAttachment from './ChatAttachment';
 import { t } from 'i18next';
@@ -82,6 +81,7 @@ export interface ChatMessageProps {
   hideActionBar?: boolean;
   size?: 'small' | 'medium';
   onToolClick?: (toolCall: any, toolMessageContent: any) => void;
+  onOpenHistory?: (messages: any) => void;
 }
 
 const ChatMessageBox = React.forwardRef(
@@ -95,11 +95,12 @@ const ChatMessageBox = React.forwardRef(
       onEdit,
       onSetDivider,
       toolMessages,
-      hideHead = value.role == 'user',
+      hideHead = true,
       hideIcon = value.role == 'user',
       hideActionBar = false,
       size = 'small',
       onToolClick,
+      onOpenHistory,
     }: ChatMessageProps,
     ref: React.ForwardedRef<any>,
   ) => {
@@ -136,6 +137,9 @@ const ChatMessageBox = React.forwardRef(
     };
     const onPlay = () => {
       window.electron.app.tts(getTextContent());
+    };
+    const openHistory = () => {
+      onOpenHistory?.(value.additional_kwargs.history);
     };
 
     const updateTextContent = async () => {
@@ -181,9 +185,6 @@ const ChatMessageBox = React.forwardRef(
         .join('\n');
     };
 
-    const onHistory = () => {
-      console.log(value?.additional_kwargs?.history);
-    };
     const renderToolContent = (value: ChatMessage) => {
       const toolContent = value?.content?.filter((x) => x.type == 'tool_call');
       return (
@@ -205,12 +206,12 @@ const ChatMessageBox = React.forwardRef(
       );
     };
     return (
-      <div className="w-full">
-        <div className="flex flex-col justify-between px-5 mx-auto mb-3 max-w-5xl rounded-lg group">
+      <div className="w-full mb-2">
+        <div className="flex flex-col justify-between px-5 mx-auto max-w-5xl rounded-lg group">
           <div className="flex w-full">
             {!hideIcon && value.role == 'assistant' && value.provider_type && (
               <ProviderIcon
-                size="2.5rem"
+                size="2.0rem"
                 provider={value.provider_type}
                 className="flex justify-center items-center mr-4 w-10 h-10 bg-gray-100 rounded-2xl"
               />
@@ -256,7 +257,7 @@ const ChatMessageBox = React.forwardRef(
                       <div
                         className={`flex flex-col flex-wrap gap-2 ${
                           value.role == 'user' ? 'items-end' : ''
-                        } w-full`}
+                        } w-full mb-1`}
                       >
                         {value?.content
                           ?.filter((x) => x.type == 'text')
@@ -350,7 +351,7 @@ const ChatMessageBox = React.forwardRef(
                   )}
 
                   {value.tool_calls && value.tool_calls.length > 0 && (
-                    <>
+                    <div className="mb-1">
                       {size == 'medium' && (
                         <div className="flex flex-row flex-wrap gap-2">
                           <Collapse
@@ -448,98 +449,119 @@ const ChatMessageBox = React.forwardRef(
                         </div>
                       )}
                       {size == 'small' && (
-                        <div className="flex flex-col flex-wrap gap-2">
-                          {value.tool_calls.map((toolCall) => {
-                            let toolMessageContent;
-                            const toolMessage = toolMessages?.find((t) =>
-                              t.content?.some(
-                                (c) =>
-                                  c.type == 'tool_call' &&
-                                  c.tool_call_id == toolCall.id,
-                              ),
-                            );
-                            if (toolMessage) {
-                              toolMessageContent = toolMessage.content?.find(
-                                (c) =>
-                                  c.type == 'tool_call' &&
-                                  c.tool_call_id == toolCall.id,
+                        <div className="flex flex-col flex-wrap gap-2 mt-2">
+                          {value?.tool_calls
+                            ?.filter((x) => x)
+                            .map((toolCall) => {
+                              let toolMessageContent;
+                              const toolMessage = toolMessages?.find((t) =>
+                                t.content?.some(
+                                  (c) =>
+                                    c.type == 'tool_call' &&
+                                    c.tool_call_id == toolCall.id,
+                                ),
                               );
-                            }
-                            let inputArgs = '';
-                            if (
-                              Object.keys(toolCall.args).length > 0 &&
-                              isString(
-                                toolCall.args[Object.keys(toolCall.args)[0]],
-                              )
-                            ) {
-                              inputArgs =
-                                toolCall.args[Object.keys(toolCall.args)[0]];
-                            }
-                            let attachments;
-                            if (toolMessageContent?.text) {
-                              const { attachments: _attachments } =
-                                splitContextAndFiles(toolMessageContent?.text);
-                              attachments = _attachments;
-                            }
+                              if (toolMessage) {
+                                toolMessageContent = toolMessage.content?.find(
+                                  (c) =>
+                                    c.type == 'tool_call' &&
+                                    c.tool_call_id == toolCall.id,
+                                );
+                              }
+                              let inputArgs = '';
+                              if (toolCall?.args) {
+                                if (
+                                  Object.keys(toolCall.args).length > 0 &&
+                                  isString(
+                                    toolCall.args[
+                                      Object.keys(toolCall.args)[0]
+                                    ],
+                                  )
+                                ) {
+                                  inputArgs =
+                                    toolCall.args[
+                                      Object.keys(toolCall.args)[0]
+                                    ];
+                                }
+                              }
 
-                            return (
-                              <>
-                                <motion.div
-                                  className="flex flex-row gap-2 items-center p-0 px-2 bg-gray-100 rounded-2xl cursor-pointer w-fit"
-                                  onClick={() =>
-                                    onToolClick?.(toolCall, toolMessageContent)
-                                  }
-                                >
-                                  {toolMessage?.status == 'success' && (
-                                    <FaCheckCircle color="green" />
+                              let attachments;
+                              if (toolMessageContent?.text) {
+                                const { attachments: _attachments } =
+                                  splitContextAndFiles(
+                                    toolMessageContent?.text,
+                                  );
+                                attachments = _attachments;
+                              }
+
+                              return (
+                                <>
+                                  <motion.div
+                                    className="flex flex-row gap-2 items-center p-0 px-2 bg-gray-100 rounded-2xl cursor-pointer w-fit"
+                                    onClick={() =>
+                                      onToolClick?.(
+                                        toolCall,
+                                        toolMessageContent,
+                                      )
+                                    }
+                                  >
+                                    {toolMessage?.status == 'success' && (
+                                      <FaCheckCircle color="green" />
+                                    )}
+                                    {toolMessage?.status == 'error' && (
+                                      <FaExclamationCircle color="red" />
+                                    )}
+                                    {toolMessage?.status == 'running' && (
+                                      <Spin
+                                        indicator={
+                                          <LoadingOutlined
+                                            style={{ fontSize: 10 }}
+                                            spin
+                                          ></LoadingOutlined>
+                                        }
+                                      />
+                                    )}
+                                    {toolCall.name}{' '}
+                                    <small className="text-xs text-gray-500 max-w-[200px] line-clamp-1 break-all">
+                                      {inputArgs}
+                                    </small>
+                                  </motion.div>
+                                  {attachments && (
+                                    <div className="flex flex-wrap gap-2 p-1">
+                                      {attachments.map((file) => {
+                                        return (
+                                          <ChatAttachment
+                                            showPreview
+                                            value={file}
+                                            key={file.path}
+                                          ></ChatAttachment>
+                                        );
+                                      })}
+                                    </div>
                                   )}
-                                  {toolMessage?.status == 'error' && (
-                                    <FaExclamationCircle color="red" />
-                                  )}
-                                  {toolMessage?.status == 'running' && (
-                                    <Spin
-                                      indicator={
-                                        <LoadingOutlined
-                                          style={{ fontSize: 10 }}
-                                          spin
-                                        ></LoadingOutlined>
-                                      }
-                                    />
-                                  )}
-                                  {toolCall.name}{' '}
-                                  <small className="text-xs text-gray-500 max-w-[200px] line-clamp-1 break-all">
-                                    {inputArgs}
-                                  </small>
-                                </motion.div>
-                                {attachments && (
-                                  <div className="flex flex-wrap gap-2 p-1">
-                                    {attachments.map((file) => {
-                                      return (
-                                        <ChatAttachment
-                                          showPreview
-                                          value={file}
-                                          key={file.path}
-                                        ></ChatAttachment>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })}
+                                </>
+                              );
+                            })}
                         </div>
                       )}
-                    </>
+                    </div>
                   )}
 
                   {value.status == 'error' && (
-                    <div className="mt-2">
-                      <Alert message={value.error_msg} type="error" />
+                    <div className="mt-1 mb-1">
+                      <Alert
+                        message={
+                          value.error_msg || value.additional_kwargs.error
+                        }
+                        type="error"
+                      />
                     </div>
                   )}
 
                   {!hideActionBar && !edit && value.status != 'running' && (
-                    <div className="flex overflow-x-auto gap-2 justify-start items-center mt-5 text-gray-700 opacity-0 transition-opacity duration-300 buttons dark:text-gray-500 group-hover:opacity-100">
+                    <div
+                      className={`flex overflow-x-auto gap-2 ${value.role == 'user' ? 'justify-end' : 'justify-start'} items-center  text-gray-700 opacity-0 transition-opacity duration-300 buttons dark:text-gray-500 group-hover:opacity-100`}
+                    >
                       <div className="flex flex-row space-x-1">
                         {getTextContent() && (
                           <>
@@ -563,14 +585,6 @@ const ChatMessageBox = React.forwardRef(
                             ></Button>
                           </>
                         )}
-
-                        {/* <button
-                          type="button"
-                          className="invisible p-1 rounded transition group-hover:visible dark:hover:text-white hover:text-black edit-user-message-button"
-                          onClick={onRedo}
-                        >
-                          <FaRedo className="w-4 h-4" />{' '}
-                        </button>{' '} */}
                         <Tooltip title="断开上下文">
                           <Button
                             type="text"
@@ -581,39 +595,11 @@ const ChatMessageBox = React.forwardRef(
                           ></Button>
                         </Tooltip>
                         {value?.additional_kwargs?.history && (
-                          <Popover
-                            content={
-                              <div className="flex flex-col gap-2 max-w-[400px] max-h-[300px] overflow-y-auto">
-                                {value?.additional_kwargs?.history.map((x) => {
-                                  if (!x?.['kwargs']) return <></>;
-                                  return (
-                                    <div
-                                      key={x['kwargs'].id}
-                                      className="flex flex-col gap-1"
-                                    >
-                                      <div>
-                                        <Tag>{x['id'][x['id'].length - 1]}</Tag>
-                                      </div>
-                                      {x?.['kwargs']?.['tool_calls'] &&
-                                        JSON.stringify(
-                                          x['kwargs']['tool_calls'],
-                                        )}
-                                      <small className="">
-                                        {JSON.stringify(x?.['kwargs']?.content)}
-                                      </small>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            }
-                            title="Input Message History"
-                            trigger="click"
-                          >
-                            <Button
-                              type="text"
-                              icon={<FaHistory></FaHistory>}
-                            ></Button>
-                          </Popover>
+                          <Button
+                            type="text"
+                            icon={<FaHistory></FaHistory>}
+                            onClick={() => openHistory()}
+                          ></Button>
                         )}
                         <Button
                           type="text"
@@ -675,7 +661,7 @@ const ChatMessageBox = React.forwardRef(
                     </div>
                   )}
                 </div>
-                <div className="my-2.5 w-full flex overflow-x-auto gap-2 flex-wrap">
+                {/* <div className="my-2.5 w-full flex overflow-x-auto gap-2 flex-wrap">
                   {documents.map((document, index) => {
                     return (
                       <div className="text-sm" key={index}>
@@ -683,7 +669,7 @@ const ChatMessageBox = React.forwardRef(
                       </div>
                     );
                   })}
-                </div>
+                </div> */}
               </div>
               {value.divider && (
                 <Divider

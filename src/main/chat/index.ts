@@ -88,6 +88,7 @@ import {
   StateType,
 } from '@langchain/langgraph';
 import { isArray, isString } from '../utils/is';
+import { LanggraphCheckPoints, LanggraphWrites } from '@/entity/CheckPoints';
 // const repository = dbManager.dataSource.getRepository(Chat);
 
 export interface ChatInfo extends Chat {
@@ -284,6 +285,9 @@ export class ChatManager {
         await workbook.xlsx.writeFile(input.savePath);
         event.returnValue = undefined;
       },
+    );
+    ipcMain.handle('chat:clear', (event, chatId: string) =>
+      this.clearChat(chatId),
     );
     ipcMain.on(
       'chat:split-multi-line',
@@ -579,7 +583,9 @@ export class ChatManager {
       }
     }
 
-    messages = [...headHistory, ...messages].filter((x) => x.content);
+    messages = [...headHistory, ...messages].filter(
+      (x) => x.content || isToolMessage(x),
+    );
 
     event(`chat:message-changed:${chatId}`, insertData);
     chat.status = 'running';
@@ -760,6 +766,8 @@ export class ChatManager {
             configurable: {
               workspace: this.getChatPath(chatId),
               thread_id: agent.fixedThreadId === true ? chatId : undefined,
+              recursionLimit:
+                agent.config?.recursionLimit || agent?.recursionLimit || 25,
               chatId,
             },
           });
@@ -1013,6 +1021,8 @@ export class ChatManager {
       modelName,
       providerType,
       state,
+      recursionLimit:
+        agent.config?.recursionLimit || agent?.recursionLimit || 25,
       callbacks: {
         handlerMessageCreated,
         handlerMessageFinished,
@@ -1342,6 +1352,33 @@ export class ChatManager {
     const _image = image.substring(image.indexOf(',') + 1);
     const imageBuffer = Buffer.from(_image, 'base64');
     await writeFile(_savePath, imageBuffer);
+  }
+
+  public async clearChat(chatId: string) {
+    const messages = await this.chatMessageRepository.find({
+      where: { chatId: chatId },
+    });
+    await this.chatMessageRepository.remove(messages);
+
+    const checkPoints =
+      await dbManager.dataSource.getRepository(LanggraphCheckPoints);
+    const writes = await dbManager.dataSource.getRepository(LanggraphWrites);
+
+    const checkPointsData = await checkPoints.find({
+      where: { thread_id: chatId },
+    });
+    const writesData = await writes.find({
+      where: { thread_id: chatId },
+    });
+
+    await checkPoints.remove(checkPointsData);
+    await writes.remove(writesData);
+    const workspace = path.join(getDataPath(), 'chats', chatId);
+    try {
+      if ((await fs.stat(workspace)).isDirectory()) {
+        await fs.rmdir(workspace, { recursive: true });
+      }
+    } catch {}
   }
 
   public async onDeleteMessage(chatMessageId: string) {

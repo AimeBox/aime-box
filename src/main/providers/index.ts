@@ -42,6 +42,9 @@ import { BaseManager } from '../BaseManager';
 import { channel } from '../ipc/IpcController';
 import { GoogleProvider } from './GoogleProvider';
 import { GroqProvider } from './GroqProvider';
+import { TongyiProvider } from './TongyiProvider';
+import { TogetherProvider } from './TogetherProvider';
+import { ElevenLabsProvider } from './ElevenLabsProvider';
 
 export interface ProviderInfo extends Providers {
   credits: {
@@ -189,27 +192,13 @@ export class ProvidersManager extends BaseManager {
           };
         });
       } else if (connection.type === ProviderType.TONGYI) {
-        const options = {
-          method: 'GET',
-          agent: httpProxy,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${connection.api_key}`,
-          },
-          // body: JSON.stringify({}),
-        };
-        const url = `https://dashscope.aliyuncs.com/compatible-mode/v1/models`;
-        const res = await fetch(url, options);
-        const data = await res.json();
-        return data.data
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models?.find((z) => z.name == x.id)?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+        const tongyi = new TongyiProvider({ provider: connection });
+        const list = await tongyi.getModelList();
+        return list;
+      } else if (connection.type === ProviderType.TOGETHERAI) {
+        const togetherai = new TogetherProvider({ provider: connection });
+        const list = await togetherai.getModelList();
+        return list;
       } else if (connection.type === ProviderType.GROQ) {
         const groq = new GroqProvider({ provider: connection });
         const list = await groq.getModelList();
@@ -312,6 +301,12 @@ export class ProvidersManager extends BaseManager {
         return new OpenrouterProvider({ provider: providerObj });
       case ProviderType.SILICONFLOW:
         return new SiliconflowProvider({ provider: providerObj });
+      case ProviderType.TONGYI:
+        return new TongyiProvider({ provider: providerObj });
+      case ProviderType.TOGETHERAI:
+        return new TogetherProvider({ provider: providerObj });
+      case ProviderType.ELEVENLABS:
+        return new ElevenLabsProvider({ provider: providerObj });
       default:
         return undefined;
     }
@@ -437,41 +432,28 @@ export class ProvidersManager extends BaseManager {
       try {
         if (connection?.type === ProviderType.OLLAMA) {
           try {
-            const localOllama = new Ollama();
-            const list = await localOllama.list();
-
-            if (list.models.length > 0) {
-              emb_list.push({
-                name: connection.name,
-                type: ProviderType.OLLAMA,
-                api_base: connection.api_base,
-                api_key: connection.api_key,
-                static: true,
-                models: list.models.map((x) => x.name).sort(),
-              });
-            }
+            const ollama = new OllamaProvider({ provider: connection });
+            const list = await ollama.getEmbeddingModels();
+            emb_list.push({
+              name: connection.name,
+              models: list,
+            });
           } catch {}
         } else if (connection?.type === ProviderType.OPENAI) {
           try {
-            const openai = new OpenAI({
-              baseURL: connection.api_base,
-              apiKey: connection.api_key,
-              httpAgent: httpProxy,
-            });
-
-            const list = await openai.models.list();
+            const tongyi = new OpenAIProvider({ provider: connection });
+            const list = await tongyi.getEmbeddingModels();
             emb_list.push({
               name: connection.name,
-              models: list.data
-                .filter((x) => x.id.startsWith('text-'))
-                .map((x) => x.id)
-                .sort(),
+              models: list,
             });
           } catch {}
         } else if (connection?.type === ProviderType.TONGYI) {
+          const tongyi = new TongyiProvider({ provider: connection });
+          const list = await tongyi.getEmbeddingModels();
           emb_list.push({
             name: connection.name,
-            models: ['text-embedding-v2', 'text-embedding-v1'],
+            models: list,
           });
         } else if (connection?.type === ProviderType.ZHIPU) {
           emb_list.push({
@@ -486,31 +468,12 @@ export class ProvidersManager extends BaseManager {
             models: list,
           });
         } else if (connection?.type === ProviderType.GOOGLE) {
-          const options = {
-            method: 'GET',
-            // headers: {
-            //   accept: 'application/json',
-            //   'content-type': 'application/json',
-            // },
-            agent: httpProxy,
-          };
-          const url = `${connection.api_base}/v1beta/models?key=${connection.api_key}`;
-          let models;
-          try {
-            const res = await fetch(url, options);
-            models = await res.json();
-            emb_list.push({
-              name: connection.name,
-              models: models.models
-                .filter((x) => x.name.includes('embedding'))
-                .map((x) => x.name.split('/')[1]),
-            });
-          } catch (e) {
-            emb_list.push({
-              name: connection.name,
-              models: [],
-            });
-          }
+          const google = new GoogleProvider({ provider: connection });
+          const list = await google.getEmbeddingModels();
+          emb_list.push({
+            name: connection.name,
+            models: list,
+          });
         } else if (connection?.type === ProviderType.LMSTUDIO) {
           const options = {
             method: 'GET',
@@ -542,6 +505,13 @@ export class ProvidersManager extends BaseManager {
           });
         } else if (connection?.type === ProviderType.REPLICATE) {
           const replicate = new ReplicateProvider({ provider: connection });
+          const list = await replicate.getEmbeddingModels();
+          emb_list.push({
+            name: connection.name,
+            models: list,
+          });
+        } else if (connection?.type === ProviderType.TOGETHERAI) {
+          const replicate = new TogetherProvider({ provider: connection });
           const list = await replicate.getEmbeddingModels();
           emb_list.push({
             name: connection.name,
@@ -599,12 +569,12 @@ export class ProvidersManager extends BaseManager {
     for (let index = 0; index < connections.length; index++) {
       const connection = connections[index];
       try {
-        if (connection?.type === ProviderType.SILICONFLOW) {
-          const siliconflow = new SiliconflowProvider({ provider: connection });
-          const list = await siliconflow.getTTSModels();
+        const p = await this.getProvider(connection);
+        const models = await p?.getTTSModels();
+        if (models && models.length > 0) {
           emb_list.push({
             name: connection.name,
-            models: list ?? [],
+            models: models ?? [],
           });
         }
       } catch {

@@ -58,11 +58,13 @@ import { MessageHistory, MessageManager } from '../message_manager';
 import {
   BaseAction,
   DoneAction,
+  ExecuteAction,
   GetMemoryAction,
   HandoffAction,
   HumanFeedbackAction,
   LockedTaskAction,
   PlanAction,
+  RemoveMemoryAction,
   SaveMemoryAction,
   SearchMemoryAction,
 } from './Actions';
@@ -75,6 +77,7 @@ import { Memory, MemoryItem } from './Memory';
 import { MemoryVectorStore } from 'langchain/vectorstores/memory';
 import { getDefaultEmbeddingModel } from '@/main/embeddings';
 import path from 'path';
+import { m } from 'motion/react';
 
 export class ManusAgent extends BaseAgent {
   name: string = 'aime_manus';
@@ -95,6 +98,8 @@ export class ManusAgent extends BaseAgent {
   systemPrompt: string;
 
   plannerSystemPrompt: string;
+
+  agentLoopSystemPrompt: string;
 
   fixedThreadId: boolean = true;
 
@@ -125,6 +130,12 @@ export class ManusAgent extends BaseAgent {
       label: t('agents.agents'),
       field: 'defaultAgents',
       component: 'AgentSelect',
+    },
+    {
+      component: 'InputNumber',
+      field: 'recursionLimit',
+      defaultValue: 25,
+      label: t('agents.recursionLimit'),
     },
   ];
 
@@ -304,6 +315,7 @@ export class ManusAgent extends BaseAgent {
         task: Annotation<string>,
         log_list: Annotation<string>,
         current_state: Annotation<z.infer<typeof this.current_state>>,
+        current_step_messages: Annotation<BaseMessage[]>,
         // action: Annotation<any>,
         // actionName: Annotation<string>,
         memory: Annotation<MemoryItem[]>,
@@ -325,7 +337,7 @@ export class ManusAgent extends BaseAgent {
       }
     }
 
-    let { systemPrompt, plannerSystemPrompt } = config;
+    let { systemPrompt, plannerSystemPrompt, agentLoopSystemPrompt } = config;
     try {
       systemPrompt = fs.readFileSync(
         getAssetPath('prompts', 'manus_system_prompt.md'),
@@ -337,9 +349,14 @@ export class ManusAgent extends BaseAgent {
         getAssetPath('prompts', 'manus_planner_prompt.md'),
         'utf-8',
       );
+      agentLoopSystemPrompt = fs.readFileSync(
+        getAssetPath('prompts', 'manus_agent_loop_system_prompt.md'),
+        'utf-8',
+      );
     } catch {}
 
     this.plannerSystemPrompt = plannerSystemPrompt;
+    this.agentLoopSystemPrompt = agentLoopSystemPrompt;
     this.defaultAgents = config?.defaultAgents || [];
     this.maxFailTimes = config?.maxFailTimes || 5;
     let agentNames = chatOptions?.agentNames || [];
@@ -406,6 +423,13 @@ export class ManusAgent extends BaseAgent {
       ...tools,
     ];
 
+    const hostAagentActionList = [
+      DoneAction,
+      PlanAction,
+      // HumanFeedbackAction,
+      ExecuteAction,
+    ];
+
     const renderedTools = renderTextDescription(tools);
     this.systemPrompt = (
       await SystemMessagePromptTemplate.fromTemplate(systemPrompt).format({
@@ -417,15 +441,26 @@ export class ManusAgent extends BaseAgent {
     await this.initMemory(state);
 
     console.log(
-      `当前可使用的动作: [${agentActionList.map((x) => x.name).join(', ')}]`,
+      `当前可使用的动作: [${hostAagentActionList.map((x) => x.name).join(', ')}]`,
     );
 
     const humanNode = async (state: typeof StateAnnotation.State) => {
+      const ai = state.messages[state.messages.length - 2] as AIMessage;
       const value = interrupt({
-        text_to_revise: state.current_state.action_args.question,
+        text_to_revise: ai.text,
       });
+      const lastMessage = state.messages[state.messages.length - 1];
+      if (isToolMessage(lastMessage)) {
+        that.messageManager.removeLastMessage();
+        lastMessage.content = value;
+        await that.messageManager?.addMessage(
+          new HumanMessage(value),
+          undefined,
+          'human',
+        );
+      }
       const humanMessage = value;
-      await that.messageManager?.addMessage(humanMessage);
+
       await sendMessage(humanMessage);
       return new Command({
         update: {
@@ -433,7 +468,7 @@ export class ManusAgent extends BaseAgent {
           history: that.messageManager.history,
           waitHumanAsk: false,
         },
-        goto: 'manus',
+        goto: 'agent-loop',
       });
     };
 
@@ -769,15 +804,349 @@ export class ManusAgent extends BaseAgent {
       return agentNode;
     };
 
+    const buildAgentLoopMessages = async (
+      state: typeof StateAnnotation.State,
+    ): Promise<BaseMessage[]> => {
+      const messages = [];
+
+      const renderedTools = renderTextDescription(tools);
+      const systemPrompt = (
+        await SystemMessagePromptTemplate.fromTemplate(
+          this.agentLoopSystemPrompt,
+        ).format({
+          renderedTools,
+        })
+      ).text;
+
+      messages.push(new SystemMessage(systemPrompt));
+      const msg = this.messageManager.getMessages(['init', 'action', 'plan']);
+
+      if (this.memoryManager.memory.length > 0) {
+        messages.push(
+          new HumanMessage(
+            `[Here is memory you can use]\n${this.memoryManager.print()}\n[Here is memory end]`,
+          ),
+        );
+      }
+      if (state.todo) {
+        messages.push(...msg);
+      } else {
+        messages.push(...msg);
+      }
+      return messages;
+    };
+
+    const execute = async (state: typeof StateAnnotation.State) => {
+      const { task, plans, currentStep } = state;
+
+      if (plans?.steps.length > 0) {
+        if (plans?.steps.length > state.current_step_index) {
+          //await agentLoop(state);
+          const nextStep = plans?.steps[state.current_step_index];
+          if (state.current_state.action_args.is_continue_action !== true) {
+            await this.messageManager.addMessage(
+              new HumanMessage(
+                `当前进度: ${state.current_step_index + 1}/${state.plans.steps.length}\n当前任务: ${state.plans.steps[state.current_step_index].title}\n根据之前的任务记录和建议结合当前任务,思考使用合适的工具,开始一步一步执行`,
+              ),
+              undefined,
+              'agent-loop-start',
+            );
+          }
+
+          console.log(
+            `当前进度: ${state.current_step_index + 1}/${state.plans.steps.length}\n当前任务: ${state.plans.steps[state.current_step_index].title}`,
+          );
+          return new Command({
+            goto: 'agent-loop',
+            update: {
+              messages: this.messageManager.getMessages(),
+              history: this.messageManager.history,
+              currentStep: nextStep?.title,
+              plans,
+              current_step_messages: [],
+            },
+          });
+        } else {
+          return new Command({
+            goto: 'manus',
+            update: {
+              messages: this.messageManager.getMessages(),
+              history: this.messageManager.history,
+              currentStep: undefined,
+              plans,
+            },
+          });
+        }
+
+        // for (const step of plans.steps) {
+        //   await agentLoop(state);
+        // }
+      } else {
+        return new Command({
+          goto: 'agent-loop',
+          update: {
+            messages: this.messageManager.getMessages(),
+            history: this.messageManager.history,
+            current_step_messages: [],
+          },
+        });
+      }
+    };
+
+    const agentLoop = async (state: typeof StateAnnotation.State) => {
+      const canUsetools = [
+        DoneAction,
+        HumanFeedbackAction,
+        GetMemoryAction,
+        SaveMemoryAction,
+        RemoveMemoryAction,
+        // SearchMemoryAction,
+        HandoffAction,
+        ...tools,
+      ];
+      console.log('可用工具:', canUsetools.map((x) => x.name).join(' '));
+      const modelWithTool = this.model.bindTools(canUsetools, {
+        tool_choice: 'any',
+      });
+
+      const messages = await buildAgentLoopMessages(state);
+
+      const ai = new AIMessage('');
+      ai.id = uuidv4();
+      ai.name = this.name;
+      // ai.additional_kwargs.history = messages;
+      await sendMessage(ai, 'start');
+
+      const response = await modelWithTool.invoke(messages, {
+        tags: ['ignore'],
+        signal: signal,
+      });
+
+      ai.content = response.content;
+      if (response.tool_calls.length == 0) {
+        return new Command({
+          goto: 'agent-loop',
+          update: {
+            messages: this.messageManager.getMessages(),
+            history: this.messageManager.history,
+          },
+        });
+      }
+      ai.tool_calls = [response.tool_calls[0]];
+      console.log(
+        `行动: ${ai.tool_calls[0].name} ${JSON.stringify(ai.tool_calls[0].args, null, 2)}`,
+      );
+
+      ai.usage_metadata = response.usage_metadata;
+      await this.messageManager?.addMessage(ai, undefined, 'loop');
+      const tool_call = ai.tool_calls[0];
+      const { id, name, args } = tool_call;
+      const tool = tools.find((x) => x.name == name);
+      const current_step_messages = [...state.current_step_messages];
+      current_step_messages.push(ai);
+      if (name == DoneAction.name) {
+        // 汇总当前步骤的执行过程
+        const ms = this.messageManager.getMessagesWithMetadata();
+        const start_messages = ms.filter(
+          (x) => x.metadata.type == 'agent-loop-start',
+        );
+
+        const last_start_message = start_messages[start_messages.length - 1];
+        const start_index = ms.lastIndexOf(last_start_message);
+        const loopMessages = this.messageManager.getRangeMessages(start_index);
+
+        if (loopMessages.length - 1 > 0) {
+          const summaryMessages = [
+            new SystemMessage(
+              '以下是任务执行的过程消息请汇总,需要保留执行的重要信息,如文件路径,处理的操作记录等等',
+            ),
+            ...loopMessages.slice(0, loopMessages.length - 1),
+            new HumanMessage('开始汇总以上消息'),
+          ];
+
+          const summary = await this.model.invoke(summaryMessages, {
+            tags: ['ignore'],
+            configurable: {
+              signal: signal,
+            },
+          });
+          console.log('summary', summary.text);
+
+          this.messageManager.removeRangeMessages(
+            start_index + 1,
+            loopMessages.length - 1,
+          );
+
+          await this.messageManager.addMessage(summary, undefined, 'summary');
+
+          await this.messageManager.addMessage(
+            loopMessages[loopMessages.length - 1],
+            undefined,
+            'agent-loop-end',
+          );
+        }
+
+        //完成该节点
+        const { success, text } = args;
+        await sendMessage(
+          new AIMessage({
+            content: args.text,
+            tool_calls: [],
+            id: ai.id,
+            usage_metadata: ai.usage_metadata,
+            // additional_kwargs: { history: messages },
+          }),
+          'end',
+        );
+        const toolMessage = new ToolMessage('', id);
+        toolMessage.id = uuidv4();
+        // await sendMessage(toolMessage);
+        await this.messageManager?.addMessage(toolMessage, undefined, 'done');
+
+        let { todo } = state;
+
+        if (state.plans?.steps && state.plans.steps.length > 0) {
+          state.plans.steps[state.current_step_index].status = success
+            ? 'done'
+            : 'skip';
+
+          todo = `# ${state.plans.title}\n`;
+          let index = 1;
+          for (const step of state.plans.steps) {
+            let status = ' ';
+
+            if (step.status) {
+              if (step.status == 'done') {
+                status = 'x';
+              } else if (step.status == 'skip') {
+                status = '-';
+              }
+            }
+
+            todo += `- ${index}. [${status}] ${step.title || step}\n`;
+            index++;
+            todo += '\n';
+          }
+        }
+
+        return new Command({
+          goto: 'execute',
+          update: {
+            messages: this.messageManager.getMessages(),
+            history: this.messageManager.history,
+            plans: state.plans,
+            current_step_index: state.current_step_index + 1,
+            current_step_messages: current_step_messages,
+            currentStep: state.plans.steps[state.current_step_index + 1]?.title,
+            todo: todo,
+          },
+        });
+      } else if (name == HumanFeedbackAction.name) {
+        ai.tool_calls = [];
+        ai.content = args.question;
+        await sendMessage(ai, 'end');
+        const toolMessage = new ToolMessage('', id);
+        toolMessage.id = uuidv4();
+
+        await this.messageManager?.addMessage(toolMessage, undefined, 'tool');
+        current_step_messages.push(toolMessage);
+        return new Command({
+          goto: 'human',
+          update: {
+            messages: this.messageManager.getMessages(),
+            history: this.messageManager.history,
+            waitHumanAsk: true,
+            current_step_messages: current_step_messages,
+          },
+        });
+      } else if (name.startsWith('handoff_to_')) {
+        return new Command({
+          goto: name,
+        });
+      } else if (tool) {
+        await sendMessage(ai, 'end');
+
+        const toolMessage = new ToolMessage('', id);
+        toolMessage.id = uuidv4();
+        await sendMessage(toolMessage, 'start');
+        try {
+          const res = await tool.invoke(args);
+          console.log(res);
+          toolMessage.content = res;
+          toolMessage.status = ChatStatus.SUCCESS;
+          await sendMessage(toolMessage, 'end');
+        } catch (err) {
+          toolMessage.content = err.message;
+          toolMessage.status = ChatStatus.ERROR;
+          await sendMessage(toolMessage, 'end');
+        }
+        current_step_messages.push(toolMessage);
+
+        await this.messageManager?.addMessage(toolMessage, undefined, 'tool');
+      } else if (name == GetMemoryAction.name) {
+        // 获得记忆
+        const memory = this.memoryManager.getByIds(args.ids);
+        await sendMessage(ai, 'end');
+        const text = memory
+          .map(
+            (x) =>
+              `<memory id="${x.id}" description="${x.description}">\n${x.content}\n</memory>\n`,
+          )
+          .join('\n');
+        const toolMessage = new ToolMessage(text, id);
+        toolMessage.id = uuidv4();
+
+        await this.messageManager?.addMessage(toolMessage, undefined, 'tool');
+        await sendMessage(toolMessage);
+        current_step_messages.push(toolMessage);
+      } else if (name == SaveMemoryAction.name) {
+        // 保存记忆
+        const item = this.memoryManager.addOrUpdate(args);
+
+        await sendMessage(ai, 'end');
+        const toolMessage = new ToolMessage(
+          `memory saved, memory id "${item.id}" `,
+          id,
+        );
+        toolMessage.id = uuidv4();
+
+        await this.messageManager?.addMessage(toolMessage, undefined, 'tool');
+        await sendMessage(toolMessage);
+        current_step_messages.push(toolMessage);
+      } else if (name == RemoveMemoryAction.name) {
+        this.memoryManager.remove(args.ids);
+        await sendMessage(ai, 'end');
+        const toolMessage = new ToolMessage(
+          `memory removed, memory ids "${args.ids.join(',')}" `,
+          id,
+        );
+        toolMessage.id = uuidv4();
+
+        await this.messageManager?.addMessage(toolMessage, undefined, 'tool');
+        await sendMessage(toolMessage);
+        current_step_messages.push(toolMessage);
+      }
+
+      return new Command({
+        goto: 'agent-loop',
+        update: {
+          messages: this.messageManager.getMessages(),
+          history: this.messageManager.history,
+          memory: this.memoryManager.get(),
+          current_step_messages: current_step_messages,
+        },
+      });
+    };
+
     const getNextAction = async (
       inputMessages: BaseMessage[],
       task?: string,
     ): Promise<{
       message: BaseMessage;
-      current_state: z.infer<typeof this.current_state>;
+      current_state?: z.infer<typeof this.current_state>;
       // action: any;
     }> => {
-      const agentOutput = this.createAgentOutput(agentActionList);
+      // const agentOutput = this.createAgentOutput(hostAagentActionList);
 
       const actionTool = tool((args) => {}, {
         name: 'action',
@@ -785,7 +1154,9 @@ export class ManusAgent extends BaseAgent {
         schema: z.object({
           thought: z.string().describe('Your current thinking step'),
           action: z
-            .enum(agentActionList.map((x) => x.name) as [string, ...string[]])
+            .enum(
+              hostAagentActionList.map((x) => x.name) as [string, ...string[]],
+            )
             .describe('The action you want to take'),
           action_description: z
             .string()
@@ -793,7 +1164,7 @@ export class ManusAgent extends BaseAgent {
         }),
       });
       const modelWithThought = that.model.bindTools([actionTool], {
-        tool_choice: 'any',
+        tool_choice: 'auto',
       });
       let result = await modelWithThought.invoke(inputMessages, {
         tags: ['ignore'],
@@ -804,15 +1175,10 @@ export class ManusAgent extends BaseAgent {
       if (result.tool_calls.length == 0) {
         return {
           message: new AIMessage({
-            content: ``,
+            content: result.text,
             // tool_calls: [result.tool_calls[0]],
           }),
-          current_state: {
-            thought: '',
-            action: HumanFeedbackAction.name,
-            action_description: HumanFeedbackAction.description,
-            action_args: { question: result.content },
-          },
+          current_state: undefined,
 
           // action: args.action,
         };
@@ -823,7 +1189,7 @@ export class ManusAgent extends BaseAgent {
       console.log(`💭 思考: ${args.thought}`);
       console.log(`🚀 行动: ${args.action}: ${args.action_description}`);
       if (result.text) console.log(`💬 回复: ${result.text}`);
-      const action = agentActionList.find((x) => x.name == args.action);
+      const action = hostAagentActionList.find((x) => x.name == args.action);
       const modelWithActions = that.model.bindTools([action], {
         tool_choice: 'any',
       });
@@ -947,8 +1313,9 @@ export class ManusAgent extends BaseAgent {
     ) => {
       const { messages, task, todo } = state;
       const lastMessage = messages[messages.length - 1];
+      //const lastMessage = messages[messages.length - 1];
 
-      that.messageManager?.removeAllFromTypeMessage('plan');
+      // that.messageManager?.removeAllFromTypeMessage('plan');
 
       let _inputMessages = that.messageManager?.getMessagesWithMetadata([
         'agent',
@@ -979,27 +1346,15 @@ export class ManusAgent extends BaseAgent {
       }
 
       const inputMessages = _inputMessages.map((x) => x.message);
+
       // 保留最后3条action
 
       if (
         isHumanMessage(lastMessage) &&
-        !task &&
-        state?.current_state?.action != 'human_feedback'
+        !this.messageManager.getMessages().find((x) => x.id == lastMessage.id)
       ) {
         inputMessages.push(lastMessage);
         await this.messageManager?.addMessage(lastMessage, undefined, 'user');
-      }
-
-      if (task) {
-        if (state.plans) {
-          inputMessages.push(
-            new HumanMessage(
-              `[Here is todo.md Start]\n${todo}\n[Here is todo.md End]\n\n---\nfollow the todo.md to complete the task and current step is "${state.currentStep}"\nIf current step is completed, please update plan or if all steps are completed, please use "done" tool to response\nwhat next step action?`,
-            ),
-          );
-        } else {
-          inputMessages.push(new HumanMessage(`what next action?`));
-        }
       }
 
       let nextAction;
@@ -1033,144 +1388,93 @@ export class ManusAgent extends BaseAgent {
       const { current_state, message } = nextAction;
 
       // 添加当前动作
-      await this.messageManager.addMessage(
-        message,
-        undefined,
-        'action',
-        this.name,
-      );
+      // await this.messageManager.addMessage(
+      //   message,
+      //   undefined,
+      //   'action',
+      //   this.name,
+      // );
 
-      const actionName = current_state.action;
-
-      if (actionName) {
-        if (actionName.startsWith('handoff')) {
-          goto = `handoff_to_${current_state.action_args.agent_name}`;
-        } else if (actionName == HumanFeedbackAction.name) {
-          goto = 'human';
-        } else if (actionName == LockedTaskAction.name) {
-          goto = 'locked_task';
-        } else if (actionName == PlanAction.name) {
-          goto = 'plan';
-        } else if (tools.map((x) => x.name).includes(actionName)) {
-          goto = 'tool';
-        } else {
-          // goto = 'manus';
-        }
-      }
-
-      if (goto == 'human') {
-        const askMessage = new AIMessage(
-          `${current_state.action_args.question}`,
-        );
-        askMessage.name = this.name;
-        askMessage.additional_kwargs.model = 'human_feedback';
-        askMessage.additional_kwargs.history = [...inputMessages].map((x) =>
-          x.toJSON(),
-        );
-        await sendMessage(askMessage);
-        await this.messageManager?.addMessage(askMessage);
-      }
-
-      if (
-        actionName.startsWith('handoff') ||
-        actionName == LockedTaskAction.name
-      ) {
-        // if (current_state.thought) {
-        //   await sendMessage(
-        //     new AIMessage({
-        //       content: nextAction.current_state.thought,
-        //       name: this.name,
-        //     }),
-        //   );
-        // }
-      }
-      if (actionName == PlanAction.name) {
-        const toolCallMessage = new AIMessage({
-          content: current_state.action_description,
-          tool_calls: [
-            {
-              name: actionName,
-              args: current_state.action_args,
-              id: this.messageManager.toolId,
-              type: 'tool_call',
-            },
-          ],
+      const actionName = current_state?.action;
+      if (actionName == 'plan') {
+        return new Command({
+          update: {
+            messages: this.messageManager.getMessages(),
+            history: this.messageManager.history,
+            current_state: current_state,
+            current_step_index: undefined,
+          },
+          goto: 'plan',
         });
-        toolCallMessage.name = this.name;
-        toolCallMessage.additional_kwargs.model = model['modelName'];
-        await this.messageManager.addMessage(
-          toolCallMessage,
-          undefined,
-          'action',
-          this.name,
-        );
-        await this.messageManager.addToolMessage('', 'action');
-        await sendMessage(
-          new AIMessage({
-            content: current_state.action_description,
-            name: this.name,
-          }),
-        );
-      }
-      if (goto == 'tool') {
-        const toolCallMessage = new AIMessage({
-          content: current_state.action_description,
-          tool_calls: [
-            {
-              name: actionName,
-              args: current_state.action_args,
-              id: this.messageManager.toolId,
-              type: 'tool_call',
-            },
-          ],
+      } else if (actionName == 'execute') {
+        return new Command({
+          update: {
+            messages: this.messageManager.getMessages(),
+            history: this.messageManager.history,
+            current_state: current_state,
+            current_step_index:
+              state.current_step_index === undefined
+                ? 0
+                : state.current_step_index,
+          },
+          goto: 'execute',
         });
-        toolCallMessage.name = this.name;
-        toolCallMessage.additional_kwargs.model = model['modelName'];
-        await this.messageManager.addMessage(
-          toolCallMessage,
-          undefined,
-          'action',
-          this.name,
-        );
-        await this.messageManager.addToolMessage('', 'action');
-        await sendMessage(toolCallMessage);
+      } else if (actionName == 'done') {
+        const msg = new AIMessage(current_state?.action_args.text);
+        msg.id = uuidv4();
+        await sendMessage(msg);
+        return new Command({
+          update: {
+            messages: this.messageManager.getMessages(),
+            history: this.messageManager.history,
+            current_state: current_state,
+            current_step_index: undefined,
+            currentStep: undefined,
+          },
+          goto: END,
+        });
+      } else {
+        await sendMessage(message);
+        return new Command({
+          update: {
+            messages: this.messageManager.getMessages(),
+            history: this.messageManager.history,
+            current_state: current_state,
+          },
+          goto: END,
+        });
       }
-
-      return new Command({
-        update: {
-          failTimes: failTimes,
-          messages: this.messageManager.getMessages(),
-          history: this.messageManager.history,
-          current_state: nextAction.current_state,
-          waitHumanAsk: actionName == HumanFeedbackAction.name,
-        },
-        goto: goto,
-      });
     };
 
     const workflow = new StateGraph(StateAnnotation)
       .addNode('manus', manusAgent, {
-        ends: [
-          END,
-          ...agents.map((x) => `handoff_to_${x.name}`),
-          'tool',
-          'human',
-          'locked_task',
-          ...(agentActionList.includes(PlanAction) ? ['plan'] : []),
-        ],
+        ends: [END, 'plan', 'execute'],
       })
-      .addNode('locked_task', lockedTaskNode, {
-        ends: ['manus'],
+      .addNode('execute', execute, {
+        ends: ['manus', 'execute'],
       })
-      .addNode('tool', await toolNode(commonTools), {
-        ends: ['manus'],
+      .addNode('agent-loop', agentLoop, {
+        ends: ['execute', 'agent-loop', 'human'],
       })
+      // .addNode('plans', agentLoop, {
+      //   ends: ['manus'],
+      // })
+      // .addNode('done', agentLoop, {
+      //   ends: ['manus'],
+      // })
+
+      // .addNode('locked_task', lockedTaskNode, {
+      //   ends: ['manus'],
+      // })
+      // .addNode('tool', await toolNode(commonTools), {
+      //   ends: ['manus'],
+      // })
       .addNode('human', humanNode, {
-        ends: ['manus'],
+        ends: ['agent-loop'],
       })
       .addEdge(START, 'manus');
 
-    if (agentActionList.includes(PlanAction)) {
+    if (hostAagentActionList.includes(PlanAction)) {
       workflow
         .addNode(
           'plan',
@@ -1184,12 +1488,14 @@ export class ManusAgent extends BaseAgent {
             callBack: async (message, state) => {
               if (isAIMessage(message) && state == 'end') {
                 message.tool_calls[0].id = this.messageManager.toolId;
+                message.tool_calls[0].name = PlanAction.name;
                 await this.messageManager?.addMessage(
                   message,
                   undefined,
                   'plan',
                 );
               } else if (isToolMessage(message)) {
+                message.name = PlanAction.name;
                 message.tool_call_id = this.messageManager.toolId;
                 if (state == 'end') {
                   console.log('tool_call_id', this.messageManager.toolId);
@@ -1210,31 +1516,30 @@ export class ManusAgent extends BaseAgent {
             },
           }),
         )
-
         .addEdge('plan', 'manus');
     }
 
-    for (const agent of agents) {
-      // const _agent = await that.agentRepository.findOne({
-      //   where: { id: agentName },
-      // });
-      // const agent = await agentManager.buildAgent({
-      //   agent: _agent,
-      //   store: store,
-      //   signal: signal,
-      //   responseFormat: z.object({
-      //     logs: z.string().describe('执行日志'),
-      //     result: z.enum(['success', 'fail', 'skip']),
-      //   }),
-      // });
-      workflow.addNode(
-        `handoff_to_${agent.name}`,
-        await createAgentNode(agent),
-        {
-          ends: ['manus', 'plan'],
-        },
-      );
-    }
+    // for (const agent of agents) {
+    //   // const _agent = await that.agentRepository.findOne({
+    //   //   where: { id: agentName },
+    //   // });
+    //   // const agent = await agentManager.buildAgent({
+    //   //   agent: _agent,
+    //   //   store: store,
+    //   //   signal: signal,
+    //   //   responseFormat: z.object({
+    //   //     logs: z.string().describe('执行日志'),
+    //   //     result: z.enum(['success', 'fail', 'skip']),
+    //   //   }),
+    //   // });
+    //   workflow.addNode(
+    //     `handoff_to_${agent.name}`,
+    //     await createAgentNode(agent),
+    //     {
+    //       ends: ['agent-loop'],
+    //     },
+    //   );
+    // }
 
     // Finally, we compile it into a LangChain Runnable.
     const app = workflow.compile({

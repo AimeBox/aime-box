@@ -11,8 +11,6 @@ import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
 import { ImageLoader } from '../loaders/ImageLoader';
 import { filesize } from 'filesize';
-import { fromFile } from 'file-type';
-import { chardet } from 'chardet';
 
 export interface FileWriteParameters extends ToolParams {}
 export interface FileReadParameters extends ToolParams {}
@@ -116,6 +114,7 @@ export class FileRead extends BaseTool {
   schema = z.object({
     path: z.string().describe('local file path'),
     searchText: z.string().optional(),
+    showLineIndex: z.boolean().optional().default(false),
   });
 
   constructor(params?: FileReadParameters) {
@@ -134,7 +133,14 @@ export class FileRead extends BaseTool {
         ? filePath
         : path.join(workspace, filePath);
     }
-    return fs.readFileSync(filePath).toString();
+    const content = fs.readFileSync(filePath).toString();
+    if (input.showLineIndex) {
+      return content
+        .split('\n')
+        .map((line, index) => `${index + 1}|${line}`)
+        .join('\n');
+    }
+    return content;
   }
 }
 

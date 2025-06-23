@@ -11,7 +11,7 @@ import {
   OneOrMore,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { ChatInputAttachment, ChatMode } from '@/types/chat';
+import { ChatInputAttachment, ChatMessageType, ChatMode } from '@/types/chat';
 
 export class ChatOptions {
   system?: string | undefined;
@@ -177,6 +177,9 @@ export class ChatMessage {
 
   @Column()
   model!: string;
+
+  @Column({ nullable: true, default: 'llm' })
+  type?: string;
 
   @Column({ nullable: true })
   provider_type?: string;

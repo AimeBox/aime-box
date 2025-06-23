@@ -16,32 +16,42 @@ import CodeSandboxView from './tool-views/CodeSandboxView';
 import FileView from './tool-views/FileView';
 import WebSearchView from './tool-views/WebSearchView';
 import CodeView from './tool-views/CodeView';
+import KnowledgebaseQueryView from './tool-views/KnowledgebaseQueryView';
 
 export interface ChatToolViewProps {
   open: boolean;
-  onClose: () => void;
+  onClose?: () => void;
   className?: string;
   toolName?: string;
-  toolCall: string;
+  //toolCall: string;
   value?: { title: string; content?: any; toolCall?: any };
   chatId?: string;
 }
 
 export default function ChatToolView(props: ChatToolViewProps) {
-  const { className, open, onClose, value, toolName, toolCall, chatId } = props;
+  const { className, open, onClose, value, toolName, chatId } = props;
   const [toolCallInputView, setToolCallInputView] = useState<'json' | 'text'>(
     'json',
   );
   const getToolView = () => {
     switch (toolName) {
       case 'code_sandbox':
-        return <CodeSandboxView toolCall={toolCall} chatId={chatId} />;
+        return <CodeSandboxView toolCall={value?.toolCall} chatId={chatId} />;
       case 'file_write':
-        return <FileView toolCall={toolCall} content={value?.content} />;
+        return <FileView toolCall={value?.toolCall} content={value?.content} />;
       case 'web_search':
-        return <WebSearchView toolCall={toolCall} content={value?.content} />;
+        return (
+          <WebSearchView toolCall={value?.toolCall} content={value?.content} />
+        );
       case 'python_interpreter':
-        return <CodeView toolCall={toolCall} content={value?.content} />;
+        return <CodeView toolCall={value?.toolCall} content={value?.content} />;
+      case 'knowledgebase-query':
+        return (
+          <KnowledgebaseQueryView
+            toolCall={value?.toolCall}
+            content={value?.content}
+          />
+        );
       default:
         return (
           <>
@@ -56,10 +66,10 @@ export default function ChatToolView(props: ChatToolViewProps) {
                 <Radio.Button value="text">Text</Radio.Button>
               </Radio.Group>
               {toolCallInputView == 'text' && (
-                <ResponseCard value={value.toolCall.args} />
+                <ResponseCard value={value?.toolCall?.args} />
               )}
               {toolCallInputView == 'json' && (
-                <ReactJsonView src={value.toolCall.args} />
+                <ReactJsonView src={value?.toolCall?.args} />
               )}
             </div>
             <div className="h-auto">{renderToolContent()}</div>
@@ -93,7 +103,7 @@ export default function ChatToolView(props: ChatToolViewProps) {
   };
   return (
     open && (
-      <div className={cn('h-full w-[400px] p-2', className)}>
+      <div className={cn('h-full  p-2', className)}>
         <div className="bg-gray-50 rounded-2xl p-4 h-full flex flex-col">
           <div className="flex flex-row items-center justify-between">
             <div className="flex flex-col gap-1">
@@ -102,16 +112,17 @@ export default function ChatToolView(props: ChatToolViewProps) {
                 {value?.toolCall?.id}
               </small>
             </div>
-
-            <div className="text-sm font-medium">
-              <Button
-                icon={<FaTimes />}
-                onClick={() => {
-                  onClose();
-                }}
-                type="text"
-              />
-            </div>
+            {onClose && (
+              <div className="text-sm font-medium">
+                <Button
+                  icon={<FaTimes />}
+                  onClick={() => {
+                    onClose();
+                  }}
+                  type="text"
+                />
+              </div>
+            )}
           </div>
           <ScrollArea className="flex-1 h-full mt-2">
             <div className="mr-3 h-full">{getToolView()}</div>

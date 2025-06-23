@@ -12,4 +12,6 @@ export abstract class BaseInstance {
   }
 
   stop = async () => {};
+
+  clear = async () => {};
 }

@@ -11,9 +11,12 @@ import { imageToBase64, saveFile } from '../utils/common';
 import { v4 as uuidv4 } from 'uuid';
 import { isArray, isUrl } from '../utils/is';
 import { Images } from 'zhipuai-sdk-nodejs-v4';
+import { ProviderType } from '@/entity/Providers';
+import providersManager from '../providers';
+import { ReplicateProvider } from '../providers/ReplicateProvider';
 
 export interface ReplicateParameters extends ToolParams {
-  apiKey: string;
+  providerId: string;
 }
 const REPLICATE_API_URL = 'https://api.replicate.com/v1';
 const REPLICATE_OFFICIAL_LINK = 'https://replicate.com/account/keys';
@@ -45,14 +48,11 @@ export class ReplicateImageEditing extends BaseTool {
 
   apiKey?: string;
 
-  replicate: Replicate;
+  params: ReplicateParameters;
 
   constructor(params?: ReplicateParameters) {
     super();
-    this.apiKey = params?.apiKey || getEnvironmentVariable('REPLICATE_API_KEY');
-    this.replicate = new Replicate({
-      auth: this.apiKey,
-    });
+    this.params = params;
   }
 
   async _call(
@@ -60,6 +60,10 @@ export class ReplicateImageEditing extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
+    const provider = (await providersManager.getProvider(
+      this.params?.providerId,
+    )) as ReplicateProvider;
+
     const body: any = input;
 
     if (isUrl(body.input_image)) {
@@ -72,7 +76,7 @@ export class ReplicateImageEditing extends BaseTool {
     }
     const model = 'flux-kontext-pro';
 
-    const output = await this.replicate.run(
+    const output = await provider.replicate.run(
       'black-forest-labs/flux-kontext-pro',
       {
         input: body,
@@ -125,14 +129,11 @@ export class ReplicateImageGeneration extends BaseTool {
 
   apiKey?: string;
 
-  replicate: Replicate;
+  params: ReplicateParameters;
 
   constructor(params?: ReplicateParameters) {
     super();
-    this.apiKey = params?.apiKey || getEnvironmentVariable('REPLICATE_API_KEY');
-    this.replicate = new Replicate({
-      auth: this.apiKey,
-    });
+    this.params = params;
   }
 
   async _call(
@@ -140,6 +141,10 @@ export class ReplicateImageGeneration extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
+    const provider = (await providersManager.getProvider(
+      this.params?.providerId,
+    )) as ReplicateProvider;
+
     const body: any = input;
 
     if (body.subject_reference) {
@@ -155,7 +160,7 @@ export class ReplicateImageGeneration extends BaseTool {
       }
     }
 
-    const output = await this.replicate.run(
+    const output = await provider.replicate.run(
       body.model || 'black-forest-labs/flux-kontext-pro',
       {
         input: body,
@@ -189,6 +194,7 @@ export class ReplicateTextToVideo extends BaseTool {
       'google/veo-2',
       'minimax/video-01',
       'minimax/video-01-live',
+      'kwaivgi/kling-v2.1',
       'kwaivgi/kling-v2.0',
       'kwaivgi/kling-v1.6-standard',
       'kwaivgi/kling-v1.6-pro',
@@ -213,20 +219,17 @@ export class ReplicateTextToVideo extends BaseTool {
     },
   ];
 
-  name: string = 'replicate_text_to_video';
+  name: string = 'replicate_video_generate';
 
   description: string = 'generate the video from the prompt';
 
   apiKey?: string;
 
-  replicate: Replicate;
+  params: ReplicateParameters;
 
   constructor(params?: ReplicateParameters) {
     super();
-    this.apiKey = params?.apiKey || getEnvironmentVariable('REPLICATE_API_KEY');
-    this.replicate = new Replicate({
-      auth: this.apiKey,
-    });
+    this.params = params;
   }
 
   async _call(
@@ -234,6 +237,10 @@ export class ReplicateTextToVideo extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
+    const provider = (await providersManager.getProvider(
+      this.params?.providerId,
+    )) as ReplicateProvider;
+
     const body: any = input;
     if (body.input_image) {
       if (isUrl(body.input_image)) {
@@ -265,7 +272,7 @@ export class ReplicateTextToVideo extends BaseTool {
       }
     }
 
-    const output = await this.replicate.run(body.model || 'google/veo-2', {
+    const output = await provider.replicate.run(body.model || 'google/veo-2', {
       input: body,
     });
     const url = output.url();
@@ -324,14 +331,11 @@ export class ReplicateMusicGeneration extends BaseTool {
 
   apiKey?: string;
 
-  replicate: Replicate;
+  params: ReplicateParameters;
 
   constructor(params?: ReplicateParameters) {
     super();
-    this.apiKey = params?.apiKey || getEnvironmentVariable('REPLICATE_API_KEY');
-    this.replicate = new Replicate({
-      auth: this.apiKey,
-    });
+    this.params = params;
   }
 
   async _call(
@@ -339,6 +343,9 @@ export class ReplicateMusicGeneration extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
+    const provider = (await providersManager.getProvider(
+      this.params?.providerId,
+    )) as ReplicateProvider;
     const body: any = input;
 
     const data = {
@@ -349,7 +356,7 @@ export class ReplicateMusicGeneration extends BaseTool {
       voice_id: input.voice_id,
     };
 
-    const output = await this.replicate.run('minimax/music-01', {
+    const output = await provider.replicate.run('minimax/music-01', {
       input: data,
     });
     const url = output.url();
@@ -406,14 +413,11 @@ export class ReplicatetSpeechGeneration extends BaseTool {
 
   apiKey?: string;
 
-  replicate: Replicate;
+  params: ReplicateParameters;
 
   constructor(params?: ReplicateParameters) {
     super();
-    this.apiKey = params?.apiKey || getEnvironmentVariable('REPLICATE_API_KEY');
-    this.replicate = new Replicate({
-      auth: this.apiKey,
-    });
+    this.params = params;
   }
 
   async _call(
@@ -421,6 +425,9 @@ export class ReplicatetSpeechGeneration extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
+    const provider = (await providersManager.getProvider(
+      this.params?.providerId,
+    )) as ReplicateProvider;
     const body: any = {
       ...input,
       pitch: 0,
@@ -436,7 +443,7 @@ export class ReplicatetSpeechGeneration extends BaseTool {
       delete body.voice_id;
     }
 
-    const output = await this.replicate.run(
+    const output = await provider.replicate.run(
       body.model || 'minimax/speech-02-turbo',
       {
         input: body,
@@ -472,14 +479,11 @@ export class Replicate3DGeneration extends BaseTool {
 
   apiKey?: string;
 
-  replicate: Replicate;
+  params: ReplicateParameters;
 
   constructor(params?: ReplicateParameters) {
     super();
-    this.apiKey = params?.apiKey || getEnvironmentVariable('REPLICATE_API_KEY');
-    this.replicate = new Replicate({
-      auth: this.apiKey,
-    });
+    this.params = params;
   }
 
   async _call(
@@ -487,13 +491,16 @@ export class Replicate3DGeneration extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
+    const provider = (await providersManager.getProvider(
+      this.params?.providerId,
+    )) as ReplicateProvider;
     const body: any = input;
 
     const data = {
       images: input.images,
     };
 
-    const output = await this.replicate.run('firtoz/trellis', {
+    const output = await provider.replicate.run('firtoz/trellis', {
       input: data,
     });
     console.log(output);
@@ -527,14 +534,11 @@ export class ReplicateLipSync extends BaseTool {
 
   apiKey?: string;
 
-  replicate: Replicate;
+  params: ReplicateParameters;
 
   constructor(params?: ReplicateParameters) {
     super();
-    this.apiKey = params?.apiKey || getEnvironmentVariable('REPLICATE_API_KEY');
-    this.replicate = new Replicate({
-      auth: this.apiKey,
-    });
+    this.params = params;
   }
 
   async _call(
@@ -542,13 +546,16 @@ export class ReplicateLipSync extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
+    const provider = (await providersManager.getProvider(
+      this.params?.providerId,
+    )) as ReplicateProvider;
     const body: any = input;
 
     const data = {
       images: input.images,
     };
 
-    const output = await this.replicate.run('firtoz/trellis', {
+    const output = await provider.replicate.run('firtoz/trellis', {
       input: data,
     });
     console.log(output);
@@ -563,23 +570,21 @@ export class ReplicateLipSync extends BaseTool {
 export class ReplicateToolkit extends BaseToolKit {
   name: string = 'replicate_toolkit';
 
-  configSchema?: FormSchema[] = [
+  configSchema: FormSchema[] = [
     {
-      field: 'apiKey',
-      component: 'Input',
-      label: 'API Key',
+      field: 'providerId',
+      component: 'ProviderSelect',
+      componentProps: {
+        selectMode: 'providers',
+        providerType: ProviderType.REPLICATE,
+      },
       required: true,
     },
   ];
 
-  apiKey?: string;
-
-  params?: ReplicateParameters;
-
   constructor(params?: ReplicateParameters) {
-    super();
-    this.params = params;
-    this.apiKey = params?.apiKey;
+    super(params);
+    //this.apiKey = params?.apiKey;
   }
 
   getTools(): BaseTool[] {

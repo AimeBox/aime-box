@@ -3,6 +3,7 @@ import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatOptions } from '@/entity/Chat';
 import { ChatOpenAI } from '@langchain/openai';
 import { OpenAI } from 'openai';
+import { Embeddings } from '@langchain/core/embeddings';
 
 export interface BaseProviderParams {
   provider: Providers;
@@ -37,6 +38,18 @@ export abstract class BaseProvider {
     return llm;
   }
 
+  getEmbeddings(modelName: string): Embeddings {
+    return undefined;
+  }
+
+  async speech(modelName: string, text: string, config?: any): Promise<Buffer> {
+    return undefined;
+  }
+
+  async transcriptions(modelName: string, filePath: string): Promise<string> {
+    return undefined;
+  }
+
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {
     const openai = new OpenAI({
       baseURL: this.provider.api_base,
@@ -63,6 +76,10 @@ export abstract class BaseProvider {
   }
 
   async getSTTModels(): Promise<string[]> {
+    return undefined;
+  }
+
+  async getTTSModels(): Promise<string[]> {
     return undefined;
   }
 

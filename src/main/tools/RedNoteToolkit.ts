@@ -85,7 +85,7 @@ const xhs_note_to_markdown = (data: { note: any; comments: any }) => {
   if (data.comments.length > 0) {
     text += `### 评论:\n`;
     for (const comment of data.comments) {
-      text += `${comment.content}\n`;
+      text += `- ${comment.content}\n`;
     }
   }
 
@@ -101,7 +101,7 @@ const get_xhs_page = (browser_context: BrowserContext): Page => {
 };
 
 export interface RedNoteParameters extends ToolParams {
-  instancId: string;
+  instancId?: string;
 }
 
 export class RedNoteSearchTool extends BaseTool {
@@ -125,12 +125,11 @@ export class RedNoteSearchTool extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
-    const instance = await instanceManager.getInstance(this.instancId);
+    const instance = await instanceManager.getBrowserInstance(this.instancId);
     if (!instance) {
       throw new Error('instance not found');
     }
-    const browser_instance = instance as BrowserInstance;
-    const { browser_context } = browser_instance;
+    const { browser_context } = instance;
     const outputs = [];
     let page = get_xhs_page(browser_context);
     if (!page) page = await browser_context.newPage();
@@ -185,6 +184,7 @@ export class RedNoteSearchTool extends BaseTool {
     };
     try {
       const list = await calwer();
+      page.removeAllListeners();
       console.log(list);
       //await browser_context.close();
       return list;
@@ -295,8 +295,9 @@ export class RedNoteDetailTool extends BaseTool {
         return false;
       }
     });
+    page.removeAllListeners();
 
-    page.close();
+    // page.close();
     console.log(note, comments);
     return { note, comments };
   }
@@ -306,12 +307,11 @@ export class RedNoteDetailTool extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
-    const instance = await instanceManager.getInstance(this.instancId);
+    const instance = await instanceManager.getBrowserInstance(this.instancId);
     if (!instance) {
       throw new Error('instance not found');
     }
-    const browser_instance = instance as BrowserInstance;
-    const { browser_context } = browser_instance;
+    const { browser_context } = instance;
     const outputs = [];
     let page = get_xhs_page(browser_context);
     if (!page) page = await browser_context.newPage();
@@ -335,6 +335,83 @@ export class RedNoteDetailTool extends BaseTool {
     }
 
     return outputs.join('\n');
+  }
+}
+
+export class RedNoteProfileTool extends BaseTool {
+  schema = z.object({
+    url: z.string(),
+  });
+
+  name: string = 'rednote_profile';
+
+  toolKitName?: string = 'rednote_toolkit';
+
+  description: string =
+    'get rednote post detail,input urls must be like https://www.xiaohongshu.com/user/profile/<user_id>';
+
+  instancId: string;
+
+  constructor(params: RedNoteParameters) {
+    super(params);
+    this.instancId = params?.instancId;
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager?: CallbackManagerForToolRun,
+    parentConfig?: ToolRunnableConfig,
+  ): Promise<any> {
+    const instance = await instanceManager.getBrowserInstance(this.instancId);
+    if (!instance) {
+      throw new Error('instance not found');
+    }
+    const { browser_context } = instance;
+    let notes = null;
+    let userPageData = null;
+    const page = await browser_context.newPage();
+    page.on('response', async (response: Response) => {
+      const url = new URL(response.url());
+      const status = response.status();
+      if (status == 200 && url.href.includes('/user/profile/')) {
+        const data = await response.text();
+
+        const $ = cheerio.load(data);
+
+        $('script').each((index, element) => {
+          const scriptContent = $(element).html();
+          const myVarMatch = scriptContent.match(/window.__INITIAL_STATE__/);
+          if (myVarMatch) {
+            const text = scriptContent.substring(
+              scriptContent.indexOf('=') + 1,
+            );
+            const sandbox = { info: undefined };
+            vm.createContext(sandbox); // 创建隔离的沙箱环境
+            vm.runInContext(`var info = ${text}`, sandbox);
+            userPageData = sandbox.info.user.userPageData;
+            notes = sandbox.info.user.notes[0];
+            console.log('userPageData:', userPageData);
+            console.log('notes:', notes);
+          }
+        });
+      }
+    });
+
+    await page.goto(input.url);
+
+    page.waitForResponse(async (response) => {
+      if (userPageData || notes) {
+        // const data = await response.json();
+        // //console.log(data.data.comments);
+        // comments = data.data.comments;
+        return true;
+      } else {
+        return false;
+      }
+    });
+    page.removeAllListeners();
+    await page.close();
+    return 'success';
   }
 }
 
@@ -368,12 +445,11 @@ export class RedNotePublishTool extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     parentConfig?: ToolRunnableConfig,
   ): Promise<any> {
-    const instance = await instanceManager.getInstance(this.instancId);
+    const instance = await instanceManager.getBrowserInstance(this.instancId);
     if (!instance) {
       throw new Error('instance not found');
     }
-    const browser_instance = instance as BrowserInstance;
-    const { browser_context } = browser_instance;
+    const { browser_context } = instance;
     const outputs = [];
     let page = get_xhs_page(browser_context);
     if (!page) page = await browser_context.newPage();
@@ -398,15 +474,16 @@ export class RedNoteToolkit extends BaseToolKit {
       label: t('tools.instancId'),
       field: 'instancId',
       component: 'InstanceSelect',
+      componentProps: {
+        allowClear: true,
+      },
     },
   ];
 
-  params?: RedNoteParameters;
   //instancId: string;
 
   constructor(params: RedNoteParameters) {
-    super();
-    this.params = params;
+    super(params);
   }
 
   getTools(): BaseTool[] {
@@ -414,6 +491,7 @@ export class RedNoteToolkit extends BaseToolKit {
       new RedNoteSearchTool(this.params),
       new RedNoteDetailTool(this.params),
       new RedNotePublishTool(this.params),
+      new RedNoteProfileTool(this.params),
     ];
   }
 }

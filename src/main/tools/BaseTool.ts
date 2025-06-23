@@ -1,6 +1,7 @@
 import {
   BaseToolkit as LangchainBaseToolkit,
   StructuredTool,
+  ToolParams,
 } from '@langchain/core/tools';
 import { FormSchema } from '@/types/form';
 
@@ -32,7 +33,9 @@ export abstract class BaseTool extends StructuredTool {
   tags?: string[] = [];
 }
 
-export abstract class BaseToolKit extends LangchainBaseToolkit {
+export abstract class BaseToolKit<
+  T extends ToolParams = any,
+> extends LangchainBaseToolkit {
   name: string;
 
   description?: string;
@@ -42,6 +45,13 @@ export abstract class BaseToolKit extends LangchainBaseToolkit {
   configSchema?: FormSchema[] = [];
 
   tools: BaseTool[] = [];
+
+  params?: T;
+
+  constructor(params: T) {
+    super();
+    this.params = params;
+  }
 
   abstract getTools(): BaseTool[];
 }

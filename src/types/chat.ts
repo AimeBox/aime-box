@@ -10,3 +10,5 @@ export interface ChatInputExtend {
 }
 
 export type ChatMode = 'default' | 'planner' | 'agent' | 'file';
+
+export type ChatMessageType = 'llm';

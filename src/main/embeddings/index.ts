@@ -29,6 +29,7 @@ import { ProviderType, Providers } from '../../entity/Providers';
 import { ChatOptions } from '../../entity/Chat';
 import { Embeddings, EmbeddingsParams } from '@langchain/core/embeddings';
 import { HuggingFaceTransformersEmbeddings } from './HuggingFaceTransformersEmbeddings';
+import { SiliconflowEmbeddings } from './SiliconflowEmbeddings';
 
 export async function getEmbeddingModel(
   providerName: string,
@@ -44,6 +45,15 @@ export async function getEmbeddingModel(
     });
     return emb;
   }
+  const _provider = await providersManager.getProvider(providerName);
+
+  const emb = _provider?.getEmbeddings(model);
+
+  if (emb) {
+    return emb;
+  }
+
+  throw new Error(`embedding model "${model}" not found`);
 
   if (provider?.type === ProviderType.OLLAMA) {
     const emb = new OllamaEmbeddings({
@@ -51,11 +61,7 @@ export async function getEmbeddingModel(
       model: model,
     });
     return emb;
-  } else if (
-    provider?.type === ProviderType.OPENAI ||
-    provider?.type === ProviderType.SILICONFLOW ||
-    provider?.type === ProviderType.AZURE_OPENAI
-  ) {
+  } else if (provider?.type === ProviderType.OPENAI) {
     const emb = new OpenAIEmbeddings({
       model: model,
       apiKey: provider.api_key,
@@ -72,7 +78,17 @@ export async function getEmbeddingModel(
     const emb = new ZhipuAIEmbeddings({ apiKey: provider.api_key });
     return emb;
   } else if (provider?.type === ProviderType.TOGETHERAI) {
-    const emb = new TogetherAIEmbeddings({ apiKey: provider.api_key });
+    const emb = new TogetherAIEmbeddings({
+      apiKey: provider.api_key,
+      model: model,
+    });
+    return emb;
+  } else if (provider?.type === ProviderType.SILICONFLOW) {
+    const emb = new SiliconflowEmbeddings({
+      modelName: model,
+      apiKey: provider.api_key,
+      baseURL: provider.api_base,
+    });
     return emb;
   }
   throw new Error();

@@ -13,12 +13,13 @@ import {
 } from 'electron';
 import settingsManager from '../settings';
 import { TextToSpeech } from '../tools/TextToSpeech';
-import * as fs from 'fs/promises';
+import fs from 'fs';
 import { ChatInputAttachment } from '@/types/chat';
 import path from 'path';
 import { platform } from 'process';
-import { getDataPath } from '../utils/path';
-import { isArray } from '../utils/is';
+import { getDataPath, getTmpPath } from '../utils/path';
+import { isArray, isString } from '../utils/is';
+import { v4 as uuidv4 } from 'uuid';
 
 export class AppManager {
   textToSpeech: TextToSpeech;
@@ -49,7 +50,7 @@ export class AppManager {
       const result: ChatInputAttachment[] = [];
       for (const _path of paths) {
         if (_path) {
-          const stats = await fs.stat(_path);
+          const stats = await fs.promises.stat(_path);
           result.push({
             path: _path,
             name: path.basename(_path),
@@ -110,13 +111,13 @@ export class AppManager {
           const list = [] as ChatInputAttachment[];
           for (let index = 0; index < res.filePaths.length; index++) {
             const file = res.filePaths[index];
-            if ((await fs.stat(file)).isDirectory()) {
+            if ((await fs.promises.stat(file)).isDirectory()) {
               list.push({
                 path: file,
                 name: path.basename(file),
                 type: 'folder',
               } as ChatInputAttachment);
-            } else if ((await fs.stat(file)).isFile()) {
+            } else if ((await fs.promises.stat(file)).isFile()) {
               const extension = path.extname(file);
               list.push({
                 path: file,
@@ -243,6 +244,23 @@ export class AppManager {
   public async sendEvent(event: string, data: any) {
     const windows = BrowserWindow.getAllWindows();
     windows[0].webContents.send(event, data);
+  }
+
+  async playAudio(data: string | Buffer) {
+    let filePath;
+    if (isString(data)) {
+      if (!data.startsWith('file://')) {
+        filePath = `file://${data.replaceAll(/\\/g, '/').replaceAll(' ', '%20')}`;
+      } else {
+        filePath = data;
+      }
+    } else {
+      filePath = path.join(getTmpPath(), `${uuidv4()}.wav`);
+      await fs.promises.writeFile(filePath, data);
+    }
+    appManager.sendEvent('play-audio', {
+      filename: filePath,
+    });
   }
 }
 

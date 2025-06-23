@@ -277,7 +277,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
         if (record.state == 'pending') {
           return <FaSpinner className="w-full animate-spin"></FaSpinner>;
         } else if (record.state == 'fail') {
-          return <FaTimes color="red"></FaTimes>;
+          return <FaTimes color="red" className="w-full"></FaTimes>;
         } else {
           return (
             <FaCheckCircle color="green" className="w-full"></FaCheckCircle>
@@ -309,9 +309,9 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
       kbId: props?.knowledgeBaseId,
       config: { ...values },
     });
-    window.electron.ipcRenderer.once('kb:queue', async () => {
-      // await getData();
-    });
+    // window.electron.ipcRenderer.once('kb:queue', async () => {
+    //   // await getData();
+    // });
     modalRef.current.openModal(false);
   };
   const onChange = async (pagination, filter, sorter) => {
@@ -405,6 +405,16 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
 
   useEffect(() => {
     getData();
+    window.electron.ipcRenderer.on(`kb:update-item`, (data: any) => {
+      if (data.knowledgeBase.id == knowledgeBaseId) {
+        if (pagination.current == 1) {
+          getData();
+        }
+      }
+    });
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners(`kb:update-item`);
+    };
   }, [props.knowledgeBaseId, searchText]);
 
   const rowSelection = {

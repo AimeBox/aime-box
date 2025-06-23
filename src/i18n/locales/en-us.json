@@ -110,7 +110,8 @@
     "agents": "Agents",
     "parameters": "Parameters",
     "quit": "Quit",
-    "search": "Search"
+    "search": "Search",
+    "add_remote_agent": "Add Remote Agent"
   },
   "agents": {
     "name": "Name",
@@ -128,7 +129,10 @@
     "recursionLimit": "Recursion Limit",
     "type_a2a": "A2A",
     "type_anp": "ANP",
-    "baseUrl": "Base Url"
+    "baseUrl": "Base Url",
+    "apiKey": "ApiKey",
+    "type_dify": "Dify",
+    "type_coze": "Coze"
   },
   "sidebar": {
     "settings": "Settings",

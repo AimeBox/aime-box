@@ -13,7 +13,9 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import fs from 'fs';
 import FormData from 'form-data';
 import fetch from 'node-fetch';
-
+import { SiliconflowEmbeddings } from '../embeddings/SiliconflowEmbeddings';
+import { Embeddings } from '@langchain/core/embeddings';
+import path from 'path';
 export class SiliconflowProvider extends BaseProvider {
   name: string = ProviderType.SILICONFLOW;
 
@@ -26,6 +28,15 @@ export class SiliconflowProvider extends BaseProvider {
   constructor(params?: BaseProviderParams) {
     super(params);
     this.httpProxy = settingsManager.getHttpAgent();
+  }
+
+  getEmbeddings(modelName: string): Embeddings {
+    const emb = new SiliconflowEmbeddings({
+      modelName: modelName,
+      apiKey: this.provider.api_key,
+      baseURL: this.provider.api_base,
+    });
+    return emb;
   }
 
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {
@@ -114,7 +125,9 @@ export class SiliconflowProvider extends BaseProvider {
   async transcriptions(modelName: string, filePath: string): Promise<string> {
     const form = new FormData();
     form.append('model', modelName);
-    form.append('file', fs.createReadStream(filePath));
+    form.append('file', fs.createReadStream(filePath), {
+      filename: path.basename(filePath),
+    });
 
     const options = {
       method: 'POST',
@@ -129,9 +142,42 @@ export class SiliconflowProvider extends BaseProvider {
       `${this.provider.api_base || this.defaultApiBase}/audio/transcriptions`,
       options,
     );
-    if (!res.ok) throw new Error(`${res.statusText}`);
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(text);
+      throw new Error(`${res.statusText} ${text}`);
+    }
     const data = await res.json();
     return data.text;
+  }
+
+  async speech(modelName: string, text: string): Promise<Buffer> {
+    const options = {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.provider.api_key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: modelName,
+        input: text,
+        voice: 'FunAudioLLM/CosyVoice2-0.5B:alex',
+        response_format: 'wav',
+        sample_rate: 32000,
+        stream: false,
+        speed: 1,
+        gain: 0,
+      }),
+    };
+
+    const response = await fetch(
+      `${this.provider.api_base || this.defaultApiBase}/audio/speech`,
+      options,
+    );
+    if (!response.ok)
+      throw new Error(`generation audio fail: ${await response.text()}`);
+    const buffer = await response.buffer();
+    return buffer;
   }
 
   async getCredits(): Promise<{

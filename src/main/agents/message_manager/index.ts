@@ -18,10 +18,11 @@ type MessageType =
   | 'plan'
   | 'agent'
   | 'action'
-  | 'handoff';
+  | 'handoff'
+  | 'loop';
 
 interface MessageMetadata {
-  type: MessageType;
+  type: MessageType | string;
   tokens: number;
   name?: string;
   inMemory?: boolean;
@@ -65,6 +66,14 @@ export class MessageHistory {
     );
     this.messages = this.messages.filter(
       (message) => message.metadata.type !== messageType,
+    );
+  }
+
+  removeRangeMessages(startIndex: number, length: number) {
+    const deletedMessage = this.messages.splice(startIndex, length);
+    this.totalTokens -= deletedMessage.reduce(
+      (acc, message) => acc + message.metadata.tokens,
+      0,
     );
   }
 }
@@ -178,7 +187,7 @@ export class MessageManager {
   async addMessage(
     message: BaseMessage,
     position?: number,
-    messageType?: MessageType,
+    messageType?: MessageType | string,
     name?: string,
     inMemory?: boolean,
   ) {
@@ -215,6 +224,15 @@ export class MessageManager {
     }
     const msg = this.history.messages.map((message) => message.message);
     return msg;
+  }
+
+  getRangeMessages(startIndex: number): BaseMessage[] {
+    const msg = this.history.messages.slice(startIndex);
+    return msg.map((x) => x.message);
+  }
+
+  removeRangeMessages(startIndex: number, length: number) {
+    this.history.removeRangeMessages(startIndex, length);
   }
 
   removeAllFromTypeMessage(messageType: MessageType) {

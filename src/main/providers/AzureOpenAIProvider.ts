@@ -10,6 +10,13 @@ import { ChatOptions } from '@/entity/Chat';
 import { OpenAI } from 'openai';
 import settingsManager from '../settings';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import {
+  AzureChatOpenAI,
+  AzureOpenAIEmbeddings,
+  ChatOpenAI,
+  OpenAIEmbeddings,
+} from '@langchain/openai';
+import { Embeddings } from '@langchain/core/embeddings';
 
 export class AzureOpenAIProvider extends BaseProvider {
   name: string = ProviderType.AZURE_OPENAI;
@@ -24,6 +31,48 @@ export class AzureOpenAIProvider extends BaseProvider {
   constructor(params?: BaseProviderParams) {
     super(params);
     this.httpProxy = settingsManager.getHttpAgent();
+  }
+
+  getChatModel(modelName: string, options: ChatOptions): BaseChatModel {
+    const llm = new AzureChatOpenAI({
+      model: modelName,
+      temperature: options?.temperature,
+      maxTokens: options?.maxTokens,
+      apiKey: this.provider.api_key,
+      openAIApiVersion: this.provider.config?.apiVersion || '2024-10-21',
+      // maxRetries: 2,
+      azureOpenAIApiKey: this.provider.api_key, // In Node.js defaults to process.env.AZURE_OPENAI_API_KEY
+      azureOpenAIApiInstanceName: new URL(this.provider.api_base).host.split(
+        '.',
+      )[0], // In Node.js defaults to process.env.AZURE_OPENAI_API_INSTANCE_NAME
+      azureOpenAIApiDeploymentName: modelName,
+      streaming: options?.streaming,
+      topP: options?.top_p,
+      configuration: {
+        httpAgent: settingsManager.getHttpAgent(),
+      },
+      //  process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME, // In Node.js defaults to process.env.AZURE_OPENAI_API_DEPLOYMENT_NAME
+      //azureOpenAIApiVersion: provider.extend_params.apiVersion, // In Node.js defaults to process.env.AZURE_OPENAI_API_VERSION
+    });
+    return llm;
+  }
+
+  getEmbeddings(modelName: string): Embeddings {
+    const emb = new AzureOpenAIEmbeddings({
+      model: modelName,
+      apiKey: this.provider.api_key,
+      azureOpenAIEndpoint: this.provider.api_base,
+      azureOpenAIApiKey: this.provider.api_key,
+      azureOpenAIApiDeploymentName: modelName,
+      openAIApiVersion: this.provider.config?.apiVersion || '2024-10-21',
+      azureOpenAIApiInstanceName: new URL(this.provider.api_base).host.split(
+        '.',
+      )[0],
+      configuration: {
+        httpAgent: settingsManager.getHttpAgent(),
+      },
+    });
+    return emb;
   }
 
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {

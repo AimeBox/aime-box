@@ -111,7 +111,7 @@ export const runAgent = async (
     };
 
     for await (const { event, tags, data } of eventStream) {
-      console.log(event, tags, data);
+      // console.log(event, tags, data);
       if (tags.includes('ignore')) {
         // console.log(event, tags, data);
         continue;
@@ -270,7 +270,7 @@ export const runAgent = async (
                 debugger;
                 const _msg = new ToolMessage({
                   id: uuidv4(),
-                  content: '',
+                  content: msg.content || '',
                   tool_call_id: msg.tool_call_id,
                   name: msg.name,
                   additional_kwargs: {

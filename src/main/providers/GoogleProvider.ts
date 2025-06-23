@@ -1,8 +1,12 @@
 import { ProviderType } from '@/entity/Providers';
 import { BaseProvider, BaseProviderParams } from './BaseProvider';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import {
+  ChatGoogleGenerativeAI,
+  GoogleGenerativeAIEmbeddings,
+} from '@langchain/google-genai';
 import { ChatOptions } from '@/entity/Chat';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { Embeddings } from '@langchain/core/embeddings';
 
 export class GoogleProvider extends BaseProvider {
   name: string = ProviderType.GOOGLE;
@@ -26,6 +30,14 @@ export class GoogleProvider extends BaseProvider {
       streaming: options?.streaming,
     });
     return llm;
+  }
+
+  getEmbeddings(modelName: string): Embeddings {
+    const emb = new GoogleGenerativeAIEmbeddings({
+      modelName: modelName, // 768 dimensions
+      apiKey: this.provider.api_key,
+    });
+    return emb;
   }
 
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {

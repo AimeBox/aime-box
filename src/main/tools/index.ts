@@ -97,6 +97,9 @@ import { BaseManager } from '../BaseManager';
 import { channel } from '../ipc/IpcController';
 import { ErrorTest } from './ErrorTest';
 import { RedNoteToolkit } from './RedNoteToolkit';
+import { MinimaxToolkit } from './MinimaxToolkit';
+import { ElevenLabsToolkit } from './ElevenLabsToolkit';
+import { Think } from './ThinkTool';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -282,7 +285,7 @@ export class ToolsManager extends BaseManager {
 
   public async unregisterTool(ClassType) {
     const { name } = ClassType;
-    this.tools = this.tools.filter((x) => x.tool.name != name);
+    this.tools = this.tools.filter((x) => x.name != name);
   }
 
   @channel('tools:getList')
@@ -602,6 +605,9 @@ export class ToolsManager extends BaseManager {
     await this.registerTool(CodeSandbox);
 
     await this.registerTool(RedNoteToolkit);
+    await this.registerTool(MinimaxToolkit);
+    await this.registerTool(ElevenLabsToolkit);
+    await this.registerTool(Think);
   };
 
   @channel('tools:update')

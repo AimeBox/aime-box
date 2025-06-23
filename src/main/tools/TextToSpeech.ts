@@ -17,6 +17,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { BaseTool } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import { appManager } from '../app/AppManager';
+import providersManager from '../providers';
+import { getProviderModel } from '../utils/providerUtil';
+import { saveFile } from '../utils/common';
 
 export interface TextToSpeechParameters extends ToolParams {
   model: string;
@@ -88,6 +91,21 @@ export class TextToSpeech extends BaseTool {
         return 'tts failed';
       }
     } else {
+      const { modelName, provider: providerName } = getProviderModel(
+        this.model,
+      );
+      const provider = await providersManager.getProvider(providerName);
+      if (!provider) {
+        throw new Error(`provider ${this.model} not found`);
+      }
+      if ('speech' in provider) {
+        const buffer = await provider.speech(modelName, input.text);
+        if (buffer) {
+          const savePath = await saveFile(buffer, `${uuidv4()}.wav`, config);
+          await appManager.playAudio(savePath);
+          return `<file>${savePath}</file>`;
+        }
+      }
       return 'tts failed';
     }
   }

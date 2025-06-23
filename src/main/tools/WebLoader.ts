@@ -17,14 +17,18 @@ import { getDataPath } from '../utils/path';
 import { chromium } from 'playwright';
 import { v4 as uuidv4 } from 'uuid';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
-import { a } from 'js-tiktoken/dist/core-cb1c5044';
+import { BaseTool } from './BaseTool';
+import { instanceManager } from '../instances';
+import { FormSchema } from '@/types/form';
 
 export interface WebLoaderParameters extends ToolParams {
-  headless: boolean;
+  // headless: boolean;
   useJina: boolean;
 }
 
-export class WebLoader extends Tool {
+export class WebLoader extends BaseTool {
+  schema = z.object({ url: z.string() });
+
   name: string = 'web_loader';
 
   description: string = 'view web page';
@@ -33,21 +37,33 @@ export class WebLoader extends Tool {
 
   useJina: boolean;
 
+  configSchema: FormSchema[] = [
+    {
+      field: 'useJina',
+      label: 'Use Jina',
+      component: 'Switch',
+    },
+  ];
+
   constructor(params?: WebLoaderParameters) {
     super(params);
-    this.headless = params?.headless;
+    // this.headless = params?.headless;
     this.useJina = params?.useJina;
   }
 
-  async _call(url: string, runManager, config): Promise<any> {
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager,
+    config,
+  ): Promise<any> {
     try {
-      if (!isUrl(url)) {
+      if (!isUrl(input.url)) {
         return 'input value is not url';
       }
       const proxy = settingsManager.getPorxy() || null;
       const httpProxy = settingsManager.getPorxy();
       if (this.useJina) {
-        const response = await fetch(`https://r.jina.ai/${url}`, {
+        const response = await fetch(`https://r.jina.ai/${input.url}`, {
           method: 'GET',
         });
         return await response.text();
@@ -56,23 +72,10 @@ export class WebLoader extends Tool {
       const userDataDir = path.join(getDataPath(), 'User Data');
       let html = null;
       //try {
-      const browser_context = await chromium.launchPersistentContext(
-        userDataDir,
-        {
-          // channel: 'msedge',
-          headless: false,
-
-          proxy: httpProxy
-            ? {
-                server: `${httpProxy}`,
-              }
-            : undefined,
-          args: ['--disable-blink-features=AutomationControlled'],
-        },
-      );
-      const page = await browser_context.newPage();
+      const browser_context = await instanceManager.getBrowserInstance();
+      const page = await browser_context.browser_context.newPage();
       try {
-        await page.goto(url, { timeout: 5000 });
+        await page.goto(input.url, { timeout: 5000 });
         await page.waitForLoadState('networkidle');
       } catch {}
 
@@ -108,7 +111,7 @@ export class WebLoader extends Tool {
 
       const title = await page.title();
       await page.close();
-      await browser_context.close();
+      //await browser_context.close();
 
       return text;
     } catch (err) {
