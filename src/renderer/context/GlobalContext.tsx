@@ -146,9 +146,9 @@ export function GlobalContextProvider({
       },
       agents: {
         //isOpen: isAgentModalOpen,
-        open: (selectAgentNames: string[]) => {
+        open: async (selectAgentNames: string[]) => {
           setIsAgentModalOpen(true);
-          const agents = window.electron.agents.getList();
+          const agents = await window.electron.agents.getList();
           setAgents(agents);
           setSelectedAgents(
             agents.filter((a) => selectAgentNames.includes(a.name)),

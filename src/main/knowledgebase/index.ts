@@ -264,7 +264,7 @@ export class KnowledgeBaseManager {
     } as NotificationMessage);
   };
 
-  private async insertRecord(
+  public async insertRecord(
     kbId: string,
     document: Document,
     sourceType: KnowledgeBaseSourceType,

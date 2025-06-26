@@ -51,7 +51,9 @@ import { A2ACardResolver, A2AClient } from 'a2a-js';
 import { createA2A } from './a2a/Agent2Agent';
 import { jsonSchemaToZod } from '../utils/jsonSchemaToZod';
 import { DataMaskingAgent } from './data_masking/DataMaskingAgent';
-
+import { BaseManager } from '../BaseManager';
+import { channel } from '../ipc/IpcController';
+import { getAssetPath, getDataPath } from '../utils/path';
 export interface AgentInfo extends Agent {
   static: boolean;
   hidden: boolean;
@@ -59,7 +61,7 @@ export interface AgentInfo extends Agent {
   configSchema: FormSchema[];
 }
 
-export class AgentManager {
+export class AgentManager extends BaseManager {
   agents: { info: AgentInfo; agent: BaseAgent }[] = [];
 
   agentRepository: Repository<Agent>;
@@ -73,40 +75,57 @@ export class AgentManager {
     await this.registerAgent(PlannerAgent);
     await this.registerAgent(DataMaskingAgent);
     await this.registerAgent(ManusAgent);
+
+    await this.registerAgentFromAssetPath();
+
+
+
+
     if (!ipcMain) return;
-    ipcMain.on('agent:getList', async (event, filter?: string) => {
-      event.returnValue = await this.getList(filter);
-    });
-    ipcMain.handle('agent:create', (event, data: any) =>
-      this.createAgent(data),
-    );
-    ipcMain.handle(
-      'agent:update',
-      async (event, data: any) => await this.updateAgent(data),
-    );
-    ipcMain.handle('agent:delete', (event, id: string) => this.deleteAgent(id));
-    ipcMain.on(
-      'agent:invoke',
-      async (event, llmProvider: string, name: string, input: any) => {
-        const res = await this.invoke(llmProvider, name, input);
-        event.returnValue = res;
-      },
-    );
-    ipcMain.on(
-      'agent:invokeAsync',
-      async (event, llmProvider: string, name: string, input: any) => {
-        const res = await this.invoke(llmProvider, name, input);
-        event.sender.send('agent:invokeAsync', res);
-        event.returnValue = res;
-      },
-    );
-    ipcMain.handle(
-      'agent:addRemoteAgent',
-      async (event, data: any) => await this.addRemoteAgent(data),
-    );
+    this.registerIpcChannels();
+
+
+    
+    // ipcMain.on(
+    //   'agent:invoke',
+    //   async (event, llmProvider: string, name: string, input: any) => {
+    //     const res = await this.invoke(llmProvider, name, input);
+    //     event.returnValue = res;
+    //   },
+    // );
+    // ipcMain.on(
+    //   'agent:invokeAsync',
+    //   async (event, llmProvider: string, name: string, input: any) => {
+    //     const res = await this.invoke(llmProvider, name, input);
+    //     event.sender.send('agent:invokeAsync', res);
+    //     event.returnValue = res;
+    //   },
+    // );
     // ipcMain.on('agent:getList', async (event, filter?: string) => {
     //   event.returnValue = this.agents;
     // });
+  }
+
+  public async registerAgentFromAssetPath() {
+    const agentsPath = path.join(getAssetPath(),  'agents');
+    if(fs.existsSync(agentsPath)){
+      const agentFiles = await fs.promises.readdir(agentsPath);
+
+      for (const agentFile of agentFiles) {
+        if(agentFile.endsWith('.json')){
+          try{
+            const agentData = JSON.parse(await fs.promises.readFile(path.join(agentsPath, agentFile) , 'utf-8'));
+
+            await this.importAgent(agentData);
+          }catch(e){
+            console.error('import agent fail: ',e)
+          }
+
+        }
+      }
+    }
+
+    
   }
 
   private getAgentConfigSchema(agent: Agent): FormSchema[] {
@@ -188,12 +207,8 @@ export class AgentManager {
     };
   }
 
+  @channel('agent:getList')
   public async getList(filter?: string) {
-    // const agents = this.agents
-    //   .filter(
-    //     (x) => !x.info.hidden && (filter ? x.info.name.includes(filter) : true),
-    //   )
-    //   .map((x) => x.info);
     let custom_agents: Agent[];
     if (!filter) {
       custom_agents = await this.agentRepository.find();
@@ -226,7 +241,7 @@ export class AgentManager {
       custom_agents_info.push({
         ...agent,
         hidden: false,
-        static: agent.type == 'built-in',
+        static: agent.type == 'built-in' ? true : agent.static,
         config: config,
         configSchema: configSchema,
       });
@@ -284,6 +299,7 @@ export class AgentManager {
     }
   }
 
+  @channel('agent:create')
   public async createAgent(data: any) {
     const agent = new Agent(
       undefined,
@@ -319,6 +335,7 @@ export class AgentManager {
     }
   }
 
+  @channel('agent:update')
   public async updateAgent(data: any) {
     let agent;
     if (data.id) {
@@ -375,6 +392,7 @@ export class AgentManager {
     //this.agents.find((x) => x.info.name == data.name).info.config = data.config;
   }
 
+  @channel('agent:delete')
   public async deleteAgent(id: string) {
     await this.agentRepository.delete(id);
   }
@@ -616,6 +634,7 @@ export class AgentManager {
     return await agent.invoke(input);
   }
 
+  @channel('agent:addRemoteAgent')
   public async addRemoteAgent(data: any) {
     if (data.type == 'anp') {
       await this.addAnp(data);
@@ -694,6 +713,32 @@ export class AgentManager {
       throw new Error('');
     }
     const json = await res.json();
+  }
+  @channel('agent:import')
+  public async importAgent(data: any) {
+
+    let agent = await this.agentRepository.findOne({
+      where: { id: data.id },
+    });
+
+    if (!agent) {
+      agent = new Agent(
+        data.id,
+        data.name,
+        data.description,
+        data.prompt,
+        data.type,
+      );
+    } else {
+      agent = {
+        ...agent,
+        ...data,
+      };
+    }
+
+    
+    
+    await this.agentRepository.save(agent);
   }
 }
 
