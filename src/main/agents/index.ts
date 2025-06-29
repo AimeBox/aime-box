@@ -78,14 +78,9 @@ export class AgentManager extends BaseManager {
 
     await this.registerAgentFromAssetPath();
 
-
-
-
     if (!ipcMain) return;
     this.registerIpcChannels();
 
-
-    
     // ipcMain.on(
     //   'agent:invoke',
     //   async (event, llmProvider: string, name: string, input: any) => {
@@ -107,25 +102,27 @@ export class AgentManager extends BaseManager {
   }
 
   public async registerAgentFromAssetPath() {
-    const agentsPath = path.join(getAssetPath(),  'agents');
-    if(fs.existsSync(agentsPath)){
+    const agentsPath = path.join(getAssetPath(), 'agents');
+    if (fs.existsSync(agentsPath)) {
       const agentFiles = await fs.promises.readdir(agentsPath);
 
       for (const agentFile of agentFiles) {
-        if(agentFile.endsWith('.json')){
-          try{
-            const agentData = JSON.parse(await fs.promises.readFile(path.join(agentsPath, agentFile) , 'utf-8'));
+        if (agentFile.endsWith('.json')) {
+          try {
+            const agentData = JSON.parse(
+              await fs.promises.readFile(
+                path.join(agentsPath, agentFile),
+                'utf-8',
+              ),
+            );
 
             await this.importAgent(agentData);
-          }catch(e){
-            console.error('import agent fail: ',e)
+          } catch (e) {
+            console.error('import agent fail: ', e);
           }
-
         }
       }
     }
-
-    
   }
 
   private getAgentConfigSchema(agent: Agent): FormSchema[] {
@@ -714,9 +711,9 @@ export class AgentManager extends BaseManager {
     }
     const json = await res.json();
   }
+
   @channel('agent:import')
   public async importAgent(data: any) {
-
     let agent = await this.agentRepository.findOne({
       where: { id: data.id },
     });
@@ -736,8 +733,6 @@ export class AgentManager extends BaseManager {
       };
     }
 
-    
-    
     await this.agentRepository.save(agent);
   }
 }
