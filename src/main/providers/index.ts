@@ -66,39 +66,6 @@ export class ProvidersManager extends BaseManager {
 
   public async init() {
     if (!ipcMain) return;
-    // ipcMain.handle(
-    //   'providers:getProviders',
-    //   (event, refresh: boolean = false) => this.getProviders(refresh),
-    // );
-    // ipcMain.handle('providers:delete', (event, id: string) =>
-    //   this.deleteProviders(id),
-    // );
-    // ipcMain.handle('providers:createOrUpdate', (event, input: Providers) =>
-    //   this.createOrUpdateProvider(input),
-    // );
-    // ipcMain.handle('providers:getProviderType', (event) =>
-    //   this.getProviderType(),
-    // );
-    // ipcMain.handle('providers:getModels', (event, id: string) =>
-    //   this.getModels(id),
-    // );
-
-    //ipcMain.handle('providers:getLLMModels', (event) => this.getLLMModels());
-
-    // ipcMain.handle('providers:getEmbeddingModels', (event) =>
-    //   this.getEmbeddingModels(),
-    // );
-    // ipcMain.handle('providers:getRerankerModels', (event) =>
-    //   this.getRerankerModels(),
-    // );
-    // ipcMain.handle('providers:getTTSModels', (event) => this.getTTSModels());
-    // ipcMain.handle('providers:getSTTModels', (event) => this.getSTTModels());
-    // ipcMain.handle('providers:getWebSearchProviders', (event) =>
-    //   this.getWebSearchProviders(),
-    // );
-    // ipcMain.handle('providers:getImageGenerationProviders', (event) =>
-    //   this.getImageGenerationProviders(),
-    // );
     this.getProviders();
     ipcMain.handle(
       'providers:getDefaultLLM',

@@ -359,10 +359,7 @@ const electronHandler = {
       ipcRenderer.invoke('tools:getCodeSandboxSetup', path, chatId),
   },
   agents: {
-    getList(filter?: string) {
-      const res = ipcRenderer.sendSync('agent:getList', filter);
-      return res;
-    },
+    getList: (filter?: string) => ipcRenderer.invoke('agent:getList', filter),
     create: (data: any) => ipcRenderer.invoke('agent:create', data),
     update: (data: any) => ipcRenderer.invoke('agent:update', data),
     delete: (id: string) => ipcRenderer.invoke('agent:delete', id),
@@ -380,6 +377,7 @@ const electronHandler = {
     invokeAsync(name: string, input: any) {
       ipcRenderer.send('agent:invokeAsync', name, input);
     },
+    import: (data: any) => ipcRenderer.invoke('agent:import', data),
   },
   plugins: {
     get: (id: string) => ipcRenderer.invoke('plugins:get', id),

@@ -1,0 +1,13 @@
+{
+  "id":"test",
+  "name": "test",
+  "description": "description",
+  "prompt": "prompt",
+  "type":"react",
+  "tools": [],
+  "agents":[],
+  "model":"",
+  "recursionLimit": 25,
+  "config":{},
+  "static":true
+}

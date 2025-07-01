@@ -34,6 +34,7 @@ import FormModal, {
 } from '@/renderer/components/modals/FormModal';
 import { FormSchema } from '@/types/form';
 import { Markdown } from '@/renderer/components/common/Markdown';
+import { Agent } from '@/entity/Agent';
 
 export default function ChatContent() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -59,15 +60,25 @@ export default function ChatContent() {
   const onAgentChange = async (agent: AgentInfo) => {
     setAgentConfigDrawerOpen(false);
     setCurrentAgent(undefined);
+    await getData();
     message.success('success');
+  };
+
+  const getData = async () => {
     const agents = await window.electron.agents.getList();
     setAgents(agents);
+    console.log(agents);
+  };
+
+  const importAgent = async (agent: Agent) => {
+    await window.electron.agents.import(agent);
+    const agents = await window.electron.agents.getList();
+    setAgents(agents);
+    console.log(agents);
   };
 
   useEffect(() => {
-    const agents = window.electron.agents.getList();
-    setAgents(agents);
-    console.log(agents);
+    getData();
   }, []);
 
   const remoteAgentSchemas = [
@@ -195,9 +206,9 @@ export default function ChatContent() {
       } else {
         await window.electron.agents.create(values);
       }
+      await getData();
       message.success('success');
       modalRef.current.openModal(false);
-      setAgents(await window.electron.agents.getList());
     } catch (error) {
       message.error(error.message);
     }
@@ -205,9 +216,9 @@ export default function ChatContent() {
 
   const onSaveRemoteAgent = async (values: any) => {
     await window.electron.agents.addRemoteAgent(values);
+    await getData();
     message.success('success');
     remoteAgentModalRef.current.openModal(false);
-    setAgents(await window.electron.agents.getList());
   };
 
   const onCreate = () => {
@@ -217,7 +228,7 @@ export default function ChatContent() {
 
   const onDelete = async (agent: AgentInfo) => {
     await window.electron.agents.delete(agent.id);
-    setAgents(await window.electron.agents.getList());
+    await getData();
   };
 
   return (
@@ -278,10 +289,7 @@ export default function ChatContent() {
                           remoteAgentModalRef.current.openModal(true);
                         },
                       },
-                      // {
-                      //   label: 'Add Coze Agent',
-                      //   key: 'coze',
-                      // },
+
                       // {
                       //   label: 'Add Dify Agent',
                       //   key: 'dify',
@@ -335,33 +343,40 @@ export default function ChatContent() {
                       }}
                     ></Button>
                   )}
-                  <Button
-                    icon={<FaEdit />}
-                    type="text"
-                    onClick={() => {
-                      if (agent.static) {
-                        onOpenAgentConfigDrawer(agent);
-                      } else {
-                        setCurrentAgent(agent);
-                        modalRef.current.openModal(
-                          true,
-                          {
-                            ...agent,
-                          },
-                          t('common.edit'),
-                        );
-                      }
-                    }}
-                  ></Button>
+
                   {!agent.static && (
-                    <Popconfirm
-                      title={t('common.delete_confirm')}
-                      onConfirm={() => {
-                        onDelete(agent);
-                      }}
-                    >
-                      <Button danger icon={<FaTrashAlt />} type="text"></Button>
-                    </Popconfirm>
+                    <>
+                      <Button
+                        icon={<FaEdit />}
+                        type="text"
+                        onClick={() => {
+                          if (agent.type == 'build-in') {
+                            onOpenAgentConfigDrawer(agent);
+                          } else {
+                            setCurrentAgent(agent);
+                            modalRef.current.openModal(
+                              true,
+                              {
+                                ...agent,
+                              },
+                              t('common.edit'),
+                            );
+                          }
+                        }}
+                      ></Button>
+                      <Popconfirm
+                        title={t('common.delete_confirm')}
+                        onConfirm={() => {
+                          onDelete(agent);
+                        }}
+                      >
+                        <Button
+                          danger
+                          icon={<FaTrashAlt />}
+                          type="text"
+                        ></Button>
+                      </Popconfirm>
+                    </>
                   )}
                 </div>
               </div>
