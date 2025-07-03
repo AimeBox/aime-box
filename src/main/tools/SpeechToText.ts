@@ -12,6 +12,7 @@ import { isUrl } from '../utils/is';
 import { saveFile } from '../utils/common';
 import providersManager from '../providers';
 import { getProviderModel } from '../utils/providerUtil';
+import axios from 'axios';
 
 export interface SpeechToTextParameters extends ToolParams {
   ffmpegPath: string;
@@ -281,13 +282,7 @@ export class SpeechToText extends BaseTool {
     const ext = path.extname(filePath);
     let wave;
     let outpath = filePath;
-    if (ext.toLowerCase() == '.wav') {
-      wave = this.sherpa_onnx.readWave(filePath, false);
-      if (wave.sampleRate != 16000) {
-        outpath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
-        await this.convertTo16kHzWav(filePath, outpath);
-      }
-    } else {
+    if (ext.toLowerCase() != '.wav') {
       outpath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
       await this.convertTo16kHzWav(filePath, outpath);
     }
@@ -303,6 +298,13 @@ export class SpeechToText extends BaseTool {
       const text = await provider.transcriptions(modelName, outpath);
       if (!text) throw new Error(`file "${outpath}" transcriptions failed`);
       return text;
+    }
+    if (ext.toLowerCase() == '.wav') {
+      wave = this.sherpa_onnx.readWave(filePath, false);
+      if (wave.sampleRate != 16000) {
+        outpath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
+        await this.convertTo16kHzWav(filePath, outpath);
+      }
     }
 
     wave = this.sherpa_onnx.readWave(outpath, false);

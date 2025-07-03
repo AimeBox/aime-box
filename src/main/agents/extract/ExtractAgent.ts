@@ -595,7 +595,7 @@ export class ExtractTool extends BaseTool {
         zodObject[field.field] = z
           .string()
           .optional()
-          .describe(field.name + field.description);
+          .describe(field.name + (field?.description || ''));
       } else if (field.type == 'enum' && field.enumValues) {
         zodObject[field.field] = z
           .enum(field.enumValues as [string, ...string[]])

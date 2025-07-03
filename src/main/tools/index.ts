@@ -100,6 +100,7 @@ import { RedNoteToolkit } from './RedNoteToolkit';
 import { MinimaxToolkit } from './MinimaxToolkit';
 import { ElevenLabsToolkit } from './ElevenLabsToolkit';
 import { Think } from './ThinkTool';
+import { BilibiliToolkit } from './social-media/BilibiliToolkit';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -605,6 +606,7 @@ export class ToolsManager extends BaseManager {
     await this.registerTool(CodeSandbox);
 
     await this.registerTool(RedNoteToolkit);
+    await this.registerTool(BilibiliToolkit);
     await this.registerTool(MinimaxToolkit);
     await this.registerTool(ElevenLabsToolkit);
     await this.registerTool(Think);

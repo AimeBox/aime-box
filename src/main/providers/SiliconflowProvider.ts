@@ -16,6 +16,8 @@ import fetch from 'node-fetch';
 import { SiliconflowEmbeddings } from '../embeddings/SiliconflowEmbeddings';
 import { Embeddings } from '@langchain/core/embeddings';
 import path from 'path';
+import axios from 'axios';
+
 export class SiliconflowProvider extends BaseProvider {
   name: string = ProviderType.SILICONFLOW;
 
@@ -125,9 +127,7 @@ export class SiliconflowProvider extends BaseProvider {
   async transcriptions(modelName: string, filePath: string): Promise<string> {
     const form = new FormData();
     form.append('model', modelName);
-    form.append('file', fs.createReadStream(filePath), {
-      filename: path.basename(filePath),
-    });
+    form.append('file', fs.createReadStream(filePath));
 
     const options = {
       method: 'POST',
@@ -137,7 +137,15 @@ export class SiliconflowProvider extends BaseProvider {
       },
       body: form,
     };
-
+    const headers = form.getHeaders();
+    headers.Authorization = `Bearer ${this.provider.api_key}`;
+    const res2 = await axios.post(
+      `${this.provider.api_base || this.defaultApiBase}/audio/transcriptions`,
+      form,
+      {
+        headers,
+      },
+    );
     const res = await fetch(
       `${this.provider.api_base || this.defaultApiBase}/audio/transcriptions`,
       options,

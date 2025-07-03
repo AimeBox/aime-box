@@ -106,7 +106,7 @@ export default function ChatAttachment({
       return (
         <video
           src={path}
-          className="max-h-[15rem] w-[15rem] !h-[15rem] object-contain"
+          className="max-h-[30rem] w-[30rem] !h-[30rem] object-contain flex-1"
           controls
         >
           <track kind="captions" />
@@ -155,7 +155,7 @@ export default function ChatAttachment({
   return (
     <div
       className="flex flex-col gap-2 items-start "
-      style={{ maxWidth: 'min-content' }}
+      // style={{ maxWidth: 'min-content' }}
     >
       {showPreview &&
         value.path &&
