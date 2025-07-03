@@ -80,7 +80,7 @@ export const runCommand = async (
           stdout,
           platform == 'win32' ? 'cp936' : 'utf8',
         );
-        resolve(out);
+        resolve(out || res_err);
       },
     );
     return;

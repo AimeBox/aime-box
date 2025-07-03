@@ -27,7 +27,7 @@ export class ImageLoader extends BaseDocumentLoader {
     const { RapidOcrTool } = await ImageLoader.imports();
     const ocrTool = new RapidOcrTool();
     try {
-      const text = await ocrTool.invoke(this.filePathOrBlob);
+      const text = await ocrTool.invoke({ filePath: this.filePathOrBlob });
       const metadata = { source: this.filePathOrBlob };
 
       const pageContent = text;

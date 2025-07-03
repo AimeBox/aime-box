@@ -271,48 +271,22 @@ const electronHandler = {
       ipcRenderer.invoke('providers:getImageGenerationProviders'),
   },
   kb: {
-    save(pathOrUrl: string) {
-      const res = ipcRenderer.sendSync('kb:save', pathOrUrl);
-      return res;
-    },
-    create(input: KnowledgeBaseCreateInput) {
-      const res = ipcRenderer.sendSync('kb:create', input);
-      return res;
-    },
-    update(id: string, input: KnowledgeBaseUpdateInput) {
-      const res = ipcRenderer.sendSync('kb:update', id, input);
-      return res;
-    },
-    delete(kbId: string) {
-      const res = ipcRenderer.sendSync('kb:delete', kbId);
-      return res;
-    },
-    deleteItem(kbItemId: string | string[]) {
-      const res = ipcRenderer.sendSync('kb:delete-item', kbItemId);
-      return res;
-    },
+    create: (input: KnowledgeBaseCreateInput) =>
+      ipcRenderer.invoke('kb:create', input),
+    update: (id: string, input: KnowledgeBaseUpdateInput) =>
+      ipcRenderer.invoke('kb:update', id, input),
+    delete: (kbId: string) => ipcRenderer.invoke('kb:delete', kbId),
+    deleteItem: (kbItemId: string | string[]) =>
+      ipcRenderer.invoke('kb:delete-item', kbItemId),
     queue(input: { kbId: string; config: Record<string, any> }) {
       ipcRenderer.send('kb:queue', input);
     },
     query: (kbId: string, query: string, options: Record<string, any>) =>
       ipcRenderer.invoke('kb:query', kbId, query, options),
-    getItem(kbItemId: string): {
-      pageContent: string;
-      metadata: any;
-      chunks: KnowledgeBaseItemChunk[];
-    } {
-      const res = ipcRenderer.sendSync('kb:get-item', kbItemId);
-      return res;
-    },
-    updateItem(input: { kbItemId: string; data: any }) {
-      const res = ipcRenderer.sendSync('kb:update-item', input);
-      return res;
-    },
-
-    get(input) {
-      const res = ipcRenderer.sendSync('kb:get', input);
-      return res;
-    },
+    getItem: (kbItemId: string) => ipcRenderer.invoke('kb:get-item', kbItemId),
+    updateItem: (input: { kbItemId: string; data: any }) =>
+      ipcRenderer.invoke('kb:update-item', input),
+    get: (input) => ipcRenderer.invoke('kb:get', input),
     restart(kbId: string) {
       ipcRenderer.send('kb:restart', kbId);
     },

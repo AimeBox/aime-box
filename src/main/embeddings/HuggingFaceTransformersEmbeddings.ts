@@ -54,36 +54,6 @@ export class HuggingFaceTransformersEmbeddings
 
   constructor(fields?: Partial<HuggingFaceTransformersEmbeddingsParams>) {
     super(fields ?? {});
-    Object.defineProperty(this, 'modelName', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: undefined,
-    });
-    Object.defineProperty(this, 'batchSize', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 32,
-    });
-    Object.defineProperty(this, 'stripNewLines', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: true,
-    });
-    Object.defineProperty(this, 'timeout', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: void 0,
-    });
-    Object.defineProperty(this, 'pipelinePromise', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: void 0,
-    });
     this.modelName = fields?.modelName ?? this.modelName;
     this.stripNewLines = fields?.stripNewLines ?? this.stripNewLines;
     this.batchSize = fields?.batchSize ?? this.batchSize;
@@ -128,10 +98,11 @@ export class HuggingFaceTransformersEmbeddings
       });
       this.pipelinePromise = pipe;
     }
+    const that = this;
 
     return this.caller.call(async () => {
       try {
-        const output = await this.pipelinePromise(texts, {
+        const output = await that.pipelinePromise(texts, {
           pooling: 'cls',
           normalize: true,
         });

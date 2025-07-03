@@ -1376,7 +1376,7 @@ export class ChatManager {
     const workspace = path.join(getDataPath(), 'chats', chatId);
     try {
       if ((await fs.stat(workspace)).isDirectory()) {
-        await fs.rmdir(workspace, { recursive: true });
+        await fs.rm(workspace, { recursive: true });
       }
     } catch {}
   }

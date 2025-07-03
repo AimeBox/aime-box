@@ -220,6 +220,8 @@
     "npm-run-all": "^4.1.5",
     "officeparser": "^4.2.0",
     "pdf-parse": "^1.1.1",
+    "pdf-poppler": "^0.2.1",
+    "pdfjs-dist": "^5.3.31",
     "playwright": "^1.50.1",
     "pngjs": "^7.0.0",
     "postcss": "^8.5.1",
@@ -299,7 +301,9 @@
       "**/node_modules/@img/**/*",
       "**/node_modules/undici/**/*",
       "**/node_modules/sherpa-onnx-node/**/*",
-      "**/node_modules/playwright/**/*"
+      "**/node_modules/playwright/**/*",
+      "**/node_modules/pdfjs-dist/**/*",
+      "**/node_modules/canvas/**/*"
     ],
     "files": [
       "dist",
