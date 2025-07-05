@@ -63,6 +63,7 @@ import ChatAttachment from './ChatAttachment';
 import { t } from 'i18next';
 import { ChatInputAttachment } from '@/types/chat';
 import { splitContextAndFiles } from '@/renderer/utils/ContentUtils';
+import AskHumanMessage from './tool-messages/AskHumanMessage';
 // import 'katex/dist/katex.min.css';
 // import * as prod from 'react/jsx-runtime';
 // import { ProviderIcon } from '../common/ProviderIcon';
@@ -203,6 +204,48 @@ const ChatMessageBox = React.forwardRef(
             }
           })}
         </div>
+      );
+    };
+
+    const renderToolMessage = (
+      inputArgs: any,
+      toolCall: any,
+      toolMessageContent: any,
+      toolMessage: ChatMessage,
+    ) => {
+      if (toolCall.name == 'ask-human') {
+        return (
+          <AskHumanMessage toolMessage={toolMessage} toolCall={toolCall} />
+        );
+      }
+      return (
+        <motion.div
+          className="flex flex-row gap-2 items-center p-0 px-2 bg-gray-100 rounded-2xl cursor-pointer w-fit"
+          onClick={() => onToolClick?.(toolCall, toolMessageContent)}
+        >
+          <div>
+            {toolMessage?.status == 'success' && (
+              <FaCheckCircle color="green" />
+            )}
+            {toolMessage?.status == 'error' && (
+              <FaExclamationCircle color="red" />
+            )}
+            {toolMessage?.status == 'running' && (
+              <Spin
+                indicator={
+                  <LoadingOutlined
+                    style={{ fontSize: 10 }}
+                    spin
+                  ></LoadingOutlined>
+                }
+              />
+            )}
+          </div>
+          {toolCall.name}{' '}
+          <small className="text-xs text-gray-500 max-w-[200px] line-clamp-1 break-all">
+            {inputArgs}
+          </small>
+        </motion.div>
       );
     };
     return (
@@ -496,36 +539,13 @@ const ChatMessageBox = React.forwardRef(
 
                               return (
                                 <>
-                                  <motion.div
-                                    className="flex flex-row gap-2 items-center p-0 px-2 bg-gray-100 rounded-2xl cursor-pointer w-fit"
-                                    onClick={() =>
-                                      onToolClick?.(
-                                        toolCall,
-                                        toolMessageContent,
-                                      )
-                                    }
-                                  >
-                                    {toolMessage?.status == 'success' && (
-                                      <FaCheckCircle color="green" />
-                                    )}
-                                    {toolMessage?.status == 'error' && (
-                                      <FaExclamationCircle color="red" />
-                                    )}
-                                    {toolMessage?.status == 'running' && (
-                                      <Spin
-                                        indicator={
-                                          <LoadingOutlined
-                                            style={{ fontSize: 10 }}
-                                            spin
-                                          ></LoadingOutlined>
-                                        }
-                                      />
-                                    )}
-                                    {toolCall.name}{' '}
-                                    <small className="text-xs text-gray-500 max-w-[200px] line-clamp-1 break-all">
-                                      {inputArgs}
-                                    </small>
-                                  </motion.div>
+                                  {renderToolMessage(
+                                    inputArgs,
+                                    toolCall,
+                                    toolMessageContent,
+                                    toolMessage,
+                                  )}
+
                                   {attachments && (
                                     <div className="flex flex-wrap gap-2 p-1">
                                       {attachments.map((file) => {

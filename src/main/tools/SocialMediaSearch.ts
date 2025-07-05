@@ -85,7 +85,7 @@ export class SocialMediaSearch extends BaseTool {
     runManager,
     config,
   ): Promise<any> {
-    this.httpProxy = settingsManager.getPorxy();
+    this.httpProxy = settingsManager.getProxy();
 
     let res = null;
     //try {

@@ -19,7 +19,7 @@ import {
   Tag,
   Tooltip,
 } from 'antd';
-import {
+import React, {
   MutableRefObject,
   ReactNode,
   useCallback,
@@ -62,14 +62,23 @@ import domtoimage from 'dom-to-image';
 import { ChatInfo } from '@/main/chat';
 import FileDropZone from '@/renderer/components/common/FileDropZone';
 import ChatToolView from '@/renderer/components/chat/ChatToolView';
+import ChatHistoryDrawer from './ChatHistoryDrawer';
 
-export default function ChatContent() {
+export interface ChatContentProps {
+  chatId?: string;
+}
+
+const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
+  const { chatId } = props;
+
   const location = useLocation();
   const [emojiOpen, setEmojiOpen] = useState<boolean>(false);
   const [currentChat, setCurrentChat] = useState<ChatInfo | undefined>(
     undefined,
   );
   const [openChatOptionsDrawer, setOpenChatOptionsDrawer] =
+    useState<boolean>(false);
+  const [openChatHistoryDrawer, setOpenChatHistoryDrawer] =
     useState<boolean>(false);
   const [currentModel, setCurrentModel] = useState<string | undefined>(
     undefined,
@@ -104,6 +113,7 @@ export default function ChatContent() {
   const getChat = async (id: string) => {
     let res = await window.electron.chat.getChat(id);
     console.log(res);
+
     if (!res.model) {
       if (res.mode == 'agent' || res.mode == 'supervisor') {
         const agent = await window.electron.db.get('agent', res.agent);
@@ -133,12 +143,11 @@ export default function ChatContent() {
         }
       }
     }
+    const lastMessage = res.chatMessages[res.chatMessages.length - 1];
     setCurrentModel(res.model);
-    setCurrentChat((chat) => {
-      registerEvent(res.id);
-
-      return res;
-    });
+    setCurrentChat(res);
+    registerEvent(res.id);
+    return res;
   };
 
   const onChat = async () => {
@@ -161,22 +170,10 @@ export default function ChatContent() {
     window.electron.chat.cancel(chatId);
   };
   async function handleChatChanged(chat?: Chat) {
-    setCurrentChat((preChat) => {
-      if (chat && preChat?.id === chat.id) {
-        getChat(chat.id);
-        return preChat;
-      }
-      return preChat;
-    });
+    await getChat(chat.id);
   }
   async function handleChatMessageChanged(chatMessage: ChatMessage) {
-    setCurrentChat((preChat) => {
-      if (chatMessage && preChat?.id === chatMessage.chat.id) {
-        getChat(chatMessage.chat.id);
-        return preChat;
-      }
-      return preChat;
-    });
+    const chat = await getChat(chatMessage.chat.id);
   }
 
   const scrollToBottom = useCallback((onlyIsBottom = false) => {
@@ -213,13 +210,20 @@ export default function ChatContent() {
   };
 
   const handleChatFinish = async (chatMessage: ChatMessage) => {
-    setCurrentChat((preChat) => {
-      if (preChat?.id === chatMessage.chat.id) {
-        getChat(chatMessage.chat.id);
-        return preChat;
+    const chat = await getChat(chatMessage.chat.id);
+    if (chatMessage.role == 'tool' && chatMessage?.content?.length > 0) {
+      const { tool_call_id } = chatMessage.content[0];
+      const tool_call = chat.chatMessages
+        .find((x) => x.tool_calls?.some((z) => z.id == tool_call_id))
+        .tool_calls.find((x) => x.id == tool_call_id);
+      if (tool_call_id && tool_call) {
+        openCanvas({
+          title: chatMessage.name,
+          content: chatMessage.content[0],
+          toolCall: tool_call,
+        });
       }
-      return preChat;
-    });
+    }
   };
 
   const handleChangedTitle = async () => {
@@ -240,30 +244,33 @@ export default function ChatContent() {
   };
 
   useEffect(() => {
-    const id = location.pathname.split('/')[2];
+    //const id = location.pathname.split('/')[2];
     closeCanvas();
-    if (id) {
-      getChat(id);
+    if (chatId) {
+      getChat(chatId);
       scrollToBottom();
     } else {
       setCurrentChat(undefined);
       return () => {};
     }
-
     return () => {
-      window.electron.ipcRenderer.removeAllListeners(`chat:changed:${id}`);
+      window.electron.ipcRenderer.removeAllListeners(`chat:changed:${chatId}`);
       window.electron.ipcRenderer.removeAllListeners(
-        `chat:message-changed:${id}`,
+        `chat:message-changed:${chatId}`,
       );
       window.electron.ipcRenderer.removeAllListeners(
-        `chat:message-finish:${id}`,
+        `chat:message-finish:${chatId}`,
       );
       window.electron.ipcRenderer.removeAllListeners(
-        `chat:message-stream:${id}`,
+        `chat:message-stream:${chatId}`,
       );
       console.log('已删除监听');
     };
-  }, [location.pathname]);
+  }, [chatId]);
+
+  const openHistory = (history: any) => {
+    setOpenChatHistoryDrawer(true);
+  };
 
   const onDelete = async (chatMessage: ChatMessage) => {
     const res = await window.electron.chat.getChat(chatMessage.chatId);
@@ -425,7 +432,7 @@ export default function ChatContent() {
                           />
                           <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400">
                             <a href={`/${currentChat.id}`} target="_blank">
-                              {currentChat.id}
+                              {chatId}
                             </a>
                             <span>token: {currentChat.totalToken}</span>
                             <span className="flex flex-row items-center">
@@ -540,6 +547,9 @@ export default function ChatContent() {
                                             chatMessage.chatId,
                                           );
                                         setCurrentChat(res);
+                                      }}
+                                      onOpenHistory={(history) => {
+                                        openHistory(history);
                                       }}
                                       value={chatMessage}
                                     />
@@ -817,6 +827,13 @@ export default function ChatContent() {
         width="50vw"
         onClose={() => setOpenChatOptionsDrawer(false)}
       />
+      <ChatHistoryDrawer
+        open={openChatHistoryDrawer}
+        width="50vw"
+        onClose={() => setOpenChatHistoryDrawer(false)}
+      ></ChatHistoryDrawer>
     </div>
   );
-}
+});
+
+export default ChatContent;

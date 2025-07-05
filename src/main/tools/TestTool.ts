@@ -1,7 +1,7 @@
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import { ToolCall } from '@langchain/core/dist/messages/tool';
 import { RunnableConfig } from '@langchain/core/runnables';
-import { Tool, ToolParams } from '@langchain/core/tools';
+import { Tool, ToolParams, ToolSchemaBase } from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { CallOptions } from '@langchain/langgraph/dist/pregel/types';
 import { notificationManager } from '../app/NotificationManager';
@@ -10,31 +10,25 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import { getModelsPath } from '../utils/path';
+import { BaseTool } from './BaseTool';
+import z from 'zod';
 //import { createCanvas } from 'canvas';
 
-export class ChartjsTool extends Tool {
-  name: string;
+export class TestTool extends BaseTool {
+  schema = z.object({
+    fileOrUrl: z.string(),
+  });
 
-  description: string;
+  name: string = 'test';
+
+  description: string = 'test';
 
   constructor() {
     super();
-    Object.defineProperty(this, 'name', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'chartjs',
-    });
-    Object.defineProperty(this, 'description', {
-      enumerable: true,
-      configurable: true,
-      writable: true,
-      value: 'draw a chart',
-    });
   }
 
   async _call(
-    input: any,
+    input: z.infer<typeof this.schema>,
     runManager?: CallbackManagerForToolRun,
     config?: RunnableConfig,
   ): Promise<string> {
@@ -47,16 +41,15 @@ export class ChartjsTool extends Tool {
   }
 
   async stream(
-    input: string,
+    input: z.infer<typeof this.schema>,
     options?: Partial<CallOptions>,
   ): Promise<IterableReadableStream<any>> {
     async function* generateStream() {
-      throw new Error('not implemented');
       const t = new Transformers({
         task: 'object-detection',
         modelName: 'doclayout_yolo',
       });
-      const fileOrUrl = input.input;
+      const { fileOrUrl } = input;
       const output = await t.doclayout(fileOrUrl);
       const image_draw = sharp(fileOrUrl);
       const metadata = await image_draw.metadata();

@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import { runCommand } from './exec';
 import fs from 'fs';
 import { dialog } from 'electron';
+import { notificationManager } from '../app/NotificationManager';
 
 /**
  * 将 PDF 每一页渲染为 PNG 图片
@@ -38,14 +39,14 @@ export async function convertPdfToImages(pdfPath: string, outputDir: string) {
     } catch {}
     if (!hasPoppler) {
       const res = await dialog.showMessageBox({
-        title: 'Poppler not found',
-        message: 'Poppler not found, please install it',
+        title: 'poppler not found',
+        message: 'poppler not found, please install it',
         buttons: ['OK', 'Cancel'],
       });
       if (res.response === 1) {
-        throw new Error('Poppler install cancelled');
+        throw new Error('poppler install cancelled');
       }
-      await runCommand(`brew install poppler`);
+      await runCommand(`brew install poppler`, { timeout: 60 * 1000 });
       await runCommand(`poppler -v`);
     }
 

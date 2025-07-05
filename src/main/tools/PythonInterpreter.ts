@@ -12,7 +12,7 @@ import path from 'path';
 import { app } from 'electron';
 import { PythonShell, Options } from 'python-shell';
 import fs from 'fs';
-import { runCommand, runCommandSync } from '../utils/exec';
+import { runCommand } from '../utils/exec';
 import { getTmpPath } from '../utils/path';
 import { platform } from 'process';
 import { BaseTool } from './BaseTool';
@@ -206,8 +206,9 @@ export class PythonInterpreterTool extends BaseTool {
         console.log(`"${this.pythonPath}" "${pythonScriptFilePath}"`);
         const res = await runCommand(
           `"${this.pythonPath}" "${pythonScriptFilePath}"`,
-          undefined,
-          cwd,
+          {
+            cwd,
+          },
         );
         if (res.toString().trim() == '') {
           return 'you should use print() in script!';

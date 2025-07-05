@@ -345,7 +345,7 @@ class SettingsManager {
     return undefined;
   }
 
-  public getPorxy(): string {
+  public getProxy(): string {
     if (this.settingsCache.proxy) {
       return `${this.settingsCache.proxy}`;
     }

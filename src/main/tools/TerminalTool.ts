@@ -96,11 +96,10 @@ export class TerminalTool extends BaseTool {
     } else {
       let res;
       try {
-        res = await runCommand(
-          input.command as string,
-          (input.terminal as string) || this.terminale,
+        res = await runCommand(input.command as string, {
+          file: this.terminale,
           cwd,
-        );
+        });
       } catch (err) {
         console.error(err);
         res = err.message;

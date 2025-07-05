@@ -128,17 +128,21 @@ export class ExtractTool extends BaseTool {
 
   embedding: Embeddings;
 
+  messages?: BaseMessage[];
+
   constructor(params?: {
     model: BaseChatModel;
     allFieldInLLM: boolean;
     allDocInLLM: boolean;
     embedding: Embeddings;
+    messages?: BaseMessage[];
   }) {
     super({});
     this.model = params?.model;
     this.allFieldInLLM = params?.allFieldInLLM ?? false;
     this.allDocInLLM = params?.allDocInLLM ?? false;
     this.embedding = params?.embedding;
+    this.messages = params?.messages ?? [];
   }
 
   getFiles = async (sources: string[]) => {
@@ -540,6 +544,9 @@ export class ExtractTool extends BaseTool {
       }
       if (input.savePath) {
         try {
+          if (!input.savePath.toLowerCase().endsWith('.xlsx')) {
+            input.savePath += '.xlsx';
+          }
           const workbook = new ExcelJS.Workbook();
           const worksheet = workbook.addWorksheet('Sheet1');
 
@@ -629,28 +636,28 @@ export class ExtractAgent extends BaseAgent {
   schema = z.object({
     source: z.array(z.string()).describe('FilePaths Or Directories'),
     task: z.string().describe('Extract Task'),
-    savePath: z.optional(z.string()).describe('Save Path'),
+    savePath: z.string().optional().describe('Save Path'),
   });
 
   configSchema: FormSchema[] = [
+    // {
+    //   label: t('字段分析模型'),
+    //   field: 'fieldModel',
+    //   component: 'ProviderSelect',
+    //   componentProps: {
+    //     type: 'llm',
+    //   },
+    // },
+    // {
+    //   label: t('提取模型'),
+    //   field: 'extractModel',
+    //   component: 'ProviderSelect',
+    //   componentProps: {
+    //     type: 'llm',
+    //   },
+    // },
     {
-      label: t('字段分析模型'),
-      field: 'fieldModel',
-      component: 'ProviderSelect',
-      componentProps: {
-        type: 'llm',
-      },
-    },
-    {
-      label: t('提取模型'),
-      field: 'extractModel',
-      component: 'ProviderSelect',
-      componentProps: {
-        type: 'llm',
-      },
-    },
-    {
-      label: t('embedding'),
+      label: t('common.embedding'),
       field: 'embedding',
       component: 'ProviderSelect',
       componentProps: {
@@ -689,9 +696,9 @@ export class ExtractAgent extends BaseAgent {
 
   llm: BaseChatModel;
 
-  fieldLLM: BaseChatModel;
+  // fieldLLM: BaseChatModel;
 
-  extractLLM: BaseChatModel;
+  // extractLLM: BaseChatModel;
 
   embedding: Embeddings;
 
@@ -723,20 +730,16 @@ export class ExtractAgent extends BaseAgent {
   }) {
     const config = await this.getConfig();
     this.systemPrompt = config.systemPrompt;
-    const { provider, modelName } = getProviderModel(config.fieldModel);
-    const { provider: extractProvider, modelName: extractModelName } =
-      getProviderModel(config.extractModel);
+    // const { provider, modelName } = getProviderModel(config.fieldModel);
+    // const { provider: extractProvider, modelName: extractModelName } =
+    //   getProviderModel(config.extractModel);
     const that = this;
     this.textSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
       chunkOverlap: 20,
     });
-    const fieldModel = await getChatModel(provider, modelName, {
-      temperature: 0,
-    });
-    const extractModel = await getChatModel(extractProvider, extractModelName, {
-      temperature: 0,
-    });
+    const fieldModel = params.model;
+    const extractModel = params.model;
     if (config.embedding) {
       const { provider: embeddingProvider, modelName: embeddingModelName } =
         getProviderModel(config.embedding);
@@ -802,6 +805,7 @@ export class ExtractAgent extends BaseAgent {
         allFieldInLLM: config.allFieldInLLM,
         allDocInLLM: config.allDocInLLM,
         embedding: that.embedding,
+        messages: messages,
       });
       const toolNode = new ToolNode([extractTool]);
       const result = await toolNode.streamEvents(

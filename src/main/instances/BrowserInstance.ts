@@ -17,7 +17,7 @@ export class BrowserInstance extends BaseInstance {
   }
 
   run = async () => {
-    const httpProxy = settingsManager.getPorxy();
+    const httpProxy = settingsManager.getProxy();
     if (
       this.instances?.config?.userDataPath ||
       this.instances?.config?.executablePath

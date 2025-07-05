@@ -575,13 +575,15 @@ export class ProvidersManager extends BaseManager {
     for (let index = 0; index < connections.length; index++) {
       const provider = await this.getProvider(connections[index]);
       if (provider) {
-        const models = await provider.getSTTModels();
-        if (models && models.length > 0) {
-          emb_list.push({
-            name: connections[index].name,
-            models: models,
-          });
-        }
+        try {
+          const models = await provider.getSTTModels();
+          if (models && models.length > 0) {
+            emb_list.push({
+              name: connections[index].name,
+              models: models,
+            });
+          }
+        } catch {}
       }
     }
     return emb_list;

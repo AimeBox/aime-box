@@ -60,8 +60,8 @@ export class WebLoader extends BaseTool {
       if (!isUrl(input.url)) {
         return 'input value is not url';
       }
-      const proxy = settingsManager.getPorxy() || null;
-      const httpProxy = settingsManager.getPorxy();
+      const proxy = settingsManager.getProxy() || null;
+      const httpProxy = settingsManager.getProxy();
       if (this.useJina) {
         const response = await fetch(`https://r.jina.ai/${input.url}`, {
           method: 'GET',

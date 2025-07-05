@@ -6,29 +6,46 @@ import { Tool, StructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { isUrl } from '../utils/is';
 import fs from 'fs';
+import { BaseTool } from './BaseTool';
+import type { ComponentType } from '@/types';
 
-export class AskHuman extends StructuredTool {
+export class AskHuman extends BaseTool {
   schema = z.object({
     question: z.string().describe('Ask human questions'),
-    displayFormat: z
-      .enum(['string', 'radio', 'checkbox', 'file', 'date-range', 'date'])
-      .describe('base64'),
-    radioConfig: z
-      .optional(z.array(z.string()))
-      .describe('if displayFormat is radio this is required'),
-    checkboxConfig: z
-      .optional(z.array(z.string()))
-      .describe('if displayFormat is checkbox this is required'),
-    fileConfig: z
-      .optional(z.object({ multiple: z.boolean() }))
-      .describe('if displayFormat is file this is required'),
+    form_items: z
+      .array(
+        z.object({
+          component: z.enum([
+            'Input',
+            'InputTextArea',
+            'Select',
+            'Switch',
+            'DatePicker',
+          ]),
+          componentProps: z.any().optional(),
+          field: z.string(),
+          label: z.string(),
+          defaultValue: z.string().optional(),
+          required: z.boolean().default(false),
+        }),
+      )
+      .optional(),
   });
 
   name = 'ask-human';
 
-  description = 'Ask human question and show ui Format to human action';
+  description = [
+    'Ask human question or show ui Format to human action',
+    'componentProps: ',
+    '- if `Input` : null',
+    '- if `InputTextArea` : null',
+    '- if `Select` : {options:[{label:string,value:string},...],mode: "multiple" | "tags" | undefined}',
+    '- if `Switch` : null',
+    '- if `File` : null',
+    '- if `DatePicker` : null',
+  ].join('\n');
 
   async _call(input: z.infer<typeof this.schema>): Promise<string> {
-    return JSON.stringify(input);
+    return 'wait human answer';
   }
 }

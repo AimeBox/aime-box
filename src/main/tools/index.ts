@@ -58,7 +58,7 @@ import { ComfyuiTool } from './ComfyuiTool';
 import { WebSearchEngine } from '@/types/webSearchEngine';
 import { v4 as uuidv4 } from 'uuid';
 import { WebSearchTool } from './WebSearchTool';
-import { ChartjsTool } from './Chartjs';
+import { TestTool } from './TestTool';
 import { z, ZodObject } from 'zod';
 import { BaseTool, BaseToolKit } from './BaseTool';
 import { KnowledgeBaseQuery } from './KnowledgeBaseQuery';
@@ -559,7 +559,7 @@ export class ToolsManager extends BaseManager {
     if (!app.isPackaged) {
       await this.registerTool(SleepTool);
       await this.registerTool(ErrorTest);
-      await this.registerTool(ChartjsTool);
+      await this.registerTool(TestTool);
       await this.registerTool(NodejsVM);
     }
     await this.registerTool(BrowserUseTool);
@@ -589,7 +589,7 @@ export class ToolsManager extends BaseManager {
     await this.registerTool(Ideogram);
     await this.registerTool(Midjourney);
     await this.registerTool(ComfyuiTool);
-    // await this.registerTool(AskHuman);
+    await this.registerTool(AskHuman);
     await this.registerTool(FileSystemToolKit);
 
     await this.registerTool(TextToSpeech);

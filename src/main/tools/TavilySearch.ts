@@ -69,7 +69,7 @@ export class TavilySearchTool extends BaseTool {
     runManager,
     config,
   ): Promise<any> {
-    const proxy = settingsManager.getPorxy();
+    const proxy = settingsManager.getProxy();
 
     const body = {
       query: input.query,

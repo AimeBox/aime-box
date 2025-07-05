@@ -30,6 +30,7 @@ import ChatPlannerContent from './ChatPlannerContent';
 export default function ChatPage() {
   const chatListRef = useRef<ChatListRef | null>(null);
   const [mode, setMode] = useState<ChatMode | null>(null);
+  const [chatId, setChatId] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   useEffect(() => {
@@ -46,7 +47,11 @@ export default function ChatPage() {
       const _mode = s['mode'];
       setMode(_mode);
     }
-  }, [location.search]);
+    // debugger;
+    const chatId = location.pathname.split('/')[2];
+
+    setChatId(chatId);
+  }, [location.search, location.pathname]);
 
   const onNewChat = async (mode: ChatMode) => {
     const chat = await window.electron.chat.create(mode);
@@ -65,7 +70,7 @@ export default function ChatPage() {
         <div className="flex flex-col flex-1 w-full min-w-0 h-full min-h-full">
           <Routes>
             {(mode == 'default' || mode == 'agent') && (
-              <Route path="*" element={<ChatContent />} />
+              <Route path="*" element={<ChatContent chatId={chatId} />} />
             )}
             {mode == 'file' && <Route path="*" element={<ChatFileContent />} />}
             {mode == 'planner' && (

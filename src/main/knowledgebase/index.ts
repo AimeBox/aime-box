@@ -103,11 +103,6 @@ export class KnowledgeBaseManager extends BaseManager {
     );
     if (!ipcMain) return;
     this.registerIpcChannels();
-
-    // ipcMain.on('kb:save', async (event, pathOrUrl: string) => {
-    //   await this.save(pathOrUrl);
-    //   event.returnValue = null;
-    // });
     ipcMain.on(
       'kb:queue',
       async (
@@ -125,33 +120,6 @@ export class KnowledgeBaseManager extends BaseManager {
       await this.restart(kbId);
       event.sender.send('kb:restart');
     });
-    // ipcMain.on('kb:delete', async (event, kbId: string) => {
-    //   await this.delete(kbId);
-    //   event.returnValue = null;
-    // });
-    // ipcMain.on('kb:delete-item', async (event, kbItemId: string) => {
-    //   await this.deleteItem(kbItemId);
-    //   event.returnValue = null;
-    // });
-
-    // ipcMain.handle('kb:query', (event, kbId, query, options) =>
-    //   this.query(kbId, query, options),
-    // );
-    // ipcMain.on('kb:get-item', async (event, kbItemId: string) => {
-    //   const res = await this.getItem(kbItemId);
-    //   event.returnValue = res;
-    // });
-    // ipcMain.on(
-    //   'kb:update-item',
-    //   async (event, input: { kbItemId: string; data: any }) => {
-    //     const res = await this.updateItem(input.kbItemId, input.data);
-    //     event.returnValue = res;
-    //   },
-    // );
-    // ipcMain.on('kb:get', async (event, input) => {
-    //   const res = await this.get(input);
-    //   event.returnValue = res;
-    // });
   }
 
   public restart = async (kbId: string) => {

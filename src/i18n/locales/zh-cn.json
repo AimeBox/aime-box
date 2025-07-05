@@ -178,7 +178,8 @@
     "parameters": "参数",
     "quit": "退出",
     "search": "搜索",
-    "add_remote_agent": "添加远程助手"
+    "add_remote_agent": "添加远程助手",
+    "embedding": "向量嵌入模型"
   },
   "agents": {
     "name": "名称",

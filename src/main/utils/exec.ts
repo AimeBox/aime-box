@@ -2,6 +2,8 @@ import { exec, execFile, execFileSync, spawn } from 'node:child_process';
 import { platform } from 'node:process';
 import iconv from 'iconv-lite';
 import fixPath from 'fix-path';
+import os from 'os';
+import settingsManager from '../settings';
 
 export const runCommandSync = (command: string) => {
   if (platform == 'win32') {
@@ -15,9 +17,16 @@ export const runCommandSync = (command: string) => {
 };
 export const runCommand = async (
   command: string,
-  file?: string,
-  cwd?: string,
+  options: {
+    file?: string;
+    cwd?: string;
+    env?: string;
+    timeout?: number;
+    stdout?: (data: any) => void;
+    stderr?: (data: any) => void;
+  } = {},
 ): Promise<string> => {
+  const { file, cwd, timeout, stdout, stderr } = options;
   let _file = file;
   if (!_file) {
     if (platform == 'win32') {
@@ -43,16 +52,24 @@ export const runCommand = async (
       commands.push(command);
     }
     fixPath();
+    const env = {
+      ...process.env,
+      PATH: process.env.PATH,
+      HOME: os.homedir(),
+    };
+    if (settingsManager.getProxy()) {
+      env['HTTP_PROXY'] = settingsManager.getProxy();
+      env['HTTPS_PROXY'] = settingsManager.getProxy();
+    }
 
-    const child2 = exec(
+    const child = exec(
       commands.join(' '),
       {
         encoding: 'buffer',
         windowsHide: false,
         cwd: cwd,
-        env: {
-          PATH: process.env.PATH,
-        },
+        env: env,
+        timeout: timeout,
       },
       (error, stdout, stderr) => {
         const res_out = iconv.decode(
@@ -83,62 +100,18 @@ export const runCommand = async (
         resolve(out || res_err);
       },
     );
-    return;
-    const child = execFile(
-      _file,
-      commands,
-      {
-        encoding: 'buffer',
-        // stdio: ['pipe', 'pipe', 'pipe'],
-        // shell: true,
-        // windowsVerbatimArguments: true,
-      },
-      (error, stdout, stderr) => {
-        const res_out = iconv.decode(stdout, 'cp936');
-        const res_err = iconv.decode(stderr, 'cp936');
-        if (error) {
-          if (res_err) {
-            reject(new Error(`Error:\n${res_err}`));
-            return;
-          }
-          if (res_out) {
-            reject(new Error(`${res_out}`));
-            return;
-          }
-          return;
-        }
-        const out = iconv.decode(stdout, 'cp936');
-        resolve(out);
-      },
-    );
-    // let stdoutData = Buffer.alloc(0);
-    // let stderrData = Buffer.alloc(0);
-    // child.stdout.on('data', (chunk) => {
-    //   stdoutData = Buffer.concat([stdoutData, chunk]);
-    //   const output = iconv.decode(stdoutData, 'cp936');
-    //   console.log(output);
-    // });
-    // // if (command) {
-    // //   child.stdin.write(command);
-    // //   child.stdin.end();
-    // // }
+    child.stdout?.on('data', (data: any) => {
+      stdout?.(data);
+    });
 
-    // // 收集错误输出
-    // child.stderr.on('data', (chunk) => {
-    //   stderrData = Buffer.concat([stderrData, chunk]);
-    // });
+    // 动态获取 stderr
+    child.stderr?.on('data', (data: any) => {
+      stderr?.(data);
+    });
 
-    // child.on('close', (code) => {
-    //   if (code === 0) {
-    //     const output = iconv.decode(stdoutData, 'cp936');
-    //     resolve(output);
-    //   } else {
-    //     const errorOutput = iconv.decode(stderrData, 'cp936');
-    //     reject(new Error(`进程退出，退出码 ${code}\n${errorOutput}`));
-    //   }
-    // });
-    // child.on('error', (error) => {
-    //   reject(error);
-    // });
+    // 结束时处理退出码
+    child.on('close', (code) => {
+      console.log(`子进程退出，退出码 ${code}`);
+    });
   });
 };
