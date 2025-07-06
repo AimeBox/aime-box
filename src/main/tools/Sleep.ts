@@ -9,7 +9,6 @@ import {
 import { isArray, isString } from '../utils/is';
 import { z } from 'zod';
 import iconv from 'iconv-lite';
-import { runCommand } from '../utils/exec';
 import { BaseTool } from './BaseTool';
 import { platform } from 'process';
 

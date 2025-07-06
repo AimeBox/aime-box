@@ -153,7 +153,7 @@ export default function Tools() {
     setToolSettinSchemas(toolSettinSchemas);
     setTimeout(() => {
       setCurrentTool(tool);
-      toolSettingModalRef.current.openModal(true, tool.parameters);
+      toolSettingModalRef.current.openModal(true, tool.config);
     });
   };
 

@@ -60,6 +60,8 @@ import { notificationManager } from '../app/NotificationManager';
 import { NotificationMessage } from '@/types/notification';
 import { ChatStatus } from '@/entity/Chat';
 import { appManager } from '../app/AppManager';
+import { BaseManager } from '../BaseManager';
+import { channel } from '../ipc/IpcController';
 
 export interface KnowledgeBaseDocument {
   document: DocumentInterface<Record<string, any>>;
@@ -86,7 +88,7 @@ export interface KnowledgeBaseUpdateInput {
   reranker?: string | undefined;
 }
 
-export class KnowledgeBaseManager {
+export class KnowledgeBaseManager extends BaseManager {
   // limiter: Bottleneck;
 
   public async init() {
@@ -100,25 +102,7 @@ export class KnowledgeBaseManager {
       },
     );
     if (!ipcMain) return;
-    // this.limiter = new Bottleneck({
-    //   maxConcurrent: 1, // 最大并发任务数
-    //   minTime: 1000, // 任务之间的最小间隔时间（毫秒）
-    // });
-    ipcMain.on('kb:create', async (event, input: KnowledgeBaseCreateInput) => {
-      await this.create(input);
-      event.returnValue = null;
-    });
-    ipcMain.on(
-      'kb:update',
-      async (event, id: string, input: KnowledgeBaseUpdateInput) => {
-        await this.update(id, input);
-        event.returnValue = null;
-      },
-    );
-    // ipcMain.on('kb:save', async (event, pathOrUrl: string) => {
-    //   await this.save(pathOrUrl);
-    //   event.returnValue = null;
-    // });
+    this.registerIpcChannels();
     ipcMain.on(
       'kb:queue',
       async (
@@ -132,33 +116,6 @@ export class KnowledgeBaseManager {
         event.sender.send('kb:queue');
       },
     );
-    ipcMain.on('kb:delete', async (event, kbId: string) => {
-      await this.delete(kbId);
-      event.returnValue = null;
-    });
-    ipcMain.on('kb:delete-item', async (event, kbItemId: string) => {
-      await this.deleteItem(kbItemId);
-      event.returnValue = null;
-    });
-
-    ipcMain.handle('kb:query', (event, kbId, query, options) =>
-      this.query(kbId, query, options),
-    );
-    ipcMain.on('kb:get-item', async (event, kbItemId: string) => {
-      const res = await this.getItem(kbItemId);
-      event.returnValue = res;
-    });
-    ipcMain.on(
-      'kb:update-item',
-      async (event, input: { kbItemId: string; data: any }) => {
-        const res = await this.updateItem(input.kbItemId, input.data);
-        event.returnValue = res;
-      },
-    );
-    ipcMain.on('kb:get', async (event, input) => {
-      const res = await this.get(input);
-      event.returnValue = res;
-    });
     ipcMain.on('kb:restart', async (event, kbId: string) => {
       await this.restart(kbId);
       event.sender.send('kb:restart');
@@ -615,11 +572,12 @@ export class KnowledgeBaseManager {
     }
   }
 
-  public query = async (
+  @channel('kb:query')
+  public async query(
     kbId: string,
     query: string,
     options: Record<string, any> = { k: 10 },
-  ): Promise<KnowledgeBaseDocument[]> => {
+  ): Promise<KnowledgeBaseDocument[]> {
     const kb_repository = dbManager.dataSource.getRepository(KnowledgeBase);
     const kb = await kb_repository.findOne({ where: { id: kbId } });
     const embeddings = await this.getEmbeddings(kb);
@@ -676,9 +634,10 @@ export class KnowledgeBaseManager {
     });
 
     return result;
-  };
+  }
 
-  public delete = async (kbId: string) => {
+  @channel('kb:delete')
+  public async delete(kbId: string) {
     const kb_repository = dbManager.dataSource.getRepository(KnowledgeBase);
     const kb = await kb_repository.findOne({
       where: { id: kbId },
@@ -691,9 +650,10 @@ export class KnowledgeBaseManager {
     } catch (e) {
       console.error(e);
     }
-  };
+  }
 
-  public deleteItem = async (kbItemId: string | string) => {
+  @channel('kb:delete-item')
+  public async deleteItem(kbItemId: string | string) {
     const repository = dbManager.dataSource.getRepository(KnowledgeBaseItem);
     const kb_repository = dbManager.dataSource.getRepository(KnowledgeBase);
     if (isArray(kbItemId)) {
@@ -723,15 +683,16 @@ export class KnowledgeBaseManager {
       await repository.delete({ id: kbItemId });
       await vectorStore.delete({ kbitemid: kb_item.id });
     }
-  };
+  }
 
-  public get = async (input: {
+  @channel('kb:get')
+  public async get(input: {
     knowledgeBaseId: string;
     filter: string;
     skip: number;
     pageSize: number;
     sort: string | undefined;
-  }) => {
+  }) {
     const where = { knowledgeBaseId: input.knowledgeBaseId } as any;
     if (input.filter) where['name'] = Like(`%${input.filter.trim()}%`);
     const res = await dbManager.page(
@@ -742,15 +703,14 @@ export class KnowledgeBaseManager {
       input.sort,
     );
     return res;
-  };
+  }
 
-  public getItem = async (
-    kbItemId: string,
-  ): Promise<{
+  @channel('kb:get-item')
+  public async getItem(kbItemId: string): Promise<{
     pageContent: string;
     metadata: any;
     chunks: KnowledgeBaseItemChunk[];
-  }> => {
+  }> {
     const repository = dbManager.dataSource.getRepository(KnowledgeBaseItem);
     const kb_item = await repository.findOne({
       where: { id: kbItemId },
@@ -779,9 +739,10 @@ export class KnowledgeBaseManager {
     });
 
     return results;
-  };
+  }
 
-  public updateItem = async (kbItemId: string, data: any) => {
+  @channel('kb:update-item')
+  public async updateItem(kbItemId: string, data: any) {
     const repository = dbManager.dataSource.getRepository(KnowledgeBaseItem);
     const kb_item = await repository.findOne({ where: { id: kbItemId } });
     const kb_repository = dbManager.dataSource.getRepository(KnowledgeBase);
@@ -791,18 +752,20 @@ export class KnowledgeBaseManager {
     const vectorStore = await this.getVectorStore(kb);
     await vectorStore.update(data, { kbitemid: kb_item.id });
     await repository.update({ id: kbItemId }, data);
-  };
+  }
 
-  public create = async (input: KnowledgeBaseCreateInput) => {
+  @channel('kb:create')
+  public async create(input: KnowledgeBaseCreateInput) {
     const kbId = uuidv4();
     await dbManager.insert('knowledgebase', {
       id: kbId,
       ...input,
     });
     const v = await this.getVectorStore(kbId);
-  };
+  }
 
-  public update = async (id: string, input: KnowledgeBaseUpdateInput) => {
+  @channel('kb:update')
+  public async update(id: string, input: KnowledgeBaseUpdateInput) {
     delete input['embedding'];
     delete input['vectorStoreType'];
     const kb_repository = dbManager.dataSource.getRepository(KnowledgeBase);
@@ -812,7 +775,7 @@ export class KnowledgeBaseManager {
     const _kb = { ...kb, ...input };
     const res = await kb_repository.save(_kb);
     console.log(res);
-  };
+  }
 }
 
 export const kbManager = new KnowledgeBaseManager();

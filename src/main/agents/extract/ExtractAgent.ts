@@ -67,6 +67,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { NotificationMessage } from '@/types/notification';
 import ExcelJS from 'exceljs';
 import { ExtractAgentSystemPrompt } from './prompt';
+import { removeThinkTags } from '@/main/utils/messages';
 
 const fieldZod = z
   .array(
@@ -77,7 +78,7 @@ const fieldZod = z
           'field name to display,be consistent with user input language',
         ),
       field: z.string().describe('field name must english lower case'),
-      description: z.string().optional().nullable().describe('field description'),
+      description: z.string().optional().describe('field description'),
       type: z
         .enum([
           'string',
@@ -94,7 +95,7 @@ const fieldZod = z
         .describe('field type'),
       enumValues: z
         .array(z.string())
-        .optional().nullable()
+        .optional()
         .describe('field type is enum value'),
     }),
   )
@@ -108,7 +109,7 @@ export class ExtractTool extends BaseTool {
     fields: fieldZod,
     savePath: z
       .string()
-      .optional().nullable()
+      .optional()
       .describe('File Save Path(.xlsx), Empty if not mentioned by the user'),
   });
 
@@ -127,17 +128,21 @@ export class ExtractTool extends BaseTool {
 
   embedding: Embeddings;
 
+  messages?: BaseMessage[];
+
   constructor(params?: {
     model: BaseChatModel;
     allFieldInLLM: boolean;
     allDocInLLM: boolean;
     embedding: Embeddings;
+    messages?: BaseMessage[];
   }) {
     super({});
     this.model = params?.model;
     this.allFieldInLLM = params?.allFieldInLLM ?? false;
     this.allDocInLLM = params?.allDocInLLM ?? false;
     this.embedding = params?.embedding;
+    this.messages = params?.messages ?? [];
   }
 
   getFiles = async (sources: string[]) => {
@@ -235,7 +240,7 @@ export class ExtractTool extends BaseTool {
     const allDocInLLM = this.allDocInLLM ?? false;
     const checkExtractResult = false;
     const splits = await this.textSplitter.splitDocuments(doc);
-    
+
     const extractFieldsResult = {};
     for (const field of fields) {
       extractFieldsResult[field.field] = undefined;
@@ -248,9 +253,9 @@ export class ExtractTool extends BaseTool {
         return ex;
       } else {
         const vectorStore = await MemoryVectorStore.fromDocuments(
-        splits,
-        this.embedding,
-      );
+          splits,
+          this.embedding,
+        );
         let pageContent = [];
         if (splits.length == 1) {
           pageContent = [splits[0].pageContent];
@@ -291,7 +296,7 @@ export class ExtractTool extends BaseTool {
           d = splits;
         } else {
           d = await vectorStore.similaritySearch(
-            `${field.name}\n\n${field.description}`,
+            `${field.name}\n\n${field?.description || ''}`,
             5,
           );
         }
@@ -344,7 +349,7 @@ export class ExtractTool extends BaseTool {
 
             [
               'human',
-              '### 任务\n提取字段={field}[{name}:{description}]\n### 注意\n - 直接输出结果无需任务解析,不要胡乱编写答案,如果找不到输出"NULL"\n - 以最简短明确准确的文字一字不漏输出最终答案\n\n### 以下为需要提取的文本\n<text>\n{text}\n</text>\n\n### 提取结果\n{name}:{description}\n{field}:',
+              '### 任务\n提取字段: {field}\n提取名称: {name}\n### 注意\n - 直接输出结果无需任务解析,不要胡乱编写答案,如果找不到输出"NULL"\n - 以最简短明确准确的文字一字不漏输出最终答案\n\n### 以下是需要提取的文本\n<text>\n{text}\n</text>\n\n### 需要提取\n{name}\n{field}:',
             ],
           ]);
           let result = 'NULL';
@@ -356,11 +361,11 @@ export class ExtractTool extends BaseTool {
                 text: text,
                 field: field.field,
                 name: field.name,
-                description: field.description,
               },
               { tags: ['ignore'] },
             );
             result = rex.content.toString();
+            result = removeThinkTags(result);
             console.log(`${field.field}:${result}`);
             console.log('==========');
             if (!result.includes('NULL')) {
@@ -412,10 +417,10 @@ export class ExtractTool extends BaseTool {
       chunkSize: 1000,
       chunkOverlap: 200,
     });
-    if(!this.embedding){
+    if (!this.embedding) {
       this.embedding = await getDefaultEmbeddingModel();
     }
-    
+
     const { pathOrUrl, fields } = input;
     let type: 'url' | 'file' | 'directory';
     if (isUrl(pathOrUrl)) {
@@ -539,6 +544,9 @@ export class ExtractTool extends BaseTool {
       }
       if (input.savePath) {
         try {
+          if (!input.savePath.toLowerCase().endsWith('.xlsx')) {
+            input.savePath += '.xlsx';
+          }
           const workbook = new ExcelJS.Workbook();
           const worksheet = workbook.addWorksheet('Sheet1');
 
@@ -579,44 +587,37 @@ export class ExtractTool extends BaseTool {
         zodObject[field.field] = z
           .number()
           .optional()
-          .nullable()
-          .describe(field.name + field.description);
+          .describe(field.name + (field?.description || ''));
       } else if (field.type == 'boolean') {
         zodObject[field.field] = z
           .boolean()
           .optional()
-          .nullable()
-          .describe(field.name + field.description);
+          .describe(field.name + (field?.description || ''));
       } else if (field.type == 'bigint') {
         zodObject[field.field] = z
           .bigint()
           .optional()
-          .nullable()
-          .describe(field.name + field.description);
+          .describe(field.name + (field?.description || ''));
       } else if (field.type == 'date') {
         zodObject[field.field] = z
           .string()
           .optional()
-          .nullable()
-          .describe(field.name + field.description);
+          .describe(field.name + (field?.description || ''));
       } else if (field.type == 'enum' && field.enumValues) {
         zodObject[field.field] = z
           .enum(field.enumValues as [string, ...string[]])
           .optional()
-          .nullable()
-          .describe(field.name + field.description);
+          .describe(field.name + (field?.description || ''));
       } else if (field.type == 'array') {
         zodObject[field.field] = z
           .array(z.string())
           .optional()
-          .nullable()
-          .describe(field.name + field.description);
+          .describe(field.name + (field?.description || ''));
       } else {
         zodObject[field.field] = z
           .string()
           .optional()
-          .nullable()
-          .describe(field.name + field.description);
+          .describe(field.name + (field?.description || ''));
       }
     }
     return z.object(zodObject);
@@ -635,28 +636,28 @@ export class ExtractAgent extends BaseAgent {
   schema = z.object({
     source: z.array(z.string()).describe('FilePaths Or Directories'),
     task: z.string().describe('Extract Task'),
-    savePath: z.optional(z.string()).describe('Save Path'),
+    savePath: z.string().optional().describe('Save Path'),
   });
 
   configSchema: FormSchema[] = [
+    // {
+    //   label: t('字段分析模型'),
+    //   field: 'fieldModel',
+    //   component: 'ProviderSelect',
+    //   componentProps: {
+    //     type: 'llm',
+    //   },
+    // },
+    // {
+    //   label: t('提取模型'),
+    //   field: 'extractModel',
+    //   component: 'ProviderSelect',
+    //   componentProps: {
+    //     type: 'llm',
+    //   },
+    // },
     {
-      label: t('字段分析模型'),
-      field: 'fieldModel',
-      component: 'ProviderSelect',
-      componentProps: {
-        type: 'llm',
-      },
-    },
-    {
-      label: t('提取模型'),
-      field: 'extractModel',
-      component: 'ProviderSelect',
-      componentProps: {
-        type: 'llm',
-      },
-    },
-    {
-      label: t('embedding'),
+      label: t('common.embedding'),
       field: 'embedding',
       component: 'ProviderSelect',
       componentProps: {
@@ -695,9 +696,9 @@ export class ExtractAgent extends BaseAgent {
 
   llm: BaseChatModel;
 
-  fieldLLM: BaseChatModel;
+  // fieldLLM: BaseChatModel;
 
-  extractLLM: BaseChatModel;
+  // extractLLM: BaseChatModel;
 
   embedding: Embeddings;
 
@@ -729,27 +730,27 @@ export class ExtractAgent extends BaseAgent {
   }) {
     const config = await this.getConfig();
     this.systemPrompt = config.systemPrompt;
-    const { provider, modelName } = getProviderModel(config.fieldModel);
-    const { provider: extractProvider, modelName: extractModelName } =
-      getProviderModel(config.extractModel);
+    // const { provider, modelName } = getProviderModel(config.fieldModel);
+    // const { provider: extractProvider, modelName: extractModelName } =
+    //   getProviderModel(config.extractModel);
     const that = this;
     this.textSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
       chunkOverlap: 20,
     });
-    const fieldModel = await getChatModel(provider, modelName, {
-      temperature: 0,
-    });
-    const extractModel = await getChatModel(extractProvider, extractModelName, {
-      temperature: 0,
-    });
-    if(config.embedding){
-      const { provider :embeddingProvider, modelName: embeddingModelName } = getProviderModel(config.embedding);
-      this.embedding = await getEmbeddingModel(embeddingProvider, embeddingModelName)
-    }else{
+    const fieldModel = params.model;
+    const extractModel = params.model;
+    if (config.embedding) {
+      const { provider: embeddingProvider, modelName: embeddingModelName } =
+        getProviderModel(config.embedding);
+      this.embedding = await getEmbeddingModel(
+        embeddingProvider,
+        embeddingModelName,
+      );
+    } else {
       this.embedding = await getDefaultEmbeddingModel();
     }
-    
+
     async function callCheck(state: typeof MessagesAnnotation.State) {
       const promptTemplate = ChatPromptTemplate.fromMessages([
         ['system', that.systemPrompt],
@@ -804,6 +805,7 @@ export class ExtractAgent extends BaseAgent {
         allFieldInLLM: config.allFieldInLLM,
         allDocInLLM: config.allDocInLLM,
         embedding: that.embedding,
+        messages: messages,
       });
       const toolNode = new ToolNode([extractTool]);
       const result = await toolNode.streamEvents(
@@ -817,7 +819,7 @@ export class ExtractAgent extends BaseAgent {
       );
 
       for await (const chunk of result) {
-        console.log(chunk);
+        //console.log(chunk);
       }
 
       return { messages: [lastMessage] };

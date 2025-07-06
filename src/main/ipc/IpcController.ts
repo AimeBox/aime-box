@@ -3,7 +3,11 @@ import { ipcMain } from 'electron';
 
 // 主进程装饰器
 export function channel(channelName: string) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function (
+    target: any,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ) {
     // 确保类有注册方法
     if (!target.registerIpcChannels) {
       target.registerIpcChannels = function (instance: any) {
@@ -15,10 +19,10 @@ export function channel(channelName: string) {
     if (!target._ipcChannels) {
       target._ipcChannels = [];
     }
-    
+
     target._ipcChannels.push({
       channel: channelName,
-      method: propertyKey
+      method: propertyKey,
     });
 
     // 修改原始方法，确保它能在主进程中被正确调用
@@ -28,4 +32,3 @@ export function channel(channelName: string) {
     };
   };
 }
-

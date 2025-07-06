@@ -4,9 +4,16 @@ import {
   ChatGoogleGenerativeAI,
   GoogleGenerativeAIEmbeddings,
 } from '@langchain/google-genai';
+import {
+  GoogleGenAI,
+  createUserContent,
+  createPartFromUri,
+} from '@google/genai';
 import { ChatOptions } from '@/entity/Chat';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { Embeddings } from '@langchain/core/embeddings';
+import fs from 'fs';
+import { isUrl } from '../utils/is';
 
 export class GoogleProvider extends BaseProvider {
   name: string = ProviderType.GOOGLE;
@@ -73,5 +80,38 @@ export class GoogleProvider extends BaseProvider {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((x) => x.name);
     return emb_models;
+  }
+
+  async videoUnderstanding(data: {
+    model: string;
+    fileOrUrl: string;
+    prompt: string;
+  }): Promise<string> {
+    const ai = new GoogleGenAI({
+      apiKey: this.provider.api_key,
+    });
+    if (isUrl(data.fileOrUrl)) {
+      return 'not support url';
+    } else {
+      const base64VideoFile = fs.readFileSync(data.fileOrUrl, {
+        encoding: 'base64',
+      });
+
+      const contents = [
+        {
+          inlineData: {
+            mimeType: 'video/mp4',
+            data: base64VideoFile,
+          },
+        },
+        { text: data.prompt },
+      ];
+      const response = await ai.models.generateContent({
+        model: data.model,
+        contents: contents,
+      });
+      console.log(response.text);
+      return response.text;
+    }
   }
 }

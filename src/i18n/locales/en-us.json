@@ -111,7 +111,8 @@
     "parameters": "Parameters",
     "quit": "Quit",
     "search": "Search",
-    "add_remote_agent": "Add Remote Agent"
+    "add_remote_agent": "Add Remote Agent",
+    "embedding": "Embedding"
   },
   "agents": {
     "name": "Name",

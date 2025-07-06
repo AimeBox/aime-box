@@ -13,9 +13,10 @@ import iconv from 'iconv-lite';
 import path from 'path';
 import { app } from 'electron';
 import fs from 'fs';
-import { getModelsPath } from '../utils/path';
+import { getModelsPath, getTmpPath } from '../utils/path';
 import { BaseTool } from './BaseTool';
 import Sharp from 'sharp';
+import { convertPdfToImages } from '../utils/pdfUtil';
 
 export interface RapidOcrToolParameters extends ToolParams {}
 
@@ -98,6 +99,38 @@ export class RapidOcrTool extends BaseTool {
     runManager,
     config,
   ): Promise<string> {
+    if (!(isString(input.filePath) || fs.statSync(input.filePath).isFile())) {
+      throw new Error('Please provide a valid file path');
+    }
+    const ext = path.extname(input.filePath).toLowerCase();
+    if (
+      !(
+        ext == '.jpg' ||
+        ext == '.jpeg' ||
+        ext == '.png' ||
+        ext == '.bmp' ||
+        ext == '.tiff' ||
+        ext == '.webp' ||
+        ext == '.pdf'
+      )
+    ) {
+      throw new Error('extension not supported');
+    }
+    if (ext == '.pdf') {
+      const res = await convertPdfToImages(input.filePath, getTmpPath());
+      if (res.length > 0) {
+        const results = [];
+        for (const image of res) {
+          results.push(await this.winOcr(image));
+        }
+        const dir = path.dirname(res[0]);
+        await fs.promises.rmdir(dir, { recursive: true });
+        return results.join('\n\n');
+      } else {
+        throw new Error('Failed to convert pdf to images');
+      }
+    }
+
     if (process.platform === 'win32') {
       if (
         !fs.existsSync(
@@ -107,49 +140,11 @@ export class RapidOcrTool extends BaseTool {
         return 'model not found';
       }
       try {
-        if (isString(input.filePath) || fs.statSync(input.filePath).isFile()) {
-          const json_res = (await new Promise((resolve, reject) => {
-            const process = spawn('RapidOCR-json.exe', {
-              cwd: path.join(getModelsPath(), 'ocr', 'RapidOCR-json_v0.2.0'),
-            });
-            let output = null;
-            process.stdin.write(
-              `{"image_path": "${input.filePath.replaceAll('\\', '/')}"}\n`,
-            );
-            process.stdout.on('data', (data) => {
-              const text = data.toString();
-
-              if (text.startsWith('{"code":')) {
-                const j = JSON.parse(text);
-                output = j;
-                process.kill();
-              }
-              //process.kill();
-            });
-
-            process.stderr.on('data', (data) => {
-              process.kill();
-            });
-
-            process.on('close', (code) => {
-              if (output != null && output.code == 100) {
-                resolve(output);
-              } else {
-                resolve(output);
-              }
-            });
-          })) as any;
-          if (json_res.code == 100) {
-            return json_res.data.map((x) => x.text).join('');
-          } else if (json_res.code == 101) {
-            return `Error: ${json_res.data}`;
-          } else {
-            return json_res.data;
-          }
-        } else {
-          return 'Please provide a valid file path';
-        }
+        return this.winOcr(input.filePath);
       } catch (err) {
+        if (err.message) {
+          throw err;
+        }
         const out = iconv.decode(
           Buffer.from(err.stderr.length > 0 ? err.stderr : err.stdout),
           'cp936',
@@ -173,6 +168,72 @@ export class RapidOcrTool extends BaseTool {
     }
 
     return 'Unsupported platform';
+  }
+
+  public async pdfOcr(
+    filePath: string,
+    splitPage: boolean = true,
+  ): Promise<string | string[]> {
+    const res = await convertPdfToImages(filePath, getTmpPath());
+    if (res.length > 0) {
+      const results = [];
+      for (const image of res) {
+        results.push(await this.winOcr(image));
+      }
+      const dir = path.dirname(res[0]);
+      await fs.promises.rmdir(dir, { recursive: true });
+      if (splitPage) {
+        return results;
+      }
+      return results.join('\n\n');
+    } else {
+      throw new Error('Failed to convert pdf to images');
+    }
+  }
+
+  public async winOcr(imagePath: string) {
+    if (isString(imagePath) || fs.statSync(imagePath).isFile()) {
+      const json_res = (await new Promise((resolve, reject) => {
+        const process = spawn('RapidOCR-json.exe', {
+          cwd: path.join(getModelsPath(), 'ocr', 'RapidOCR-json_v0.2.0'),
+        });
+        let output = null;
+        process.stdin.write(
+          `{"image_path": "${imagePath.replaceAll('\\', '/')}"}\n`,
+        );
+        process.stdout.on('data', (data) => {
+          const text = data.toString();
+
+          if (text.startsWith('{"code":')) {
+            const j = JSON.parse(text);
+            output = j;
+            process.kill();
+          }
+          //process.kill();
+        });
+
+        process.stderr.on('data', (data) => {
+          process.kill();
+        });
+
+        process.on('close', (code) => {
+          if (output != null && output.code == 100) {
+            resolve(output);
+          } else {
+            resolve(output);
+          }
+        });
+      })) as any;
+      if (json_res.code == 100) {
+        return json_res.data.map((x) => x.text).join('');
+      } else if (json_res.code == 101) {
+        throw new Error(`Error: ${json_res.data}`);
+      } else {
+        return json_res.data;
+      }
+    } else {
+      throw new Error('Please provide a valid file path');
+    }
   }
 
   private async recognizeText(imagePath: string): Promise<OcrResult> {

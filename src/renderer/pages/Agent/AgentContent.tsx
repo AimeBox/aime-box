@@ -343,27 +343,27 @@ export default function ChatContent() {
                       }}
                     ></Button>
                   )}
+                  <Button
+                    icon={<FaEdit />}
+                    type="text"
+                    onClick={() => {
+                      if (agent.type == 'built-in') {
+                        onOpenAgentConfigDrawer(agent);
+                      } else {
+                        setCurrentAgent(agent);
+                        modalRef.current.openModal(
+                          true,
+                          {
+                            ...agent,
+                          },
+                          t('common.edit'),
+                        );
+                      }
+                    }}
+                  ></Button>
 
                   {!agent.static && (
                     <>
-                      <Button
-                        icon={<FaEdit />}
-                        type="text"
-                        onClick={() => {
-                          if (agent.type == 'build-in') {
-                            onOpenAgentConfigDrawer(agent);
-                          } else {
-                            setCurrentAgent(agent);
-                            modalRef.current.openModal(
-                              true,
-                              {
-                                ...agent,
-                              },
-                              t('common.edit'),
-                            );
-                          }
-                        }}
-                      ></Button>
                       <Popconfirm
                         title={t('common.delete_confirm')}
                         onConfirm={() => {

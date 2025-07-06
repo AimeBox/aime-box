@@ -318,7 +318,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
     if (!pagination.current) {
       pagination.current = 1;
     }
-    const res = window.electron.kb.get({
+    const res = await window.electron.kb.get({
       knowledgeBaseId: props.knowledgeBaseId,
       filter: searchText,
       skip: (pagination.current - 1) * pagination.pageSize,
@@ -330,7 +330,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
     setPagination(pagination);
   };
   const getData = async () => {
-    const res = window.electron.kb.get({
+    const res = await window.electron.kb.get({
       knowledgeBaseId: knowledgeBaseId,
       filter: searchText,
       skip: 0,
@@ -356,7 +356,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
     setSelectedRowKeys([]);
   };
   const onOpenItem = async (record) => {
-    const res = window.electron.kb.getItem(record.id);
+    const res = await window.electron.kb.getItem(record.id);
     setCurrentItem(record);
     setCurrentItemChunks(res.chunks);
     setCurrentContent(res.pageContent);

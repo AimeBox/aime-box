@@ -31,6 +31,8 @@ import { Embeddings, EmbeddingsParams } from '@langchain/core/embeddings';
 import { HuggingFaceTransformersEmbeddings } from './HuggingFaceTransformersEmbeddings';
 import { SiliconflowEmbeddings } from './SiliconflowEmbeddings';
 
+const localEmbeddings = {};
+
 export async function getEmbeddingModel(
   providerName: string,
   model?: string,
@@ -40,10 +42,13 @@ export async function getEmbeddingModel(
   ).find((x) => x.name === providerName);
 
   if (!model || providerName == 'local') {
-    const emb = new HuggingFaceTransformersEmbeddings({
-      modelName: model,
-    });
-    return emb;
+    if (!localEmbeddings[model]) {
+      const emb = new HuggingFaceTransformersEmbeddings({
+        modelName: model,
+      });
+      localEmbeddings[model] = emb;
+    }
+    return localEmbeddings[model];
   }
   const _provider = await providersManager.getProvider(providerName);
 

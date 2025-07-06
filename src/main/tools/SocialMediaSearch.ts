@@ -85,7 +85,7 @@ export class SocialMediaSearch extends BaseTool {
     runManager,
     config,
   ): Promise<any> {
-    this.httpProxy = settingsManager.getPorxy();
+    this.httpProxy = settingsManager.getProxy();
 
     let res = null;
     //try {
@@ -253,13 +253,12 @@ export class SocialMediaSearch extends BaseTool {
         const text = scriptContent.substring(scriptContent.indexOf('=') + 1);
         let sandbox = { info: undefined };
         vm.createContext(sandbox); // 创建隔离的沙箱环境
-        vm.runInContext('var info = ' + text, sandbox);
+        vm.runInContext(`var info = ${text}`, sandbox);
         const result = sandbox.info?.searchResponse?.searchAllResponse?.result;
         const data = result.find((x) => x.result_type == 'video')?.data;
         list = data.map((x) => {
           return {
-            arcurl: x.arcurl,
-            bvid: x.bvid,
+            url: `https://www.bilibili.com/video/${x.bvid}`,
             title: x.title,
             description: x.description,
             duration: x.duration,

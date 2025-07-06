@@ -44,7 +44,7 @@ import {
 } from '@langchain/core/messages';
 import tokenCounter from './utils/tokenCounter';
 import { getChatModel } from './llm';
-import { getAssetPath } from './utils/path';
+import { getAssetPath, getTmpPath } from './utils/path';
 import { instanceManager } from './instances';
 
 dbManager

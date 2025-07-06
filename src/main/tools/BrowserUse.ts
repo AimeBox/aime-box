@@ -127,7 +127,7 @@ export class BrowserUseTool extends BaseTool {
       chromeInstancePath: this.chromeInstancePath,
       // userDataDir: this.userDataDir,
       proxy: {
-        server: settingsManager.getPorxy(),
+        server: settingsManager.getProxy(),
       },
       headless: false,
       extraChromiumArgs: [

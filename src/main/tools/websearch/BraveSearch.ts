@@ -65,7 +65,7 @@ export class BraveSearchTool extends BaseTool {
     runManager,
     config,
   ): Promise<any> {
-    //const proxy = settingsManager.getPorxy();
+    //const proxy = settingsManager.getProxy();
 
     const headers = {
       'X-Subscription-Token': this.apiKey,
