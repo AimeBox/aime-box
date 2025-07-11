@@ -100,6 +100,7 @@ export const runAgent = async (
       signal: options?.signal,
       recursionLimit: options?.recursionLimit || 25,
       configurable,
+      think: false,
       //subgraphs: true,
     });
     let _toolCalls = [];

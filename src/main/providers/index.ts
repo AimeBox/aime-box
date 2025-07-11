@@ -589,6 +589,32 @@ export class ProvidersManager extends BaseManager {
     return emb_list;
   }
 
+  @channel('providers:getOCRModels')
+  public async getOCRModels(): Promise<any[]> {
+    const connections = await this.getProviders(false);
+    const emb_list = [];
+    const localModels = settingsManager.getLocalModels();
+    emb_list.push({
+      name: 'local',
+      models: localModels['ocr'].filter((x) => x.exists).map((x) => x.id),
+    });
+    for (let index = 0; index < connections.length; index++) {
+      const provider = await this.getProvider(connections[index]);
+      try {
+        const models =
+          provider.provider.models.map((x) => x.name) ||
+          (await provider.getModelList());
+        if (models && models.length > 0) {
+          emb_list.push({
+            name: connections[index].name,
+            models: models,
+          });
+        }
+      } catch {}
+    }
+    return emb_list;
+  }
+
   @channel('providers:getWebSearchProviders')
   public async getWebSearchProviders(): Promise<any[]> {
     const list = [];

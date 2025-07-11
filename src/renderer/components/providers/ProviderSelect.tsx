@@ -43,7 +43,8 @@ const ProviderSelect = React.forwardRef(
           res = await window.electron.providers.getWebSearchProviders();
         else if (props.type == 'image_generation')
           res = await window.electron.providers.getImageGenerationProviders();
-
+        else if (props.type == 'ocr')
+          res = await window.electron.providers.getOCRModels();
         options = res.map((x) => {
           const options = x.models.map((o) => {
             return {

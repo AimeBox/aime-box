@@ -130,17 +130,21 @@ export class ExtractTool extends BaseTool {
 
   messages?: BaseMessage[];
 
+  mode: 'all_segment' | 'extract_segment' | 'all_in' = 'extract_segment';
+
   constructor(params?: {
     model: BaseChatModel;
     allFieldInLLM: boolean;
     allDocInLLM: boolean;
     embedding: Embeddings;
     messages?: BaseMessage[];
+    mode: 'all_segment' | 'extract_segment' | 'all_in';
   }) {
     super({});
     this.model = params?.model;
     this.allFieldInLLM = params?.allFieldInLLM ?? false;
     this.allDocInLLM = params?.allDocInLLM ?? false;
+    this.mode = params?.mode ?? 'extract_segment';
     this.embedding = params?.embedding;
     this.messages = params?.messages ?? [];
   }
@@ -235,9 +239,8 @@ export class ExtractTool extends BaseTool {
     ];
     const zodFields = this.toZod(fields);
     const extractionChain = this.model.withStructuredOutput(zodFields);
+    const { mode, allFieldInLLM, allDocInLLM } = this;
 
-    const allFieldInLLM = this.allFieldInLLM ?? false;
-    const allDocInLLM = this.allDocInLLM ?? false;
     const checkExtractResult = false;
     const splits = await this.textSplitter.splitDocuments(doc);
 
@@ -247,7 +250,7 @@ export class ExtractTool extends BaseTool {
     }
 
     if (allFieldInLLM) {
-      if (allDocInLLM) {
+      if (mode == 'all_segment' || mode == 'all_in') {
         // 使用大模型一次性提取
         const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
         return ex;
@@ -292,7 +295,7 @@ export class ExtractTool extends BaseTool {
           ['human', '{text}'],
         ]);
         let d = [];
-        if (splits.length <= 5 || allDocInLLM) {
+        if (splits.length <= 5 || mode == 'all_segment') {
           d = splits;
         } else {
           d = await vectorStore.similaritySearch(
@@ -391,6 +394,20 @@ export class ExtractTool extends BaseTool {
       }
     }
     return extractFieldsResult;
+  }
+
+  async extractFileAllIn(
+    doc: Document<Record<string, any>>[],
+    fields: {
+      name?: string;
+      field: string;
+      type: string;
+      description?: string;
+      enumValues?: string[];
+    }[],
+  ): Promise<any | undefined> {
+    if (doc.length == 0) return undefined;
+    const zodFields = this.toZod(fields);
   }
 
   async _call(
@@ -677,6 +694,19 @@ export class ExtractAgent extends BaseAgent {
       defaultValue: false,
     },
     {
+      label: '模式',
+      field: 'mode',
+      component: 'Select',
+      componentProps: {
+        options: [
+          { label: '全文分段扫描', value: 'all_segment' },
+          { label: '截取分段扫描', value: 'extract_segment' },
+          { label: '全文扫描', value: 'all_in' },
+        ],
+      },
+      defaultValue: 'extract_segment',
+    },
+    {
       label: t('agents.prompt'),
       field: 'systemPrompt',
       component: 'InputTextArea',
@@ -704,6 +734,8 @@ export class ExtractAgent extends BaseAgent {
 
   systemPrompt: string;
 
+  mode: 'all_segment' | 'extract_segment' | 'all_in';
+
   constructor(options: {
     provider: string;
     modelName: string;
@@ -730,6 +762,7 @@ export class ExtractAgent extends BaseAgent {
   }) {
     const config = await this.getConfig();
     this.systemPrompt = config.systemPrompt;
+    this.mode = config.mode;
     // const { provider, modelName } = getProviderModel(config.fieldModel);
     // const { provider: extractProvider, modelName: extractModelName } =
     //   getProviderModel(config.extractModel);
@@ -766,7 +799,6 @@ export class ExtractAgent extends BaseAgent {
           savePath: z
             .string()
             .optional()
-            .nullable()
             .describe('save path, Empty if not mentioned by the user'),
         }),
       });
@@ -804,6 +836,7 @@ export class ExtractAgent extends BaseAgent {
         model: extractModel,
         allFieldInLLM: config.allFieldInLLM,
         allDocInLLM: config.allDocInLLM,
+        mode: config.mode,
         embedding: that.embedding,
         messages: messages,
       });

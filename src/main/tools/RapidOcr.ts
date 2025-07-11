@@ -7,18 +7,26 @@ import {
   ExecSyncOptionsWithStringEncoding,
   spawn,
 } from 'child_process';
-import { isArray, isString } from '../utils/is';
+import { isArray, isString, isUrl } from '../utils/is';
 import { z } from 'zod';
 import iconv from 'iconv-lite';
 import path from 'path';
 import { app } from 'electron';
-import fs from 'fs';
+import fs, { existsSync } from 'fs';
 import { getModelsPath, getTmpPath } from '../utils/path';
 import { BaseTool } from './BaseTool';
 import Sharp from 'sharp';
 import { convertPdfToImages } from '../utils/pdfUtil';
+import { FormSchema } from '@/types/form';
+import { t } from 'i18next';
+import providersManager from '../providers';
+import { getChatModel } from '../llm';
+import { getProviderModel } from '../utils/providerUtil';
 
-export interface RapidOcrToolParameters extends ToolParams {}
+export interface RapidOcrToolParameters extends ToolParams {
+  model: string;
+  prompt: string;
+}
 
 interface TextBox {
   box: number[][];
@@ -44,61 +52,49 @@ export class RapidOcrTool extends BaseTool {
 
   description: string = 'an ocr tool that accurately extracts text from images';
 
+  configSchema?: FormSchema[] = [
+    {
+      field: 'model',
+      component: 'ProviderSelect',
+      label: t('common.model'),
+      required: true,
+      componentProps: {
+        type: 'ocr',
+      },
+    },
+    {
+      field: 'prompt',
+      component: 'InputTextArea',
+      label: t('common.prompt'),
+    },
+  ];
+
+  model?: string;
+
+  prompt?: string;
+
+  defaultPrompt: string = [
+    'Below is the image of one page of a document. Just return the plain text representation of this document as if you were reading it naturally.',
+    'ALL tables should be presented in HTML format.',
+    'If there are images or figures in the page, present them as "<Image>(left,top),(right,bottom)</Image>", (left,top,right,bottom) are the coordinates of the top-left and bottom-right corners of the image or figure.',
+    'Present all titles and headings as H1 headings.',
+    'Do not hallucinate.',
+  ].join('\n');
+
   // private keys: string[] = [];
 
   constructor(params?: RapidOcrToolParameters) {
     super(params);
+    this.model = params?.model;
+    this.prompt = params?.prompt;
   }
-
-  // private async initializeModels(): Promise<void> {
-  //   if (process.platform !== 'darwin') return;
-
-  //   try {
-  //     const modelsPath = path.join(getModelsPath(), 'ocr', 'RapidOCR-darwin');
-
-  //     // 加载检测模型
-  //     const detModelPath = path.join(
-  //       modelsPath,
-  //       'ch_PP-OCRv4_det_server_infer.onnx',
-  //     );
-  //     if (!this.detSession && fs.existsSync(detModelPath)) {
-  //       this.detSession = await ort.InferenceSession.create(detModelPath);
-  //     }
-
-  //     // 加载分类模型
-  //     const clsModelPath = path.join(
-  //       modelsPath,
-  //       'ch_ppocr_mobile_v2.0_cls_infer.onnx',
-  //     );
-  //     if (!this.clsSession && fs.existsSync(clsModelPath)) {
-  //       this.clsSession = await ort.InferenceSession.create(clsModelPath);
-  //     }
-
-  //     // 加载识别模型
-  //     const recModelPath = path.join(
-  //       modelsPath,
-  //       'ch_PP-OCRv4_rec_server_infer.onnx',
-  //     );
-  //     if (!this.recSession && fs.existsSync(recModelPath)) {
-  //       this.recSession = await ort.InferenceSession.create(recModelPath);
-  //     }
-
-  //     // 加载字典
-  //     const keysPath = path.join(modelsPath, 'ppocr_keys_v1.txt');
-  //     if (this.keys.length === 0 && fs.existsSync(keysPath)) {
-  //       const keysContent = fs.readFileSync(keysPath, 'utf-8');
-  //       this.keys = keysContent.split('\n').filter((line) => line.trim());
-  //     }
-  //   } catch (error) {
-  //     console.error('Failed to initialize OCR models:', error);
-  //   }
-  // }
 
   async _call(
     input: z.infer<typeof this.schema>,
     runManager,
     config,
   ): Promise<string> {
+    const prompt = this.prompt || this.defaultPrompt;
     if (!(isString(input.filePath) || fs.statSync(input.filePath).isFile())) {
       throw new Error('Please provide a valid file path');
     }
@@ -130,44 +126,71 @@ export class RapidOcrTool extends BaseTool {
         throw new Error('Failed to convert pdf to images');
       }
     }
-
-    if (process.platform === 'win32') {
-      if (
-        !fs.existsSync(
-          path.join(getModelsPath(), 'ocr', 'RapidOCR-json_v0.2.0'),
-        )
-      ) {
-        return 'model not found';
-      }
-      try {
-        return this.winOcr(input.filePath);
-      } catch (err) {
-        if (err.message) {
-          throw err;
+    if (this.model.endsWith('@local')) {
+      if (process.platform === 'win32') {
+        if (
+          !fs.existsSync(
+            path.join(getModelsPath(), 'ocr', 'RapidOCR-json_v0.2.0'),
+          )
+        ) {
+          return 'model not found';
         }
-        const out = iconv.decode(
-          Buffer.from(err.stderr.length > 0 ? err.stderr : err.stdout),
-          'cp936',
-        );
+        try {
+          return this.winOcr(input.filePath);
+        } catch (err) {
+          if (err.message) {
+            throw err;
+          }
+          const out = iconv.decode(
+            Buffer.from(err.stderr.length > 0 ? err.stderr : err.stdout),
+            'cp936',
+          );
 
-        return out.trim();
+          return out.trim();
+        }
+      } else if (process.platform === 'darwin') {
+        try {
+          //await this.initializeModels();
+          await this.drawBoundingBoxes(
+            input.filePath,
+            '/Users/noah/Desktop/xxx.jpg',
+          );
+          // const result = await this.recognizeText(input.filePath);
+          return '';
+        } catch (error) {
+          console.error('OCR failed:', error);
+          return `OCR failed: ${error.message}`;
+        }
       }
-    } else if (process.platform === 'darwin') {
-      try {
-        //await this.initializeModels();
-        await this.drawBoundingBoxes(
-          input.filePath,
-          '/Users/noah/Desktop/xxx.jpg',
-        );
-        // const result = await this.recognizeText(input.filePath);
-        return '';
-      } catch (error) {
-        console.error('OCR failed:', error);
-        return `OCR failed: ${error.message}`;
+      return 'Unsupported platform';
+    } else {
+      const { provider, modelName } = getProviderModel(this.model);
+      const model = await getChatModel(provider, modelName, { temperature: 0 });
+      let imageBase64;
+      if (existsSync(input.filePath)) {
+        const image = await fs.promises.readFile(input.filePath);
+        imageBase64 = image.toString('base64');
       }
+      if (model) {
+        const result = await model.invoke([
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt,
+              },
+              {
+                type: 'image_url',
+                image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+              },
+            ],
+          },
+        ]);
+        return result.text;
+      }
+      return 'Provider not found';
     }
-
-    return 'Unsupported platform';
   }
 
   public async pdfOcr(

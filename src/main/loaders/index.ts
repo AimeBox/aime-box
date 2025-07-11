@@ -1,4 +1,4 @@
-import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
+import { DocxLoader } from './DocxLoader';
 import { TextLoader } from 'langchain/document_loaders/fs/text';
 import { ImageLoader } from './ImageLoader';
 import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
@@ -10,6 +10,7 @@ import { PDFLoader } from './PDFLoader';
 export const getLoaderFromExt = (ext: string, value: string) => {
   switch (ext.toLowerCase()) {
     case '.txt':
+    case '.md':
       return new TextLoader(value);
     case '.pdf':
       return new PDFLoader(value);

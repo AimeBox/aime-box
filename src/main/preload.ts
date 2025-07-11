@@ -269,6 +269,7 @@ const electronHandler = {
       ipcRenderer.invoke('providers:getWebSearchProviders'),
     getImageGenerationProviders: () =>
       ipcRenderer.invoke('providers:getImageGenerationProviders'),
+    getOCRModels: () => ipcRenderer.invoke('providers:getOCRModels'),
   },
   kb: {
     create: (input: KnowledgeBaseCreateInput) =>
