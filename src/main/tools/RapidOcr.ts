@@ -22,6 +22,7 @@ import { t } from 'i18next';
 import providersManager from '../providers';
 import { getChatModel } from '../llm';
 import { getProviderModel } from '../utils/providerUtil';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface RapidOcrToolParameters extends ToolParams {
   model: string;
@@ -88,6 +89,14 @@ export class RapidOcrTool extends BaseTool {
     this.model = params?.model;
     this.prompt = params?.prompt;
   }
+
+  getImageBase64 = async (inputPath: string): Promise<string> => {
+    const buffer = await Sharp(inputPath)
+      .jpeg({ quality: 100 }) // 你可以调整质量
+      .toBuffer();
+    const base64 = buffer.toString('base64');
+    return base64;
+  };
 
   async _call(
     input: z.infer<typeof this.schema>,
@@ -168,8 +177,7 @@ export class RapidOcrTool extends BaseTool {
       const model = await getChatModel(provider, modelName, { temperature: 0 });
       let imageBase64;
       if (existsSync(input.filePath)) {
-        const image = await fs.promises.readFile(input.filePath);
-        imageBase64 = image.toString('base64');
+        imageBase64 = await this.getImageBase64(input.filePath);
       }
       if (model) {
         const result = await model.invoke([
