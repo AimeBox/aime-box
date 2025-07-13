@@ -740,6 +740,7 @@ export class OllamaProvider extends BaseProvider {
       topP: options?.top_p,
       topK: options?.top_k,
       streaming: options?.streaming,
+      numCtx: options?.maxTokens,
       format: options?.format,
     });
     llm.invoke([], { think: false });

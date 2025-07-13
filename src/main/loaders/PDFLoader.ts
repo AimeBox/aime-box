@@ -1,6 +1,8 @@
 import { Document } from '@langchain/core/documents';
 import { BufferLoader } from 'langchain/document_loaders/fs/buffer';
 import { RapidOcrTool } from '../tools/RapidOcr';
+import settingsManager from '../settings';
+import { toolsManager } from '../tools';
 
 /**
  * A class that extends the `BufferLoader` class. It represents a document
@@ -110,16 +112,17 @@ export class PDFLoader extends BufferLoader {
       );
     }
     if (documents.length == 0) {
-      const ocrTool = new RapidOcrTool();
-      const result: string[] | string = await ocrTool.pdfOcr(
+      const tools = toolsManager.tools.find((x) => x.name == 'ocr');
+      const ocrTool = new RapidOcrTool(tools.config);
+      const result: Document[] = await ocrTool.runOcr(
         this.filePathOrBlob as string,
         this.splitPages,
       );
       if (this.splitPages) {
         documents.push(
-          ...(result as string[]).map((result, index) => {
+          ...result.map((result, index) => {
             return new Document({
-              pageContent: result,
+              pageContent: result.pageContent,
               metadata: {
                 ...metadata,
                 pdf: {
@@ -129,14 +132,27 @@ export class PDFLoader extends BufferLoader {
                   totalPages: pdf.numPages,
                 },
                 loc: {
-                  pageNumber: index,
+                  pageNumber: result.metadata.page,
                 },
               },
             });
           }),
         );
       } else {
-        return [new Document({ pageContent: result as string })];
+        return [
+          new Document({
+            pageContent: result.map((x) => x.pageContent).join('\n\n'),
+            metadata: {
+              ...metadata,
+              pdf: {
+                version,
+                info: meta?.info,
+                metadata: meta?.metadata,
+                totalPages: pdf.numPages,
+              },
+            },
+          }),
+        ];
       }
     }
 

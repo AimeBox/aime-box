@@ -12,7 +12,10 @@ import { notificationManager } from '../app/NotificationManager';
  * @param pdfPath PDF 文件路径
  * @param outputDir 输出目录
  */
-export async function convertPdfToImages(pdfPath: string, outputDir: string) {
+export async function convertPdfToImages(
+  pdfPath: string,
+  outputDir: string,
+): Promise<string[]> {
   // const info_data = await info(pdfPath);
   // console.log(info_data);
   if (process.platform === 'win32') {

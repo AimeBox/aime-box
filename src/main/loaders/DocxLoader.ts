@@ -1,6 +1,6 @@
 import { Document } from '@langchain/core/documents';
 import { BufferLoader } from 'langchain/document_loaders/fs/buffer';
-import MarkdownIt from 'markdown-it';
+import * as cheerio from 'cheerio';
 
 type DocxLoaderOptions = {
   type: 'docx' | 'doc';
@@ -74,9 +74,9 @@ export class DocxLoader extends BufferLoader {
     const html = await convertToHtml({
       buffer: raw,
     });
-    const md = new MarkdownIt();
-    const htmlContent = md.render(html.value);
-
+    // const md = new MarkdownIt();
+    // const htmlContent = md.render(html.value);
+    const text = this.htmlToTextPreserveTable(html.value);
     if (!docx.value) return [];
 
     return [
@@ -85,6 +85,28 @@ export class DocxLoader extends BufferLoader {
         metadata,
       }),
     ];
+  }
+
+  private htmlToTextPreserveTable(html: string): string {
+    const $ = cheerio.load(html);
+
+    // 暂存所有 table
+    const tables: string[] = [];
+    $('table').each((i, el) => {
+      tables[i] = $.html(el); // 保留原始 HTML 表格
+      $(el).replaceWith(`___TABLE_PLACEHOLDER_${i}___`);
+    });
+
+    // 移除所有 HTML 标签（表格已替换为占位符）
+    const textOnly = $.text();
+
+    // 恢复表格
+    let finalText = textOnly;
+    tables.forEach((tableHtml, i) => {
+      finalText = finalText.replace(`___TABLE_PLACEHOLDER_${i}___`, tableHtml);
+    });
+
+    return finalText.trim();
   }
 
   /**

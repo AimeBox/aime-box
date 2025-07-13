@@ -466,26 +466,26 @@ export class ToolsManager extends BaseManager {
         return null;
       },
     );
-    ipcMain.handle(
-      'tools:invoke',
-      async (
-        event,
-        toolName: string,
-        arg: any,
-        outputFormat: 'default' | 'markdown' = 'default',
-      ) => {
-        try {
-          const res = await this.invoke(toolName, arg, outputFormat);
-          return res;
-        } catch (e) {
-          if (e.message) {
-            return e.message;
-          } else {
-            return e;
-          }
-        }
-      },
-    );
+    // ipcMain.handle(
+    //   'tools:invoke',
+    //   async (
+    //     event,
+    //     toolName: string,
+    //     arg: any,
+    //     outputFormat: 'default' | 'markdown' = 'default',
+    //   ) => {
+    //     try {
+    //       const res = await this.invoke(toolName, arg, outputFormat);
+    //       return res;
+    //     } catch (e) {
+    //       if (e.message) {
+    //         return e.message;
+    //       } else {
+    //         return e;
+    //       }
+    //     }
+    //   },
+    // );
     ipcMain.on(
       'tools:invokeAsync',
       async (
@@ -689,38 +689,53 @@ export class ToolsManager extends BaseManager {
     }
   }
 
-  public invoke = async (
+  @channel('tools:invoke')
+  async invoke(
     toolName: string,
     arg: any,
     outputFormat: 'default' | 'markdown' = 'default',
-  ) => {
+  ) {
     const tool = await this.toolRepository.findOne({
       where: { name: toolName },
     });
     //const tool = this.tools.find((x) => x.name == toolName);
+    const now = new Date();
+    try {
+      if (tool) {
+        const _tool = await this.buildTool(tool, tool.config);
+        let output = '';
+        const toolOutputFormat = tool.outputFormat ?? 'markdown';
 
-    if (tool) {
-      const _tool = await this.buildTool(tool, tool.config);
-      let output = '';
-      const toolOutputFormat = tool.outputFormat ?? 'markdown';
-      if (toolOutputFormat == 'markdown') {
-        const res = await _tool.stream(arg);
-        for await (const chunk of res) {
-          output += chunk;
+        if (toolOutputFormat == 'markdown') {
+          const res = await _tool.stream(arg);
+          for await (const chunk of res) {
+            output += chunk;
+          }
+        } else if (toolOutputFormat == 'json') {
+          output = await _tool.invoke(arg);
         }
-      } else if (toolOutputFormat == 'json') {
-        output = await _tool.invoke(arg);
-      }
+        const time_cost = new Date().getTime() - now.getTime();
+        console.log(`tool:${toolName}`, output, time_cost);
 
-      console.log(`tool:${toolName}`, output);
-
-      if (outputFormat == 'default') return output;
-      else if (outputFormat == 'markdown') {
-        return this.toMarkdown(output);
+        if (outputFormat == 'default')
+          return { output, time_cost, is_success: true };
+        else if (outputFormat == 'markdown') {
+          return {
+            output: this.toMarkdown(output),
+            time_cost,
+            is_success: true,
+          };
+        }
       }
+      throw new Error(`${toolName} no found`);
+    } catch (e) {
+      console.error('tools:invoke', e);
+      const time_cost = new Date().getTime() - now.getTime();
+      return { output: e?.message || e, time_cost, is_success: false };
     }
-    throw new Error(`${toolName} no found`);
-  };
+
+    return null;
+  }
 
   private objectToMarkDown = (input: any) => {
     if (isString(input)) {

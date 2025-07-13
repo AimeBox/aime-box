@@ -7,7 +7,7 @@ import {
   ScrollAreaRef,
 } from '@/renderer/components/ui/scroll-area';
 import { Button, Radio } from 'antd';
-import { FaTimes } from 'react-icons/fa';
+import { FaClock, FaTimes } from 'react-icons/fa';
 import { Sandpack } from '@codesandbox/sandpack-react';
 import { useState } from 'react';
 import ReactJsonView from '@microlink/react-json-view';
@@ -24,7 +24,7 @@ export interface ChatToolViewProps {
   className?: string;
   toolName?: string;
   //toolCall: string;
-  value?: { title: string; content?: any; toolCall?: any };
+  value?: { title: string; content?: any; toolCall?: any; timeCost?: number };
   chatId?: string;
 }
 
@@ -55,7 +55,7 @@ export default function ChatToolView(props: ChatToolViewProps) {
       default:
         return (
           <>
-            <div className="mb-2 bg-gray-100 p-2 rounded-md flex flex-col gap-2">
+            <div className="flex flex-col gap-2 p-2 mb-2 bg-gray-100 rounded-md">
               {t('common.parameters')} :{' '}
               <Radio.Group
                 size="small"
@@ -73,6 +73,12 @@ export default function ChatToolView(props: ChatToolViewProps) {
               )}
             </div>
             <div className="h-auto">{renderToolContent()}</div>
+            {value?.timeCost && (
+              <div className="flex flex-row gap-1 items-center text-xs text-gray-500">
+                <FaClock />
+                {value?.timeCost}ms
+              </div>
+            )}
           </>
         );
     }
@@ -103,9 +109,9 @@ export default function ChatToolView(props: ChatToolViewProps) {
   };
   return (
     open && (
-      <div className={cn('h-full  p-2', className)}>
-        <div className="bg-gray-50 rounded-2xl p-4 h-full flex flex-col">
-          <div className="flex flex-row items-center justify-between">
+      <div className={cn('p-2 h-full', className)}>
+        <div className="flex flex-col p-4 h-full bg-gray-50 rounded-2xl">
+          <div className="flex flex-row justify-between items-center">
             <div className="flex flex-col gap-1">
               <div className="text-sm font-medium">{toolName}</div>
               <small className="text-xs text-gray-500">
@@ -124,7 +130,7 @@ export default function ChatToolView(props: ChatToolViewProps) {
               </div>
             )}
           </div>
-          <ScrollArea className="flex-1 h-full mt-2">
+          <ScrollArea className="flex-1 mt-2 h-full">
             <div className="mr-3 h-full">{getToolView()}</div>
           </ScrollArea>
         </div>

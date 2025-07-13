@@ -51,7 +51,6 @@ import { getProviderModel } from '@/main/utils/providerUtil';
 import { Document } from '@langchain/core/documents';
 
 import { IterableReadableStream } from '@langchain/core/utils/stream';
-import { CallOptions } from '@langchain/langgraph/dist/pregel/types';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { isArray, isString, isUrl } from '@/main/utils/is';
 import { Embeddings } from '@langchain/core/embeddings';
@@ -77,7 +76,9 @@ const fieldZod = z
         .describe(
           'field name to display,be consistent with user input language',
         ),
-      field: z.string().describe('field name must english lower case'),
+      field: z
+        .string()
+        .describe('field name must english lower case, eg: abc_def'),
       description: z.string().optional().describe('field description'),
       type: z
         .enum([
@@ -230,170 +231,171 @@ export class ExtractTool extends BaseTool {
     }[],
   ): Promise<any | undefined> {
     if (doc.length == 0) return undefined;
-    const SYSTEM_PROMPT_TEMPLATE = [
-      '你是一个信息抽取专家,帮助用户提取需要的字段信息,可以进行推理得出答案,输出语言跟用户输入的语言一致,如果没有则输出"NULL"',
-    ].join('\n');
-    const prompt = [
-      new SystemMessage(SYSTEM_PROMPT_TEMPLATE),
-      new HumanMessage(doc.map((x) => x.pageContent).join('\n')),
-    ];
-    const zodFields = this.toZod(fields);
-    const extractionChain = this.model.withStructuredOutput(zodFields);
-    const { mode, allFieldInLLM, allDocInLLM } = this;
+    return this.extractFileAllIn(doc, fields);
+    // const SYSTEM_PROMPT_TEMPLATE = [
+    //   '你是一个信息抽取专家,帮助用户提取需要的字段信息,可以进行推理得出答案,输出语言跟用户输入的语言一致,如果没有则输出"NULL"',
+    // ].join('\n');
+    // const prompt = [
+    //   new SystemMessage(SYSTEM_PROMPT_TEMPLATE),
+    //   new HumanMessage(doc.map((x) => x.pageContent).join('\n')),
+    // ];
+    // const zodFields = this.toZod(fields);
+    // const extractionChain = this.model.withStructuredOutput(zodFields);
+    // const { mode, allFieldInLLM, allDocInLLM } = this;
 
-    const checkExtractResult = false;
-    const splits = await this.textSplitter.splitDocuments(doc);
+    // const checkExtractResult = false;
+    // const splits = await this.textSplitter.splitDocuments(doc);
 
-    const extractFieldsResult = {};
-    for (const field of fields) {
-      extractFieldsResult[field.field] = undefined;
-    }
+    // const extractFieldsResult = {};
+    // for (const field of fields) {
+    //   extractFieldsResult[field.field] = undefined;
+    // }
 
-    if (allFieldInLLM) {
-      if (mode == 'all_segment' || mode == 'all_in') {
-        // 使用大模型一次性提取
-        const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
-        return ex;
-      } else {
-        const vectorStore = await MemoryVectorStore.fromDocuments(
-          splits,
-          this.embedding,
-        );
-        let pageContent = [];
-        if (splits.length == 1) {
-          pageContent = [splits[0].pageContent];
-        } else {
-          const d = await vectorStore.similaritySearch(
-            pageContent.map((x) => x.pageContent).join('\n'),
-            5,
-          );
-          pageContent = d.map((x) => x.pageContent);
-        }
+    // if (allFieldInLLM) {
+    //   if (mode == 'all_segment' || mode == 'all_in') {
+    //     // 使用大模型一次性提取
+    //     const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
+    //     return ex;
+    //   } else {
+    //     const vectorStore = await MemoryVectorStore.fromDocuments(
+    //       splits,
+    //       this.embedding,
+    //     );
+    //     let pageContent = [];
+    //     if (splits.length == 1) {
+    //       pageContent = [splits[0].pageContent];
+    //     } else {
+    //       const d = await vectorStore.similaritySearch(
+    //         pageContent.map((x) => x.pageContent).join('\n'),
+    //         5,
+    //       );
+    //       pageContent = d.map((x) => x.pageContent);
+    //     }
 
-        const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
-        console.log(fields);
-        console.log(ex);
-        return ex;
-      }
-    } else {
-      const vectorStore = await MemoryVectorStore.fromDocuments(
-        splits,
-        this.embedding,
-      );
-      let canStructured = true;
+    //     const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
+    //     console.log(fields);
+    //     console.log(ex);
+    //     return ex;
+    //   }
+    // } else {
+    //   const vectorStore = await MemoryVectorStore.fromDocuments(
+    //     splits,
+    //     this.embedding,
+    //   );
+    //   let canStructured = true;
 
-      for (let index = 0; index < fields.length; index++) {
-        let extractResult = [];
-        const field = fields[index];
-        const SYSTEM_PROMPT_TEMPLATE = [
-          'You are an expert at identifying key historic development in text.',
-          'Only extract important historic developments. Extract nothing if no important information can be found in the text.',
-        ].join('\n');
+    //   for (let index = 0; index < fields.length; index++) {
+    //     let extractResult = [];
+    //     const field = fields[index];
+    //     const SYSTEM_PROMPT_TEMPLATE = [
+    //       'You are an expert at identifying key historic development in text.',
+    //       'Only extract important historic developments. Extract nothing if no important information can be found in the text.',
+    //     ].join('\n');
 
-        const prompt = ChatPromptTemplate.fromMessages([
-          ['system', SYSTEM_PROMPT_TEMPLATE],
-          ['human', '{text}'],
-        ]);
-        let d = [];
-        if (splits.length <= 5 || mode == 'all_segment') {
-          d = splits;
-        } else {
-          d = await vectorStore.similaritySearch(
-            `${field.name}\n\n${field?.description || ''}`,
-            5,
-          );
-        }
+    //     const prompt = ChatPromptTemplate.fromMessages([
+    //       ['system', SYSTEM_PROMPT_TEMPLATE],
+    //       ['human', '{text}'],
+    //     ]);
+    //     let d = [];
+    //     if (splits.length <= 5 || mode == 'all_segment') {
+    //       d = splits;
+    //     } else {
+    //       d = await vectorStore.similaritySearch(
+    //         `${field.name}\n\n${field?.description || ''}`,
+    //         5,
+    //       );
+    //     }
 
-        const extractionDataSchema = this.toZod([field]);
+    //     const extractionDataSchema = this.toZod([field]);
 
-        try {
-          if (!canStructured)
-            throw new Error('Structured is Fail,Use LLM to extract');
+    //     try {
+    //       if (!canStructured)
+    //         throw new Error('Structured is Fail,Use LLM to extract');
 
-          let result = 'NULL';
-          const extractionChain = prompt.pipe(
-            this.model.withStructuredOutput(extractionDataSchema),
-          );
-          for (let index = 0; index < d.length; index++) {
-            const ex = await extractionChain.invoke(
-              {
-                text: d[index].pageContent,
-              },
-              { tags: ['ignore'] },
-            );
-            result = Object.values(ex)[0] as string;
-            if (result) {
-              if (checkExtractResult) {
-                const isMatch = await this.extractCheck(
-                  result,
-                  d[index].pageContent,
-                  field,
-                );
-                if (isMatch) {
-                  extractResult.push(result);
-                  break;
-                }
-              } else {
-                extractResult.push(result);
-                break;
-              }
-            }
-          }
-          canStructured = true;
-          //return result;
-        } catch (err) {
-          console.error(err);
-          canStructured = false;
-          const prompt_withoutStructured = ChatPromptTemplate.fromMessages([
-            [
-              'system',
-              '你是一个提取信息专家,帮助用户找到需要的内容,需要对用户的输入文本段`<text></text>`内的信息进行提取',
-            ],
+    //       let result = 'NULL';
+    //       const extractionChain = prompt.pipe(
+    //         this.model.withStructuredOutput(extractionDataSchema),
+    //       );
+    //       for (let index = 0; index < d.length; index++) {
+    //         const ex = await extractionChain.invoke(
+    //           {
+    //             text: d[index].pageContent,
+    //           },
+    //           { tags: ['ignore'] },
+    //         );
+    //         result = Object.values(ex)[0] as string;
+    //         if (result) {
+    //           if (checkExtractResult) {
+    //             const isMatch = await this.extractCheck(
+    //               result,
+    //               d[index].pageContent,
+    //               field,
+    //             );
+    //             if (isMatch) {
+    //               extractResult.push(result);
+    //               break;
+    //             }
+    //           } else {
+    //             extractResult.push(result);
+    //             break;
+    //           }
+    //         }
+    //       }
+    //       canStructured = true;
+    //       //return result;
+    //     } catch (err) {
+    //       console.error(err);
+    //       canStructured = false;
+    //       const prompt_withoutStructured = ChatPromptTemplate.fromMessages([
+    //         [
+    //           'system',
+    //           '你是一个提取信息专家,帮助用户找到需要的内容,需要对用户的输入文本段`<text></text>`内的信息进行提取',
+    //         ],
 
-            [
-              'human',
-              '### 任务\n提取字段: {field}\n提取名称: {name}\n### 注意\n - 直接输出结果无需任务解析,不要胡乱编写答案,如果找不到输出"NULL"\n - 以最简短明确准确的文字一字不漏输出最终答案\n\n### 以下是需要提取的文本\n<text>\n{text}\n</text>\n\n### 需要提取\n{name}\n{field}:',
-            ],
-          ]);
-          let result = 'NULL';
-          for (let index = 0; index < d.length; index++) {
-            const text = d[index].pageContent;
-            const extractionChain = prompt_withoutStructured.pipe(this.model);
-            const rex = await extractionChain.invoke(
-              {
-                text: text,
-                field: field.field,
-                name: field.name,
-              },
-              { tags: ['ignore'] },
-            );
-            result = rex.content.toString();
-            result = removeThinkTags(result);
-            console.log(`${field.field}:${result}`);
-            console.log('==========');
-            if (!result.includes('NULL')) {
-              if (checkExtractResult) {
-                const isMatch = await this.extractCheck(
-                  result,
-                  d[index].pageContent,
-                  field,
-                );
-                if (isMatch) {
-                  extractResult.push(result);
-                }
-              } else {
-                extractResult.push(result);
-              }
-            }
-          }
-        }
-        if (extractResult.length > 0) {
-          extractResult = [...new Set(extractResult)];
-          extractFieldsResult[field.field] = extractResult.join(',');
-        }
-      }
-    }
-    return extractFieldsResult;
+    //         [
+    //           'human',
+    //           '### 任务\n提取字段: {field}\n提取名称: {name}\n### 注意\n - 直接输出结果无需任务解析,不要胡乱编写答案,如果找不到输出"NULL"\n - 以最简短明确准确的文字一字不漏输出最终答案\n\n### 以下是需要提取的文本\n<text>\n{text}\n</text>\n\n### 需要提取\n{name}\n{field}:',
+    //         ],
+    //       ]);
+    //       let result = 'NULL';
+    //       for (let index = 0; index < d.length; index++) {
+    //         const text = d[index].pageContent;
+    //         const extractionChain = prompt_withoutStructured.pipe(this.model);
+    //         const rex = await extractionChain.invoke(
+    //           {
+    //             text: text,
+    //             field: field.field,
+    //             name: field.name,
+    //           },
+    //           { tags: ['ignore'] },
+    //         );
+    //         result = rex.content.toString();
+    //         result = removeThinkTags(result);
+    //         console.log(`${field.field}:${result}`);
+    //         console.log('==========');
+    //         if (!result.includes('NULL')) {
+    //           if (checkExtractResult) {
+    //             const isMatch = await this.extractCheck(
+    //               result,
+    //               d[index].pageContent,
+    //               field,
+    //             );
+    //             if (isMatch) {
+    //               extractResult.push(result);
+    //             }
+    //           } else {
+    //             extractResult.push(result);
+    //           }
+    //         }
+    //       }
+    //     }
+    //     if (extractResult.length > 0) {
+    //       extractResult = [...new Set(extractResult)];
+    //       extractFieldsResult[field.field] = extractResult.join(',');
+    //     }
+    //   }
+    // }
+    // return extractFieldsResult;
   }
 
   async extractFileAllIn(
@@ -408,6 +410,49 @@ export class ExtractTool extends BaseTool {
   ): Promise<any | undefined> {
     if (doc.length == 0) return undefined;
     const zodFields = this.toZod(fields);
+
+    const fieldsMessage = fields
+      .map((x) => {
+        return `- ${x.name}${x.description ? `: ${x.description}` : ''}`;
+      })
+      .join('\n');
+
+    const SYSTEM_PROMPT_TEMPLATE = [
+      '你是一个信息抽取专家,根据用户提供的文件和需要提取的字段进行信息整理,可以进行推理得出答案\n- 输出语言跟用户输入的语言一致.\n- 不要随意编造答案.\n- 你可以输出自己的解析.- 以正常文本输出',
+    ].join('\n');
+
+    const prompt = [
+      new SystemMessage(SYSTEM_PROMPT_TEMPLATE),
+      new HumanMessage(`提取这份文件的以下字段信息: \n${fieldsMessage}`),
+      new HumanMessage(`${doc.map((x) => x.pageContent).join('\n\n')}`),
+      // new AIMessage({
+      //   content: '',
+      //   tool_calls: [
+      //     {
+      //       name: 'ocr',
+      //       args: { path: '/file_1.pdf' },
+      //       id: '1',
+      //       type: 'tool_call',
+      //     },
+      //   ],
+      // }),
+      // new ToolMessage({
+      //   name: 'ocr',
+      //   tool_call_id: '1',
+      //   content: `${doc.map((x) => x.pageContent).join('\n\n')}`,
+      // }),
+    ];
+    const result = await this.model.invoke(prompt, { tags: ['ignore'] });
+    const content = removeThinkTags(result.text);
+    console.log(content);
+    prompt.push(new AIMessage(content));
+    const extractionChain = this.model.withStructuredOutput(zodFields, {
+      includeRaw: true,
+    });
+
+    const result_2 = await extractionChain.invoke(prompt, { tags: ['ignore'] });
+    console.log(result_2.parsed);
+    return result_2.parsed;
   }
 
   async _call(
@@ -446,6 +491,8 @@ export class ExtractTool extends BaseTool {
       type = 'file';
     } else if (fs.statSync(pathOrUrl).isDirectory()) {
       type = 'directory';
+    } else {
+      throw new Error('Invalid path or url');
     }
 
     async function* generateStream() {
@@ -501,7 +548,10 @@ export class ExtractTool extends BaseTool {
         let doc;
         try {
           doc = await loader.load();
-        } catch {}
+        } catch (e) {
+          console.error(e);
+          throw e;
+        }
 
         if (doc) {
           const row = [path.basename(file), file];
@@ -706,13 +756,13 @@ export class ExtractAgent extends BaseAgent {
       },
       defaultValue: 'extract_segment',
     },
-    {
-      label: t('agents.prompt'),
-      field: 'systemPrompt',
-      component: 'InputTextArea',
-      defaultValue: ExtractAgentSystemPrompt,
-      required: true,
-    },
+    // {
+    //   label: t('agents.prompt'),
+    //   field: 'systemPrompt',
+    //   component: 'InputTextArea',
+    //   defaultValue: ExtractAgentSystemPrompt,
+    //   required: true,
+    // },
   ];
 
   // config: any = {
@@ -746,8 +796,12 @@ export class ExtractAgent extends BaseAgent {
 
   extractTool = tool(async ({ filePath, fields }) => {}, {
     name: 'extract_tool',
+    description:
+      'extract information from file or directory, filePath must be full path',
     schema: z.object({
-      filePath: z.string().describe('file or directory path to extract'),
+      filePath: z
+        .string()
+        .describe('file or directory path to extract, full path'),
       fields: z.array(z.string()).describe('field names to extract'),
     }),
   });
@@ -761,7 +815,7 @@ export class ExtractAgent extends BaseAgent {
     configurable?: Record<string, any>;
   }) {
     const config = await this.getConfig();
-    this.systemPrompt = config.systemPrompt;
+    this.systemPrompt = ExtractAgentSystemPrompt;
     this.mode = config.mode;
     // const { provider, modelName } = getProviderModel(config.fieldModel);
     // const { provider: extractProvider, modelName: extractModelName } =

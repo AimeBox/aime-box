@@ -162,7 +162,6 @@ const ChatOption = React.forwardRef(
                 )}
               </Form.List>
             </Form.Item>
-
             <Form.Item label="Temperature" name="temperature">
               <Slider defaultValue={0.8} min={0.0} max={1.0} step={0.05} />
             </Form.Item>
@@ -171,6 +170,9 @@ const ChatOption = React.forwardRef(
             </Form.Item>
             <Form.Item label="Top P" name="top_p">
               <Slider defaultValue={0.9} min={0} max={1} step={0.05} />
+            </Form.Item>
+            <Form.Item label="Max Tokens" name="maxTokens">
+              <Slider defaultValue={4096} min={1} max={128000} step={1} />
             </Form.Item>
             <Form.Item name="allwaysClear" valuePropName="checked">
               <Checkbox>Allways Clear History</Checkbox>
