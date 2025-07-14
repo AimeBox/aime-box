@@ -13,6 +13,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import fs from 'fs';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { Embeddings } from '@langchain/core/embeddings';
+import { LMStudioClient } from '@lmstudio/sdk';
 
 export class LmStudioProvider extends BaseProvider {
   name: string = ProviderType.LMSTUDIO;
@@ -25,9 +26,12 @@ export class LmStudioProvider extends BaseProvider {
 
   openaiClient: OpenAI;
 
+  client: LMStudioClient;
+
   constructor(params?: BaseProviderParams) {
     super(params);
     this.httpProxy = settingsManager.getHttpAgent();
+
     this.openaiClient = new OpenAI({
       baseURL: this.provider.api_base,
       apiKey: this.provider.api_key,
@@ -48,6 +52,8 @@ export class LmStudioProvider extends BaseProvider {
   }
 
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {
+    //const llmOnly = await this.client.system.listDownloadedModels('llm');
+
     const models = (await this.openaiClient.models.list()).data;
     return models
       .filter((x) => !x.id.startsWith('text-embedding-'))
@@ -62,6 +68,7 @@ export class LmStudioProvider extends BaseProvider {
   }
 
   async getEmbeddingModels(): Promise<string[]> {
+    //const embedding_only = await this.client.system.listDownloadedModels('embedding');
     const list = await this.openaiClient.models.list();
     return list.data
       .filter((x) => x.id.startsWith('text-embedding-'))

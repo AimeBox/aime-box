@@ -101,6 +101,8 @@ import { MinimaxToolkit } from './MinimaxToolkit';
 import { ElevenLabsToolkit } from './ElevenLabsToolkit';
 import { Think } from './ThinkTool';
 import { BilibiliToolkit } from './social-media/BilibiliToolkit';
+import { KnowledgeBaseToolkit } from './KnowledgeBaseToolkit';
+import { AutoToolToolkit } from './AutoToolkit';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -594,7 +596,7 @@ export class ToolsManager extends BaseManager {
 
     await this.registerTool(TextToSpeech);
     await this.registerTool(WebSearchTool);
-    await this.registerTool(KnowledgeBaseQuery);
+    await this.registerTool(KnowledgeBaseToolkit);
     await this.registerTool(TavilySearchTool);
     await this.registerTool(BraveSearchTool);
     await this.registerTool(FireCrawl);
@@ -609,6 +611,7 @@ export class ToolsManager extends BaseManager {
     await this.registerTool(BilibiliToolkit);
     await this.registerTool(MinimaxToolkit);
     await this.registerTool(ElevenLabsToolkit);
+    await this.registerTool(AutoToolToolkit);
     await this.registerTool(Think);
   };
 

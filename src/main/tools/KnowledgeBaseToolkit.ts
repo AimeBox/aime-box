@@ -3,6 +3,10 @@ import { BaseTool, BaseToolKit } from './BaseTool';
 import { FormSchema } from '@/types/form';
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import { z } from 'zod';
+import { kbManager } from '../knowledgebase';
+import { dbManager } from '../db';
+import { Repository } from 'typeorm';
+import { KnowledgeBase } from '@/entity/KnowledgeBase';
 
 export interface KnowledgeBaseParameters extends ToolParams {
   //providerId: string;
@@ -13,18 +17,59 @@ export class KnowledgeBaseSave extends BaseTool {
 
   name: string = 'knowledge_base_save';
 
-  description: string = 'Save knowledge base';
+  description: string = 'Save knowledge base item';
 
   schema = z.object({
-    name: z.string(),
-    description: z.string(),
+    kbNameOrId: z.string(),
     content: z.string(),
   });
 
   async _call(
     arg: any,
     runManager?: CallbackManagerForToolRun,
-    parentConfig?: ToolRunnableConfig,
+    config?: ToolRunnableConfig,
+  ): Promise<any> {
+    throw new Error('Method not implemented.');
+  }
+}
+export class KnowledgeBaseUpdate extends BaseTool {
+  toolKitName: string = 'knowledge_base_toolkit';
+
+  name: string = 'knowledge_base_update';
+
+  description: string = 'Update knowledge base item';
+
+  schema = z.object({
+    kbNameOrId: z.string(),
+    kbItemId: z.string(),
+    content: z.string(),
+  });
+
+  async _call(
+    arg: any,
+    runManager?: CallbackManagerForToolRun,
+    config?: ToolRunnableConfig,
+  ): Promise<any> {
+    throw new Error('Method not implemented.');
+  }
+}
+
+export class KnowledgeBaseDelete extends BaseTool {
+  toolKitName: string = 'knowledge_base_toolkit';
+
+  name: string = 'knowledge_base_delete';
+
+  description: string = 'Delete knowledge base';
+
+  schema = z.object({
+    kbNameOrId: z.string(),
+    kbItemId: z.string(),
+  });
+
+  async _call(
+    arg: any,
+    runManager?: CallbackManagerForToolRun,
+    config?: ToolRunnableConfig,
   ): Promise<any> {
     throw new Error('Method not implemented.');
   }
@@ -38,13 +83,14 @@ export class KnowledgeBaseQuery extends BaseTool {
   description: string = 'Query knowledge base';
 
   schema = z.object({
-    name: z.string(),
+    kbNameOrId: z.string(),
+    query: z.string(),
   });
 
   protected _call(
     arg: any,
     runManager?: CallbackManagerForToolRun,
-    parentConfig?: ToolRunnableConfig,
+    config?: ToolRunnableConfig,
   ): Promise<any> {
     throw new Error('Method not implemented.');
   }
@@ -55,16 +101,29 @@ export class KnowledgeBaseList extends BaseTool {
 
   name: string = 'knowledge_base_list';
 
-  description: string = 'List knowledge base';
+  description: string = 'List All Knowledge Bases';
 
   schema = z.object({});
 
-  protected _call(
+  kbRepository: Repository<KnowledgeBase>;
+
+  constructor(params?: KnowledgeBaseParameters) {
+    super(params);
+    this.kbRepository = dbManager.dataSource.getRepository(KnowledgeBase);
+  }
+
+  async _call(
     arg: any,
     runManager?: CallbackManagerForToolRun,
-    parentConfig?: ToolRunnableConfig,
+    config?: ToolRunnableConfig,
   ): Promise<any> {
-    throw new Error('Method not implemented.');
+    const kbs = await this.kbRepository.find();
+    const res = kbs.map((x) => ({
+      id: x.id,
+      name: x.name,
+      description: x.description,
+    }));
+    return JSON.stringify(res, null, 2);
   }
 }
 

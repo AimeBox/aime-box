@@ -212,11 +212,9 @@ export default function Connections() {
       setModels(models);
       console.log(models);
       setCurrentData(data);
-      if (models.length > 0) {
-        formModels.resetFields();
-        formModels.setFieldsValue({ models: models });
-        setOpenModels(true);
-      }
+      formModels.resetFields();
+      formModels.setFieldsValue({ models: models });
+      setOpenModels(true);
     } finally {
       messageApi.destroy();
     }
