@@ -443,16 +443,19 @@ export class ExtractTool extends BaseTool {
       // }),
     ];
     const result = await this.model.invoke(prompt, { tags: ['ignore'] });
-    const content = removeThinkTags(result.text);
-    console.log(content);
-    prompt.push(new AIMessage(content));
+    const thought = removeThinkTags(result.text);
+    console.log(thought);
+    prompt.push(new AIMessage(thought));
     const extractionChain = this.model.withStructuredOutput(zodFields, {
       includeRaw: true,
     });
 
     const result_2 = await extractionChain.invoke(prompt, { tags: ['ignore'] });
     console.log(result_2.parsed);
-    return result_2.parsed;
+    return {
+      ...result_2.parsed,
+      '@thought': thought,
+    };
   }
 
   async _call(
@@ -510,12 +513,12 @@ export class ExtractTool extends BaseTool {
       }
 
       yield `\n\nExtract Fields:\n${fields.map((x) => ` - \`${x.type}\` **${x.field}** : ${x.name} (${x.description})`).join('\n')}\n___\n`;
-      const headers = ['name', 'path'];
+      const headers = ['name', 'path', 'thought'];
       yield `| name `;
       const defaultFields = {};
       for (let index = 0; index < fields.length; index++) {
         const field = fields[index];
-        yield `| ${field.field} `;
+        yield `| ${field.name} `;
         defaultFields[field.field] = null;
         headers.push(field.field);
       }
@@ -572,6 +575,9 @@ export class ExtractTool extends BaseTool {
             const result = await that.extractFile(doc, fields);
             if (result) {
               let p = '';
+              row.push(result['@thought']);
+              // p += `| ${result['@thought']?.replaceAll('\n', ' ') || ''} `;
+
               const values = { ...defaultFields };
               for (const key of Object.keys(values)) {
                 let value = '';
@@ -626,7 +632,7 @@ export class ExtractTool extends BaseTool {
           });
           await workbook.xlsx.writeFile(input.savePath);
           yield '\n___\n';
-          yield `Extract Done, File Saved : ${input.savePath}`;
+          yield `Extract Done, File Saved :\n<file>${input.savePath}</file>`;
         } catch (err) {
           console.error(err);
         }

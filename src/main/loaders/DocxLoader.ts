@@ -77,6 +77,7 @@ export class DocxLoader extends BufferLoader {
     // const md = new MarkdownIt();
     // const htmlContent = md.render(html.value);
     const text = this.htmlToTextPreserveTable(html.value);
+    console.log(text);
     if (!docx.value) return [];
 
     return [
@@ -95,6 +96,10 @@ export class DocxLoader extends BufferLoader {
     $('table').each((i, el) => {
       tables[i] = $.html(el); // 保留原始 HTML 表格
       $(el).replaceWith(`___TABLE_PLACEHOLDER_${i}___`);
+    });
+    const lines: string[] = [];
+    $('p').each((i, el) => {
+      lines.push($.text(el)); // 保留原始 HTML 表格
     });
 
     // 移除所有 HTML 标签（表格已替换为占位符）
