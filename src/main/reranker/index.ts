@@ -97,13 +97,18 @@ export class SiliconFlowReranker extends Reranker {
   }
 }
 
+const localRerankers = {};
+
 export async function getReranker(providerModel?: string): Promise<Reranker> {
   const { provider: providerName, modelName } = getProviderModel(providerModel);
 
   if (providerName === 'local') {
-    return new TransformersReranker({
-      modelName: modelName,
-    });
+    if (!localRerankers[modelName]) {
+      localRerankers[modelName] = new TransformersReranker({
+        modelName: modelName,
+      });
+    }
+    return localRerankers[modelName];
   } else {
     const provider = await (
       await providersManager.getProviders()
