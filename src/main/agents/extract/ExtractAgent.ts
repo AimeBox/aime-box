@@ -155,6 +155,7 @@ export class ExtractTool extends BaseTool {
       '.pdf',
       '.docx',
       '.doc',
+      '.md',
       '.txt',
       '.jpg',
       '.png',
@@ -450,7 +451,9 @@ export class ExtractTool extends BaseTool {
       includeRaw: true,
     });
 
-    const result_2 = await extractionChain.invoke(prompt, { tags: ['ignore'] });
+    const result_2 = await extractionChain.invoke(prompt, {
+      tags: ['ignore'],
+    });
     console.log(result_2.parsed);
     return {
       ...result_2.parsed,
