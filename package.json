@@ -352,8 +352,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "runAfterFinish": true,
-      "deleteAppDataOnUninstall": false,
-      "include": "build/installer.nsh"
+      "deleteAppDataOnUninstall": false
     },
     "linux": {
       "target": [
