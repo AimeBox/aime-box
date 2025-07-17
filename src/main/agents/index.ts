@@ -36,6 +36,7 @@ import { toolsManager } from '../tools';
 import { getProviderModel } from '../utils/providerUtil';
 import { createSupervisor, OutputMode } from '@langchain/langgraph-supervisor';
 import { BaseStore } from '@langchain/langgraph';
+
 import { ManusAgent } from './manus/ManusAgent';
 import { notificationManager } from '../app/NotificationManager';
 import { createReactAgentWithSummary } from './react/ReActAgent';
@@ -54,6 +55,7 @@ import { DataMaskingAgent } from './data_masking/DataMaskingAgent';
 import { BaseManager } from '../BaseManager';
 import { channel } from '../ipc/IpcController';
 import { getAssetPath, getDataPath } from '../utils/path';
+
 export interface AgentInfo extends Agent {
   static: boolean;
   hidden: boolean;
@@ -350,8 +352,8 @@ export class AgentManager extends BaseManager {
       throw new Error('agent id is required');
     }
     const agentInfo = await this.getAgent(agent.id);
-    if (agentInfo.config.model) {
-      agent.model = agentInfo.config.model;
+    if (agent?.config?.model) {
+      agent.model = agent?.config?.model;
     }
     if (/^[a-zA-Z0-9_-]+$/.test(agent.name)) {
       await this.agentRepository.save(agent);

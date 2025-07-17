@@ -19,6 +19,7 @@ export enum ProviderType {
   MINIMAX = 'minimax',
   REPLICATE = 'replicate',
   ELEVENLABS = 'elevenlabs',
+  MOONSHOT = 'moonshot',
 }
 
 @Entity('providers')

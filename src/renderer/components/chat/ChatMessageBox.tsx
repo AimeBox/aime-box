@@ -248,6 +248,23 @@ const ChatMessageBox = React.forwardRef(
         </motion.div>
       );
     };
+
+    const getTimeCost = () => {
+      let toolTimeCost = 0;
+      if (value.role == 'assistant') {
+        if (toolMessages?.length > 0) {
+          toolTimeCost = toolMessages.reduce(
+            (acc, curr) => acc + curr.time_cost,
+            0,
+          );
+        }
+      }
+      const totalTimeCost = (value.time_cost + toolTimeCost) / 1000;
+      if (totalTimeCost <= 60) {
+        return `${totalTimeCost.toFixed(2)}s`;
+      }
+      return `${(totalTimeCost / 60).toFixed(2)}m`;
+    };
     return (
       <div className="w-full mb-2">
         <div className="flex flex-col justify-between px-5 mx-auto max-w-5xl rounded-lg group">
@@ -644,7 +661,7 @@ const ChatMessageBox = React.forwardRef(
                           {value.time_cost && (
                             <div className="flex flex-row gap-1 items-center">
                               <FaClock />
-                              {(value.time_cost / 1000).toFixed(2)}s
+                              {getTimeCost()}
                             </div>
                           )}
                           {value.time_cost && (

@@ -133,21 +133,24 @@ export class ExtractTool extends BaseTool {
 
   mode: 'all_segment' | 'extract_segment' | 'all_in' = 'extract_segment';
 
+  signal?: AbortSignal;
+
   constructor(params?: {
     model: BaseChatModel;
-    allFieldInLLM: boolean;
-    allDocInLLM: boolean;
-    embedding: Embeddings;
     messages?: BaseMessage[];
-    mode: 'all_segment' | 'extract_segment' | 'all_in';
+    signal?: AbortSignal;
+    // allFieldInLLM: boolean;
+    // allDocInLLM: boolean;
+    // embedding?: Embeddings;
   }) {
     super({});
     this.model = params?.model;
-    this.allFieldInLLM = params?.allFieldInLLM ?? false;
-    this.allDocInLLM = params?.allDocInLLM ?? false;
-    this.mode = params?.mode ?? 'extract_segment';
-    this.embedding = params?.embedding;
+    // this.allFieldInLLM = params?.allFieldInLLM ?? false;
+    // this.allDocInLLM = params?.allDocInLLM ?? false;
+    // this.mode = params?.mode ?? 'extract_segment';
+    // this.embedding = params?.embedding;
     this.messages = params?.messages ?? [];
+    this.signal = params?.signal;
   }
 
   getFiles = async (sources: string[]) => {
@@ -443,16 +446,21 @@ export class ExtractTool extends BaseTool {
       //   content: `${doc.map((x) => x.pageContent).join('\n\n')}`,
       // }),
     ];
-    const result = await this.model.invoke(prompt, { tags: ['ignore'] });
+    const result = await this.model.invoke(prompt, {
+      tags: ['ignore'],
+      signal: this.signal,
+    });
     const thought = removeThinkTags(result.text);
     console.log(thought);
     prompt.push(new AIMessage(thought));
     const extractionChain = this.model.withStructuredOutput(zodFields, {
       includeRaw: true,
+      method: 'json_object',
     });
 
-    const result_2 = await extractionChain.invoke(prompt, {
+    const result_2 = await extractionChain.invoke(thought, {
       tags: ['ignore'],
+      signal: this.signal,
     });
     console.log(result_2.parsed);
     return {
@@ -716,14 +724,25 @@ export class ExtractAgent extends BaseAgent {
   });
 
   configSchema: FormSchema[] = [
-    // {
-    //   label: t('字段分析模型'),
-    //   field: 'fieldModel',
-    //   component: 'ProviderSelect',
-    //   componentProps: {
-    //     type: 'llm',
-    //   },
-    // },
+    {
+      label: t('common.model'),
+      field: 'model',
+      component: 'ProviderSelect',
+      componentProps: {
+        type: 'llm',
+      },
+    },
+    {
+      label: t('common.max_tokens'),
+      field: 'contentMaxTokens',
+      component: 'InputNumber',
+      componentProps: {
+        min: 4096,
+        max: 128000,
+        step: 100,
+      },
+      defaultValue: 32000,
+    },
     // {
     //   label: t('提取模型'),
     //   field: 'extractModel',
@@ -732,39 +751,39 @@ export class ExtractAgent extends BaseAgent {
     //     type: 'llm',
     //   },
     // },
-    {
-      label: t('common.embedding'),
-      field: 'embedding',
-      component: 'ProviderSelect',
-      componentProps: {
-        type: 'embedding',
-      },
-    },
-    {
-      label: t('一次性全字段提取'),
-      field: 'allFieldInLLM',
-      component: 'Switch',
-      defaultValue: false,
-    },
-    {
-      label: t('全文扫描'),
-      field: 'allDocInLLM',
-      component: 'Switch',
-      defaultValue: false,
-    },
-    {
-      label: '模式',
-      field: 'mode',
-      component: 'Select',
-      componentProps: {
-        options: [
-          { label: '全文分段扫描', value: 'all_segment' },
-          { label: '截取分段扫描', value: 'extract_segment' },
-          { label: '全文扫描', value: 'all_in' },
-        ],
-      },
-      defaultValue: 'extract_segment',
-    },
+    // {
+    //   label: t('common.embedding'),
+    //   field: 'embedding',
+    //   component: 'ProviderSelect',
+    //   componentProps: {
+    //     type: 'embedding',
+    //   },
+    // },
+    // {
+    //   label: t('一次性全字段提取'),
+    //   field: 'allFieldInLLM',
+    //   component: 'Switch',
+    //   defaultValue: false,
+    // },
+    // {
+    //   label: t('全文扫描'),
+    //   field: 'allDocInLLM',
+    //   component: 'Switch',
+    //   defaultValue: false,
+    // },
+    // {
+    //   label: '模式',
+    //   field: 'mode',
+    //   component: 'Select',
+    //   componentProps: {
+    //     options: [
+    //       { label: '全文分段扫描', value: 'all_segment' },
+    //       { label: '截取分段扫描', value: 'extract_segment' },
+    //       { label: '全文扫描', value: 'all_in' },
+    //     ],
+    //   },
+    //   defaultValue: 'extract_segment',
+    // },
     // {
     //   label: t('agents.prompt'),
     //   field: 'systemPrompt',
@@ -783,17 +802,15 @@ export class ExtractAgent extends BaseAgent {
 
   textSplitter: TextSplitter;
 
-  llm: BaseChatModel;
-
   // fieldLLM: BaseChatModel;
 
   // extractLLM: BaseChatModel;
 
-  embedding: Embeddings;
+  // embedding: Embeddings;
 
   systemPrompt: string;
 
-  mode: 'all_segment' | 'extract_segment' | 'all_in';
+  // mode: 'all_segment' | 'extract_segment' | 'all_in';
 
   constructor(options: {
     provider: string;
@@ -823,29 +840,36 @@ export class ExtractAgent extends BaseAgent {
     signal?: AbortSignal;
     configurable?: Record<string, any>;
   }) {
+    const { store, model, messageEvent, chatOptions, signal, configurable } =
+      params;
     const config = await this.getConfig();
     this.systemPrompt = ExtractAgentSystemPrompt;
-    this.mode = config.mode;
-    // const { provider, modelName } = getProviderModel(config.fieldModel);
-    // const { provider: extractProvider, modelName: extractModelName } =
-    //   getProviderModel(config.extractModel);
+    this.model = model;
+    if (!this.model) {
+      try {
+        const { provider, modelName } = getProviderModel(config.model);
+        this.model = await getChatModel(provider, modelName, chatOptions);
+      } catch {
+        console.error('model not found');
+      }
+    }
+
     const that = this;
     this.textSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
       chunkOverlap: 20,
     });
-    const fieldModel = params.model;
-    const extractModel = params.model;
-    if (config.embedding) {
-      const { provider: embeddingProvider, modelName: embeddingModelName } =
-        getProviderModel(config.embedding);
-      this.embedding = await getEmbeddingModel(
-        embeddingProvider,
-        embeddingModelName,
-      );
-    } else {
-      this.embedding = await getDefaultEmbeddingModel();
-    }
+
+    // if (config.embedding) {
+    //   const { provider: embeddingProvider, modelName: embeddingModelName } =
+    //     getProviderModel(config.embedding);
+    //   this.embedding = await getEmbeddingModel(
+    //     embeddingProvider,
+    //     embeddingModelName,
+    //   );
+    // } else {
+    //   this.embedding = await getDefaultEmbeddingModel();
+    // }
 
     async function callCheck(state: typeof MessagesAnnotation.State) {
       const promptTemplate = ChatPromptTemplate.fromMessages([
@@ -866,10 +890,10 @@ export class ExtractAgent extends BaseAgent {
         }),
       });
       //const prompt = await promptTemplate.invoke({ messages: state.messages });
-      const llmWithTool = fieldModel.bindTools([fieldsTool]);
+      const llmWithTool = that.model.bindTools([fieldsTool]);
       const response = await promptTemplate
         .pipe(llmWithTool)
-        .invoke({ messages: state.messages });
+        .invoke({ messages: state.messages, configurable: { signal: signal } });
 
       return { messages: [response] };
     }
@@ -896,12 +920,13 @@ export class ExtractAgent extends BaseAgent {
       const { filePath, fields } = toolCall.args;
 
       const extractTool = new ExtractTool({
-        model: extractModel,
-        allFieldInLLM: config.allFieldInLLM,
-        allDocInLLM: config.allDocInLLM,
-        mode: config.mode,
-        embedding: that.embedding,
+        model: model,
         messages: messages,
+        signal: signal,
+        // allFieldInLLM: config.allFieldInLLM,
+        // allDocInLLM: config.allDocInLLM,
+        // mode: config.mode,
+        // embedding: that.embedding,
       });
       const toolNode = new ToolNode([extractTool]);
       const result = await toolNode.streamEvents(

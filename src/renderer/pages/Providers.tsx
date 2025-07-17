@@ -198,6 +198,11 @@ export default function Connections() {
           api_base: 'https://ark.cn-beijing.volces.com/api/v3',
           api_key: 'NULL',
         });
+      } else if (changedFields[0].value === 'moonshot') {
+        form.setFieldsValue({
+          api_base: 'https://api.moonshot.cn/v1',
+          api_key: 'NULL',
+        });
       }
     }
   };

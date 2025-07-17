@@ -46,6 +46,7 @@ import { TongyiProvider } from './TongyiProvider';
 import { TogetherProvider } from './TogetherProvider';
 import { ElevenLabsProvider } from './ElevenLabsProvider';
 import { LmStudioProvider } from './LmStudioProvider';
+import { MoonshotProvider } from './MoonshotProvider';
 
 export interface ProviderInfo extends Providers {
   credits: {
@@ -218,6 +219,10 @@ export class ProvidersManager extends BaseManager {
         const replicate = new ReplicateProvider({ provider: connection });
         const list = await replicate.getModelList();
         return list;
+      } else if (connection?.type === ProviderType.MOONSHOT) {
+        const moonshot = new MoonshotProvider({ provider: connection });
+        const list = await moonshot.getModelList();
+        return list;
       }
     } catch (e) {
       console.log(e);
@@ -266,6 +271,8 @@ export class ProvidersManager extends BaseManager {
         return new ElevenLabsProvider({ provider: providerObj });
       case ProviderType.LMSTUDIO:
         return new LmStudioProvider({ provider: providerObj });
+      case ProviderType.MOONSHOT:
+        return new MoonshotProvider({ provider: providerObj });
       default:
         return undefined;
     }

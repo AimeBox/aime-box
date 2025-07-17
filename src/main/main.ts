@@ -23,13 +23,11 @@ import { kbManager } from './knowledgebase';
 
 import providersManager from './providers';
 import ipcListener from './ipc/ipcListener';
-import isDev from 'electron-is-dev';
 import '../i18n/index';
 import { t } from 'i18next';
 import { platform } from 'node:process';
 import { pluginsManager } from './plugins/PluginsManager';
 import { pathToFileURL } from 'url';
-import { env } from '@huggingface/transformers';
 import serverManager from './server/serverManager';
 import { appManager } from './app/AppManager';
 import promptsManager from './prompts';
