@@ -14,7 +14,7 @@ import path from 'path';
 import { app } from 'electron';
 import fs from 'fs';
 import { TextLoader } from 'langchain/document_loaders/fs/text';
-import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
+import { DocxLoader } from '../loaders/DocxLoader';
 import { PDFLoader } from '../loaders/PDFLoader';
 import { PPTXLoader } from '@langchain/community/document_loaders/fs/pptx';
 import { BaseTool } from './BaseTool';
@@ -56,12 +56,6 @@ export class FileToText extends BaseTool {
         const loader = new PDFLoader(input.filePath);
         const docs = await loader.load();
         return docs.map((x) => x.pageContent).join('\n\n');
-        // if (docs.length > 0) return docs.map((x) => x.pageContent).join('\n\n');
-        // else {
-        //   const ocrTool = new RapidOcrTool();
-        //   const result = await ocrTool.invoke({ filePath: input.filePath });
-        //   return result;
-        // }
       } else if (ext.toLowerCase() == '.txt' || ext.toLowerCase() == '.md') {
         const loader = new TextLoader(input.filePath);
         const docs = await loader.load();
@@ -93,6 +87,5 @@ export class FileToText extends BaseTool {
       }
       return JSON.stringify(err);
     }
-    return null;
   }
 }

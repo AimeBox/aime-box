@@ -26,7 +26,11 @@ const getTmpPath = () => {
 };
 
 const getAssetPath = (...paths: string[]): string => {
-  return path.join(app.getAppPath(), 'assets', ...paths);
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'assets', ...paths);
+  } else {
+    return path.join(app.getAppPath(), 'assets', ...paths);
+  }
 };
 
 const rootPath = app.isPackaged ? app.getAppPath() : __dirname;

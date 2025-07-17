@@ -86,13 +86,13 @@ export class HuggingFaceTransformersEmbeddings
   }
 
   async runEmbedding(texts: string[]) {
-    if (this.pipeline == null) {
+    if (!this.pipeline) {
       env.localModelPath = path.join(getModelsPath(), 'embeddings');
       env.allowRemoteModels = false;
       this.pipeline = pipeline;
     }
     let pipe = null;
-    if (this.pipelinePromise === undefined) {
+    if (!this.pipelinePromise) {
       pipe = await pipeline('feature-extraction', this.modelName, {
         // dtype: 'fp16',
       });

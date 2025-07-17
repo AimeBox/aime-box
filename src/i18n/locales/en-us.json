@@ -192,5 +192,8 @@
     "instances_manager": "Instances Manager",
     "instances": "Instances",
     "instances_create": "Create Instance"
+  },
+  "providers": {
+    "manager_model": "Manager Model"
   }
 }

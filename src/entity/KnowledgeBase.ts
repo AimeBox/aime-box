@@ -46,6 +46,9 @@ export class KnowledgeBase {
 
   @Column({ default: true })
   isPrivate!: boolean;
+
+  @Column({ nullable: true })
+  rootPath?: string;
 }
 
 export enum KnowledgeBaseItemState {

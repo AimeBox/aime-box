@@ -65,6 +65,8 @@ export default function Tools() {
   const [toolSettinSchemas, setToolSettinSchemas] = useState([]);
   const [toolInvokeSchemas, setToolInvokeSchemas] = useState<FormSchema[]>();
   const [invokeOutput, setInvokeOutput] = useState<string | string[]>();
+  const [timeCost, setTimeCost] = useState<number | undefined>();
+
   const [addButtonOpen, setAddButtonOpen] = useState(false);
   const [selectedFilterTag, setSelectedFilterTag] =
     useState<string>('built-in');
@@ -159,7 +161,8 @@ export default function Tools() {
 
   const invoke = async (toolName, value) => {
     console.log(toolName, value);
-    let output: string | string[] = '';
+    let _output: string | string[] = '';
+    let _time_cost = undefined;
     if (selectedFilterTag == 'built-in') {
       if (currentTool) {
         isInvoking({ ...invoking, [toolName]: true });
@@ -169,15 +172,17 @@ export default function Tools() {
           value,
           'markdown',
         );
-
         console.log(res);
-        if (isString(res)) {
-          output = res;
+        const { output, time_cost, is_success } = res;
+
+        if (isString(output)) {
+          _output = output;
         } else if (isArray(res)) {
-          output = res;
+          _output = res;
         } else {
-          output = res?.toString() || '';
+          _output = res?.toString() || '';
         }
+        _time_cost = time_cost;
       }
     } else if (selectedFilterTag == 'mcp') {
       if (currentMcp) {
@@ -188,14 +193,17 @@ export default function Tools() {
           'markdown',
         );
         console.log(res);
-        if (isString(res)) {
-          output = res;
-        } else if (isArray(res)) {
-          output = res;
+        const { output, time_cost, is_success } = res;
+        if (isString(output)) {
+          _output = output;
+        } else if (isArray(output)) {
+          _output = output;
         }
+        _time_cost = time_cost;
       }
     }
-    setInvokeOutput(output);
+    setInvokeOutput(_output);
+    setTimeCost(_time_cost);
     delete invoking[toolName];
     isInvoking(invoking);
   };
@@ -261,6 +269,7 @@ export default function Tools() {
       setToolInvokeSchemas(undefined);
     }
     setInvokeOutput(undefined);
+    setTimeCost(undefined);
     setToolCall(undefined);
   }, [location]);
 
@@ -751,6 +760,7 @@ export default function Tools() {
                       type: 'tool_call',
                       text: invokeOutput,
                     },
+                    timeCost: timeCost,
                   }}
                 ></ChatToolView>
               )}

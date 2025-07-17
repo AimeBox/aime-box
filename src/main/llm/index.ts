@@ -30,6 +30,7 @@ import { GroqProvider } from '../providers/GroqProvider';
 import { AzureOpenAIProvider } from '../providers/AzureOpenAIProvider';
 import { TongyiProvider } from '../providers/TongyiProvider';
 import { TogetherProvider } from '../providers/TogetherProvider';
+import { MoonshotProvider } from '../providers/MoonshotProvider';
 
 export async function getChatModel(
   providerName: string,
@@ -101,6 +102,10 @@ export async function getChatModel(
     );
   } else if (provider?.type === ProviderType.MINIMAX) {
     llm = new MinimaxProvider({ provider }).getChatModel(model.name, options);
+  } else if (provider?.type === ProviderType.MOONSHOT) {
+    llm = new MoonshotProvider({ provider }).getChatModel(model.name, options);
+  } else {
+    throw new Error(`provider "${providerName}" not support`);
   }
   if (tools.length > 0) {
     const llmWithTools = llm.bindTools(tools);

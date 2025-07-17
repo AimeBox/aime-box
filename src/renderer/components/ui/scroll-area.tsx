@@ -148,7 +148,7 @@ const ScrollArea = React.forwardRef<ScrollAreaRef, ScrollAreaProps>(
       >
         {showScrollBottom && (
           <div
-            className={`absolute bottom-6 right-6 z-10 text-xs p-8 ${!isBottom ? 'opacity-30 hover:opacity-50' : 'opacity-0'} transition-opacity duration-300`}
+            className={`absolute bottom-6 right-6 z-10 text-xs p-8 ${!isBottom ? 'opacity-30 hover:opacity-50' : 'hidden opacity-0'} transition-opacity duration-300`}
           >
             <FaArrowCircleDown
               onClick={() => scrollBottom(false)}

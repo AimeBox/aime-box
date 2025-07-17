@@ -62,6 +62,7 @@ import { ChatStatus } from '@/entity/Chat';
 import { appManager } from '../app/AppManager';
 import { BaseManager } from '../BaseManager';
 import { channel } from '../ipc/IpcController';
+import { getAssetPath } from '../utils/path';
 
 export interface KnowledgeBaseDocument {
   document: DocumentInterface<Record<string, any>>;
@@ -120,6 +121,13 @@ export class KnowledgeBaseManager extends BaseManager {
       await this.restart(kbId);
       event.sender.send('kb:restart');
     });
+  }
+
+  public async registerKnowledgeBaseFromAssetPath() {
+    const knowledgeBasesPath = path.join(getAssetPath(), 'knowledge-bases');
+    if (fs.existsSync(knowledgeBasesPath)) {
+      const knowledgeBaseFiles = await fs.promises.readdir(knowledgeBasesPath);
+    }
   }
 
   public restart = async (kbId: string) => {
@@ -516,45 +524,27 @@ export class KnowledgeBaseManager extends BaseManager {
       ) => {};
     }
   > {
+    let _kb: KnowledgeBase;
     if (isString(kb)) {
       const kbIdOrName = kb as string;
       const kb_repository = dbManager.dataSource.getRepository(KnowledgeBase);
-      kb = await kb_repository.findOne({
+      _kb = await kb_repository.findOne({
         where: [{ id: kbIdOrName }, { name: kbIdOrName }],
       });
-      // if (!kb) {
-      //   const name = kb as string;
-      //   kb = await kb_repository.findOne({ where: { name: kb } });
-      // }
+    } else {
+      _kb = kb;
     }
-    const embeddings = await this.getEmbeddings(kb);
+    const embeddings = await this.getEmbeddings(_kb);
     let vectraStore;
-    if (kb.vectorStoreType == VectorStoreType.PGVector) {
-      // vectraStore = await PGVectorStore.initialize(embeddings, {
-      //   postgresConnectionOptions: {
-      //     type: 'postgres',
-      //     host: '127.0.0.1',
-      //     port: 5432,
-      //     user: 'pgvector',
-      //     password: 'pgvector',
-      //     database: 'postgres',
-      //   } as PoolConfig,
-      //   tableName: 'kb_bge_m3',
-      //   columns: {
-      //     idColumnName: 'id',
-      //     vectorColumnName: 'vector',
-      //     contentColumnName: 'content',
-      //     metadataColumnName: 'metadata',
-      //   },
-      // });
-    } else if (kb.vectorStoreType == VectorStoreType.Milvus) {
-      // vectraStore = await Milvus.fromExistingCollection(embeddings, {
-      //   name: 'default',
-      // });
-    } else if (kb.vectorStoreType == VectorStoreType.LanceDB) {
+    if (_kb.vectorStoreType == VectorStoreType.PGVector) {
+      throw new Error('PGVector is not supported');
+    } else if (_kb.vectorStoreType == VectorStoreType.Milvus) {
+      throw new Error('Milvus is not supported');
+    } else if (_kb.vectorStoreType == VectorStoreType.LanceDB) {
       vectraStore = await LanceDBStore.initialize(embeddings, {
         database: 'kb',
-        tableName: kb.id,
+        tableName: _kb.id,
+        rootPath: _kb.rootPath,
         extendColumns: { kbid: '', kbitemid: '', isenable: true },
       });
     }

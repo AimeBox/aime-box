@@ -45,6 +45,8 @@ import { GroqProvider } from './GroqProvider';
 import { TongyiProvider } from './TongyiProvider';
 import { TogetherProvider } from './TogetherProvider';
 import { ElevenLabsProvider } from './ElevenLabsProvider';
+import { LmStudioProvider } from './LmStudioProvider';
+import { MoonshotProvider } from './MoonshotProvider';
 
 export interface ProviderInfo extends Providers {
   credits: {
@@ -98,25 +100,14 @@ export class ProvidersManager extends BaseManager {
         const ollama = new OllamaProvider({ provider: connection });
         const list = await ollama.getModelList();
         return list;
-      } else if (
-        connection.type === ProviderType.OPENAI ||
-        connection.type === ProviderType.LMSTUDIO
-      ) {
-        const openai = new OpenAI({
-          baseURL: connection.api_base,
-          apiKey: connection.api_key,
-          httpAgent: httpProxy,
-        });
-        const models = (await openai.models.list()).data;
-        return models
-          .map((x) => {
-            return {
-              name: x.id,
-              enable:
-                connection.models.find((z) => z.name == x.id)?.enable || false,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
+      } else if (connection.type === ProviderType.OPENAI) {
+        const openai = new OpenAIProvider({ provider: connection });
+        const list = await openai.getModelList();
+        return list;
+      } else if (connection.type === ProviderType.LMSTUDIO) {
+        const lmstudio = new LmStudioProvider({ provider: connection });
+        const list = await lmstudio.getModelList();
+        return list;
       } else if (connection.type === ProviderType.BAIDU) {
         const models = [
           'ernie-4.5-turbo-128k',
@@ -228,6 +219,10 @@ export class ProvidersManager extends BaseManager {
         const replicate = new ReplicateProvider({ provider: connection });
         const list = await replicate.getModelList();
         return list;
+      } else if (connection?.type === ProviderType.MOONSHOT) {
+        const moonshot = new MoonshotProvider({ provider: connection });
+        const list = await moonshot.getModelList();
+        return list;
       }
     } catch (e) {
       console.log(e);
@@ -274,6 +269,10 @@ export class ProvidersManager extends BaseManager {
         return new TogetherProvider({ provider: providerObj });
       case ProviderType.ELEVENLABS:
         return new ElevenLabsProvider({ provider: providerObj });
+      case ProviderType.LMSTUDIO:
+        return new LmStudioProvider({ provider: providerObj });
+      case ProviderType.MOONSHOT:
+        return new MoonshotProvider({ provider: providerObj });
       default:
         return undefined;
     }
@@ -398,14 +397,12 @@ export class ProvidersManager extends BaseManager {
       const connection = connections[index];
       try {
         if (connection?.type === ProviderType.OLLAMA) {
-          try {
-            const ollama = new OllamaProvider({ provider: connection });
-            const list = await ollama.getEmbeddingModels();
-            emb_list.push({
-              name: connection.name,
-              models: list,
-            });
-          } catch {}
+          const ollama = new OllamaProvider({ provider: connection });
+          const list = await ollama.getEmbeddingModels();
+          emb_list.push({
+            name: connection.name,
+            models: list,
+          });
         } else if (connection?.type === ProviderType.OPENAI) {
           try {
             const tongyi = new OpenAIProvider({ provider: connection });
@@ -442,27 +439,12 @@ export class ProvidersManager extends BaseManager {
             models: list,
           });
         } else if (connection?.type === ProviderType.LMSTUDIO) {
-          const options = {
-            method: 'GET',
-            headers: {
-              accept: 'application/json',
-              'content-type': 'application/json',
-              Authorization: `Bearer ${connection.api_key}`,
-            },
-          };
-          const url = `${connection.api_base}/models`;
-          try {
-            const res = await fetch(url, options);
-            const models = await res.json();
-
-            emb_list.push({
-              name: connection.name,
-              models:
-                models.data
-                  ?.filter((x) => x.id.includes('embedding'))
-                  .map((x) => x.id) ?? [],
-            });
-          } catch {}
+          const lmstudio = new LmStudioProvider({ provider: connection });
+          const list = await lmstudio.getEmbeddingModels();
+          emb_list.push({
+            name: connection.name,
+            models: list,
+          });
         } else if (connection?.type === ProviderType.AZURE_OPENAI) {
           const azureOpenAI = new AzureOpenAIProvider({ provider: connection });
           const list = await azureOpenAI.getEmbeddingModels();
@@ -585,6 +567,37 @@ export class ProvidersManager extends BaseManager {
           }
         } catch {}
       }
+    }
+    return emb_list;
+  }
+
+  @channel('providers:getOCRModels')
+  public async getOCRModels(): Promise<any[]> {
+    const connections = await this.getProviders(false);
+    const emb_list = [];
+    const localModels = settingsManager.getLocalModels();
+    const localOcrModels = localModels['ocr']
+      .filter((x) => x.exists)
+      .map((x) => x.id);
+
+    localOcrModels.push('paddleocr');
+    emb_list.push({
+      name: 'local',
+      models: localOcrModels,
+    });
+    for (let index = 0; index < connections.length; index++) {
+      const provider = await this.getProvider(connections[index]);
+      try {
+        const models =
+          provider.provider.models.map((x) => x.name) ||
+          (await provider.getModelList());
+        if (models && models.length > 0) {
+          emb_list.push({
+            name: connections[index].name,
+            models: models,
+          });
+        }
+      } catch {}
     }
     return emb_list;
   }

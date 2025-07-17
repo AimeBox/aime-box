@@ -12,6 +12,7 @@ import { BaseVectorStore } from '.';
 import * as arrow from 'apache-arrow';
 
 export interface LanceDBStoreArgs {
+  rootPath?: string;
   tableName: string;
   database: string;
   extendColumns?: Record<string, any>;
@@ -41,7 +42,12 @@ export class LanceDBStore extends BaseVectorStore {
     config: LanceDBStoreArgs,
   ): Promise<BaseVectorStore> {
     const store = new LanceDBStore(embeddings, config);
-    store.uri = path.join(getDataPath(), 'vector-db', config.database);
+    if (config.rootPath) {
+      store.uri = path.join(config.rootPath, config.database);
+    } else {
+      store.uri = path.join(getDataPath(), 'vector-db', config.database);
+    }
+
     store.connect = await lancedb.connect(store.uri);
     if (!config.extendColumns) {
       config.extendColumns = {};

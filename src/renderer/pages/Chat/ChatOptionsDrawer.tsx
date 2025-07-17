@@ -416,6 +416,29 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                         />
                       )}
                     </div>
+                    <div className="flex flex-row gap-2 items-center">
+                      <Switch
+                        checked={insideValue?.maxTokens != undefined}
+                        onChange={(v) =>
+                          onChange({ maxTokens: v ? 4096 : undefined })
+                        }
+                      ></Switch>
+                      <div className="w-20">Max Tokens</div>
+                      {insideValue?.maxTokens !== undefined && (
+                        <Slider
+                          value={insideValue?.maxTokens}
+                          disabled={insideValue?.maxTokens === undefined}
+                          className="w-60"
+                          min={1}
+                          max={128000}
+                          step={1}
+                          onChange={(v) => {
+                            setInsideValue({ ...insideValue, maxTokens: v });
+                          }}
+                          onChangeComplete={(v) => onChange({ maxTokens: v })}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

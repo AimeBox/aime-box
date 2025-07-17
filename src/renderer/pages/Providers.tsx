@@ -198,6 +198,11 @@ export default function Connections() {
           api_base: 'https://ark.cn-beijing.volces.com/api/v3',
           api_key: 'NULL',
         });
+      } else if (changedFields[0].value === 'moonshot') {
+        form.setFieldsValue({
+          api_base: 'https://api.moonshot.cn/v1',
+          api_key: 'NULL',
+        });
       }
     }
   };
@@ -212,11 +217,9 @@ export default function Connections() {
       setModels(models);
       console.log(models);
       setCurrentData(data);
-      if (models.length > 0) {
-        formModels.resetFields();
-        formModels.setFieldsValue({ models: models });
-        setOpenModels(true);
-      }
+      formModels.resetFields();
+      formModels.setFieldsValue({ models: models });
+      setOpenModels(true);
     } finally {
       messageApi.destroy();
     }

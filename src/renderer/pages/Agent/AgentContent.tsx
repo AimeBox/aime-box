@@ -44,6 +44,7 @@ export default function ChatContent() {
   const [agentMermaidOpen, setAgentMermaidOpen] = useState(false);
   const modalRef = useRef<FormModalRef>(null);
   const remoteAgentModalRef = useRef<FormModalRef>(null);
+  const [search, setSearch] = useState('');
 
   const onNewChat = async (mode: ChatMode, agentName: string) => {
     const chat = await window.electron.chat.create(mode, null, agentName);
@@ -272,10 +273,12 @@ export default function ChatContent() {
                 {t('common.agents')}
               </div>
               <div className="flex-1 max-w-[300px] mx-8">
-                <Input
-                  prefix={<FaSearch></FaSearch>}
+                <Input.Search
                   placeholder={t('common.search')}
-                ></Input>
+                  onSearch={(v) => {
+                    setSearch(v);
+                  }}
+                ></Input.Search>
               </div>
               <div>
                 <Dropdown.Button

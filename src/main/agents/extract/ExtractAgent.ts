@@ -51,7 +51,6 @@ import { getProviderModel } from '@/main/utils/providerUtil';
 import { Document } from '@langchain/core/documents';
 
 import { IterableReadableStream } from '@langchain/core/utils/stream';
-import { CallOptions } from '@langchain/langgraph/dist/pregel/types';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { isArray, isString, isUrl } from '@/main/utils/is';
 import { Embeddings } from '@langchain/core/embeddings';
@@ -77,7 +76,9 @@ const fieldZod = z
         .describe(
           'field name to display,be consistent with user input language',
         ),
-      field: z.string().describe('field name must english lower case'),
+      field: z
+        .string()
+        .describe('field name must english lower case, eg: abc_def'),
       description: z.string().optional().describe('field description'),
       type: z
         .enum([
@@ -130,19 +131,26 @@ export class ExtractTool extends BaseTool {
 
   messages?: BaseMessage[];
 
+  mode: 'all_segment' | 'extract_segment' | 'all_in' = 'extract_segment';
+
+  signal?: AbortSignal;
+
   constructor(params?: {
     model: BaseChatModel;
-    allFieldInLLM: boolean;
-    allDocInLLM: boolean;
-    embedding: Embeddings;
     messages?: BaseMessage[];
+    signal?: AbortSignal;
+    // allFieldInLLM: boolean;
+    // allDocInLLM: boolean;
+    // embedding?: Embeddings;
   }) {
     super({});
     this.model = params?.model;
-    this.allFieldInLLM = params?.allFieldInLLM ?? false;
-    this.allDocInLLM = params?.allDocInLLM ?? false;
-    this.embedding = params?.embedding;
+    // this.allFieldInLLM = params?.allFieldInLLM ?? false;
+    // this.allDocInLLM = params?.allDocInLLM ?? false;
+    // this.mode = params?.mode ?? 'extract_segment';
+    // this.embedding = params?.embedding;
     this.messages = params?.messages ?? [];
+    this.signal = params?.signal;
   }
 
   getFiles = async (sources: string[]) => {
@@ -150,6 +158,7 @@ export class ExtractTool extends BaseTool {
       '.pdf',
       '.docx',
       '.doc',
+      '.md',
       '.txt',
       '.jpg',
       '.png',
@@ -226,171 +235,238 @@ export class ExtractTool extends BaseTool {
     }[],
   ): Promise<any | undefined> {
     if (doc.length == 0) return undefined;
+    return this.extractFileAllIn(doc, fields);
+    // const SYSTEM_PROMPT_TEMPLATE = [
+    //   '你是一个信息抽取专家,帮助用户提取需要的字段信息,可以进行推理得出答案,输出语言跟用户输入的语言一致,如果没有则输出"NULL"',
+    // ].join('\n');
+    // const prompt = [
+    //   new SystemMessage(SYSTEM_PROMPT_TEMPLATE),
+    //   new HumanMessage(doc.map((x) => x.pageContent).join('\n')),
+    // ];
+    // const zodFields = this.toZod(fields);
+    // const extractionChain = this.model.withStructuredOutput(zodFields);
+    // const { mode, allFieldInLLM, allDocInLLM } = this;
+
+    // const checkExtractResult = false;
+    // const splits = await this.textSplitter.splitDocuments(doc);
+
+    // const extractFieldsResult = {};
+    // for (const field of fields) {
+    //   extractFieldsResult[field.field] = undefined;
+    // }
+
+    // if (allFieldInLLM) {
+    //   if (mode == 'all_segment' || mode == 'all_in') {
+    //     // 使用大模型一次性提取
+    //     const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
+    //     return ex;
+    //   } else {
+    //     const vectorStore = await MemoryVectorStore.fromDocuments(
+    //       splits,
+    //       this.embedding,
+    //     );
+    //     let pageContent = [];
+    //     if (splits.length == 1) {
+    //       pageContent = [splits[0].pageContent];
+    //     } else {
+    //       const d = await vectorStore.similaritySearch(
+    //         pageContent.map((x) => x.pageContent).join('\n'),
+    //         5,
+    //       );
+    //       pageContent = d.map((x) => x.pageContent);
+    //     }
+
+    //     const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
+    //     console.log(fields);
+    //     console.log(ex);
+    //     return ex;
+    //   }
+    // } else {
+    //   const vectorStore = await MemoryVectorStore.fromDocuments(
+    //     splits,
+    //     this.embedding,
+    //   );
+    //   let canStructured = true;
+
+    //   for (let index = 0; index < fields.length; index++) {
+    //     let extractResult = [];
+    //     const field = fields[index];
+    //     const SYSTEM_PROMPT_TEMPLATE = [
+    //       'You are an expert at identifying key historic development in text.',
+    //       'Only extract important historic developments. Extract nothing if no important information can be found in the text.',
+    //     ].join('\n');
+
+    //     const prompt = ChatPromptTemplate.fromMessages([
+    //       ['system', SYSTEM_PROMPT_TEMPLATE],
+    //       ['human', '{text}'],
+    //     ]);
+    //     let d = [];
+    //     if (splits.length <= 5 || mode == 'all_segment') {
+    //       d = splits;
+    //     } else {
+    //       d = await vectorStore.similaritySearch(
+    //         `${field.name}\n\n${field?.description || ''}`,
+    //         5,
+    //       );
+    //     }
+
+    //     const extractionDataSchema = this.toZod([field]);
+
+    //     try {
+    //       if (!canStructured)
+    //         throw new Error('Structured is Fail,Use LLM to extract');
+
+    //       let result = 'NULL';
+    //       const extractionChain = prompt.pipe(
+    //         this.model.withStructuredOutput(extractionDataSchema),
+    //       );
+    //       for (let index = 0; index < d.length; index++) {
+    //         const ex = await extractionChain.invoke(
+    //           {
+    //             text: d[index].pageContent,
+    //           },
+    //           { tags: ['ignore'] },
+    //         );
+    //         result = Object.values(ex)[0] as string;
+    //         if (result) {
+    //           if (checkExtractResult) {
+    //             const isMatch = await this.extractCheck(
+    //               result,
+    //               d[index].pageContent,
+    //               field,
+    //             );
+    //             if (isMatch) {
+    //               extractResult.push(result);
+    //               break;
+    //             }
+    //           } else {
+    //             extractResult.push(result);
+    //             break;
+    //           }
+    //         }
+    //       }
+    //       canStructured = true;
+    //       //return result;
+    //     } catch (err) {
+    //       console.error(err);
+    //       canStructured = false;
+    //       const prompt_withoutStructured = ChatPromptTemplate.fromMessages([
+    //         [
+    //           'system',
+    //           '你是一个提取信息专家,帮助用户找到需要的内容,需要对用户的输入文本段`<text></text>`内的信息进行提取',
+    //         ],
+
+    //         [
+    //           'human',
+    //           '### 任务\n提取字段: {field}\n提取名称: {name}\n### 注意\n - 直接输出结果无需任务解析,不要胡乱编写答案,如果找不到输出"NULL"\n - 以最简短明确准确的文字一字不漏输出最终答案\n\n### 以下是需要提取的文本\n<text>\n{text}\n</text>\n\n### 需要提取\n{name}\n{field}:',
+    //         ],
+    //       ]);
+    //       let result = 'NULL';
+    //       for (let index = 0; index < d.length; index++) {
+    //         const text = d[index].pageContent;
+    //         const extractionChain = prompt_withoutStructured.pipe(this.model);
+    //         const rex = await extractionChain.invoke(
+    //           {
+    //             text: text,
+    //             field: field.field,
+    //             name: field.name,
+    //           },
+    //           { tags: ['ignore'] },
+    //         );
+    //         result = rex.content.toString();
+    //         result = removeThinkTags(result);
+    //         console.log(`${field.field}:${result}`);
+    //         console.log('==========');
+    //         if (!result.includes('NULL')) {
+    //           if (checkExtractResult) {
+    //             const isMatch = await this.extractCheck(
+    //               result,
+    //               d[index].pageContent,
+    //               field,
+    //             );
+    //             if (isMatch) {
+    //               extractResult.push(result);
+    //             }
+    //           } else {
+    //             extractResult.push(result);
+    //           }
+    //         }
+    //       }
+    //     }
+    //     if (extractResult.length > 0) {
+    //       extractResult = [...new Set(extractResult)];
+    //       extractFieldsResult[field.field] = extractResult.join(',');
+    //     }
+    //   }
+    // }
+    // return extractFieldsResult;
+  }
+
+  async extractFileAllIn(
+    doc: Document<Record<string, any>>[],
+    fields: {
+      name?: string;
+      field: string;
+      type: string;
+      description?: string;
+      enumValues?: string[];
+    }[],
+  ): Promise<any | undefined> {
+    if (doc.length == 0) return undefined;
+    const zodFields = this.toZod(fields);
+
+    const fieldsMessage = fields
+      .map((x) => {
+        return `- ${x.name}${x.description ? `: ${x.description}` : ''}`;
+      })
+      .join('\n');
+
     const SYSTEM_PROMPT_TEMPLATE = [
-      '你是一个信息抽取专家,帮助用户提取需要的字段信息,可以进行推理得出答案,输出语言跟用户输入的语言一致,如果没有则输出"NULL"',
+      '你是一个信息抽取专家,根据用户提供的文件和需要提取的字段进行信息整理,可以进行推理得出答案\n- 输出语言跟用户输入的语言一致.\n- 不要随意编造答案.\n- 你可以输出自己的解析.- 以正常文本输出',
     ].join('\n');
+
     const prompt = [
       new SystemMessage(SYSTEM_PROMPT_TEMPLATE),
-      new HumanMessage(doc.map((x) => x.pageContent).join('\n')),
+      new HumanMessage(`提取这份文件的以下字段信息: \n${fieldsMessage}`),
+      new HumanMessage(`${doc.map((x) => x.pageContent).join('\n\n')}`),
+      // new AIMessage({
+      //   content: '',
+      //   tool_calls: [
+      //     {
+      //       name: 'ocr',
+      //       args: { path: '/file_1.pdf' },
+      //       id: '1',
+      //       type: 'tool_call',
+      //     },
+      //   ],
+      // }),
+      // new ToolMessage({
+      //   name: 'ocr',
+      //   tool_call_id: '1',
+      //   content: `${doc.map((x) => x.pageContent).join('\n\n')}`,
+      // }),
     ];
-    const zodFields = this.toZod(fields);
-    const extractionChain = this.model.withStructuredOutput(zodFields);
+    const result = await this.model.invoke(prompt, {
+      tags: ['ignore'],
+      signal: this.signal,
+    });
+    const thought = removeThinkTags(result.text);
+    console.log(thought);
+    prompt.push(new AIMessage(thought));
+    const extractionChain = this.model.withStructuredOutput(zodFields, {
+      includeRaw: true,
+      method: 'json_object',
+    });
 
-    const allFieldInLLM = this.allFieldInLLM ?? false;
-    const allDocInLLM = this.allDocInLLM ?? false;
-    const checkExtractResult = false;
-    const splits = await this.textSplitter.splitDocuments(doc);
-
-    const extractFieldsResult = {};
-    for (const field of fields) {
-      extractFieldsResult[field.field] = undefined;
-    }
-
-    if (allFieldInLLM) {
-      if (allDocInLLM) {
-        // 使用大模型一次性提取
-        const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
-        return ex;
-      } else {
-        const vectorStore = await MemoryVectorStore.fromDocuments(
-          splits,
-          this.embedding,
-        );
-        let pageContent = [];
-        if (splits.length == 1) {
-          pageContent = [splits[0].pageContent];
-        } else {
-          const d = await vectorStore.similaritySearch(
-            pageContent.map((x) => x.pageContent).join('\n'),
-            5,
-          );
-          pageContent = d.map((x) => x.pageContent);
-        }
-
-        const ex = await extractionChain.invoke(prompt, { tags: ['ignore'] });
-        console.log(fields);
-        console.log(ex);
-        return ex;
-      }
-    } else {
-      const vectorStore = await MemoryVectorStore.fromDocuments(
-        splits,
-        this.embedding,
-      );
-      let canStructured = true;
-
-      for (let index = 0; index < fields.length; index++) {
-        let extractResult = [];
-        const field = fields[index];
-        const SYSTEM_PROMPT_TEMPLATE = [
-          'You are an expert at identifying key historic development in text.',
-          'Only extract important historic developments. Extract nothing if no important information can be found in the text.',
-        ].join('\n');
-
-        const prompt = ChatPromptTemplate.fromMessages([
-          ['system', SYSTEM_PROMPT_TEMPLATE],
-          ['human', '{text}'],
-        ]);
-        let d = [];
-        if (splits.length <= 5 || allDocInLLM) {
-          d = splits;
-        } else {
-          d = await vectorStore.similaritySearch(
-            `${field.name}\n\n${field?.description || ''}`,
-            5,
-          );
-        }
-
-        const extractionDataSchema = this.toZod([field]);
-
-        try {
-          if (!canStructured)
-            throw new Error('Structured is Fail,Use LLM to extract');
-
-          let result = 'NULL';
-          const extractionChain = prompt.pipe(
-            this.model.withStructuredOutput(extractionDataSchema),
-          );
-          for (let index = 0; index < d.length; index++) {
-            const ex = await extractionChain.invoke(
-              {
-                text: d[index].pageContent,
-              },
-              { tags: ['ignore'] },
-            );
-            result = Object.values(ex)[0] as string;
-            if (result) {
-              if (checkExtractResult) {
-                const isMatch = await this.extractCheck(
-                  result,
-                  d[index].pageContent,
-                  field,
-                );
-                if (isMatch) {
-                  extractResult.push(result);
-                  break;
-                }
-              } else {
-                extractResult.push(result);
-                break;
-              }
-            }
-          }
-          canStructured = true;
-          //return result;
-        } catch (err) {
-          console.error(err);
-          canStructured = false;
-          const prompt_withoutStructured = ChatPromptTemplate.fromMessages([
-            [
-              'system',
-              '你是一个提取信息专家,帮助用户找到需要的内容,需要对用户的输入文本段`<text></text>`内的信息进行提取',
-            ],
-
-            [
-              'human',
-              '### 任务\n提取字段: {field}\n提取名称: {name}\n### 注意\n - 直接输出结果无需任务解析,不要胡乱编写答案,如果找不到输出"NULL"\n - 以最简短明确准确的文字一字不漏输出最终答案\n\n### 以下是需要提取的文本\n<text>\n{text}\n</text>\n\n### 需要提取\n{name}\n{field}:',
-            ],
-          ]);
-          let result = 'NULL';
-          for (let index = 0; index < d.length; index++) {
-            const text = d[index].pageContent;
-            const extractionChain = prompt_withoutStructured.pipe(this.model);
-            const rex = await extractionChain.invoke(
-              {
-                text: text,
-                field: field.field,
-                name: field.name,
-              },
-              { tags: ['ignore'] },
-            );
-            result = rex.content.toString();
-            result = removeThinkTags(result);
-            console.log(`${field.field}:${result}`);
-            console.log('==========');
-            if (!result.includes('NULL')) {
-              if (checkExtractResult) {
-                const isMatch = await this.extractCheck(
-                  result,
-                  d[index].pageContent,
-                  field,
-                );
-                if (isMatch) {
-                  extractResult.push(result);
-                }
-              } else {
-                extractResult.push(result);
-              }
-            }
-          }
-        }
-        if (extractResult.length > 0) {
-          extractResult = [...new Set(extractResult)];
-          extractFieldsResult[field.field] = extractResult.join(',');
-        }
-      }
-    }
-    return extractFieldsResult;
+    const result_2 = await extractionChain.invoke(thought, {
+      tags: ['ignore'],
+      signal: this.signal,
+    });
+    console.log(result_2.parsed);
+    return {
+      ...result_2.parsed,
+      '@thought': thought,
+    };
   }
 
   async _call(
@@ -429,6 +505,8 @@ export class ExtractTool extends BaseTool {
       type = 'file';
     } else if (fs.statSync(pathOrUrl).isDirectory()) {
       type = 'directory';
+    } else {
+      throw new Error('Invalid path or url');
     }
 
     async function* generateStream() {
@@ -446,12 +524,12 @@ export class ExtractTool extends BaseTool {
       }
 
       yield `\n\nExtract Fields:\n${fields.map((x) => ` - \`${x.type}\` **${x.field}** : ${x.name} (${x.description})`).join('\n')}\n___\n`;
-      const headers = ['name', 'path'];
+      const headers = ['name', 'path', 'thought'];
       yield `| name `;
       const defaultFields = {};
       for (let index = 0; index < fields.length; index++) {
         const field = fields[index];
-        yield `| ${field.field} `;
+        yield `| ${field.name} `;
         defaultFields[field.field] = null;
         headers.push(field.field);
       }
@@ -484,7 +562,10 @@ export class ExtractTool extends BaseTool {
         let doc;
         try {
           doc = await loader.load();
-        } catch {}
+        } catch (e) {
+          console.error(e);
+          throw e;
+        }
 
         if (doc) {
           const row = [path.basename(file), file];
@@ -505,6 +586,9 @@ export class ExtractTool extends BaseTool {
             const result = await that.extractFile(doc, fields);
             if (result) {
               let p = '';
+              row.push(result['@thought']);
+              // p += `| ${result['@thought']?.replaceAll('\n', ' ') || ''} `;
+
               const values = { ...defaultFields };
               for (const key of Object.keys(values)) {
                 let value = '';
@@ -559,7 +643,7 @@ export class ExtractTool extends BaseTool {
           });
           await workbook.xlsx.writeFile(input.savePath);
           yield '\n___\n';
-          yield `Extract Done, File Saved : ${input.savePath}`;
+          yield `Extract Done, File Saved :\n<file>${input.savePath}</file>`;
         } catch (err) {
           console.error(err);
         }
@@ -640,14 +724,25 @@ export class ExtractAgent extends BaseAgent {
   });
 
   configSchema: FormSchema[] = [
-    // {
-    //   label: t('字段分析模型'),
-    //   field: 'fieldModel',
-    //   component: 'ProviderSelect',
-    //   componentProps: {
-    //     type: 'llm',
-    //   },
-    // },
+    {
+      label: t('common.model'),
+      field: 'model',
+      component: 'ProviderSelect',
+      componentProps: {
+        type: 'llm',
+      },
+    },
+    {
+      label: t('common.max_tokens'),
+      field: 'contentMaxTokens',
+      component: 'InputNumber',
+      componentProps: {
+        min: 4096,
+        max: 128000,
+        step: 100,
+      },
+      defaultValue: 32000,
+    },
     // {
     //   label: t('提取模型'),
     //   field: 'extractModel',
@@ -656,33 +751,46 @@ export class ExtractAgent extends BaseAgent {
     //     type: 'llm',
     //   },
     // },
-    {
-      label: t('common.embedding'),
-      field: 'embedding',
-      component: 'ProviderSelect',
-      componentProps: {
-        type: 'embedding',
-      },
-    },
-    {
-      label: t('一次性全字段提取'),
-      field: 'allFieldInLLM',
-      component: 'Switch',
-      defaultValue: false,
-    },
-    {
-      label: t('全文扫描'),
-      field: 'allDocInLLM',
-      component: 'Switch',
-      defaultValue: false,
-    },
-    {
-      label: t('agents.prompt'),
-      field: 'systemPrompt',
-      component: 'InputTextArea',
-      defaultValue: ExtractAgentSystemPrompt,
-      required: true,
-    },
+    // {
+    //   label: t('common.embedding'),
+    //   field: 'embedding',
+    //   component: 'ProviderSelect',
+    //   componentProps: {
+    //     type: 'embedding',
+    //   },
+    // },
+    // {
+    //   label: t('一次性全字段提取'),
+    //   field: 'allFieldInLLM',
+    //   component: 'Switch',
+    //   defaultValue: false,
+    // },
+    // {
+    //   label: t('全文扫描'),
+    //   field: 'allDocInLLM',
+    //   component: 'Switch',
+    //   defaultValue: false,
+    // },
+    // {
+    //   label: '模式',
+    //   field: 'mode',
+    //   component: 'Select',
+    //   componentProps: {
+    //     options: [
+    //       { label: '全文分段扫描', value: 'all_segment' },
+    //       { label: '截取分段扫描', value: 'extract_segment' },
+    //       { label: '全文扫描', value: 'all_in' },
+    //     ],
+    //   },
+    //   defaultValue: 'extract_segment',
+    // },
+    // {
+    //   label: t('agents.prompt'),
+    //   field: 'systemPrompt',
+    //   component: 'InputTextArea',
+    //   defaultValue: ExtractAgentSystemPrompt,
+    //   required: true,
+    // },
   ];
 
   // config: any = {
@@ -694,15 +802,15 @@ export class ExtractAgent extends BaseAgent {
 
   textSplitter: TextSplitter;
 
-  llm: BaseChatModel;
-
   // fieldLLM: BaseChatModel;
 
   // extractLLM: BaseChatModel;
 
-  embedding: Embeddings;
+  // embedding: Embeddings;
 
   systemPrompt: string;
+
+  // mode: 'all_segment' | 'extract_segment' | 'all_in';
 
   constructor(options: {
     provider: string;
@@ -714,8 +822,12 @@ export class ExtractAgent extends BaseAgent {
 
   extractTool = tool(async ({ filePath, fields }) => {}, {
     name: 'extract_tool',
+    description:
+      'extract information from file or directory, filePath must be full path',
     schema: z.object({
-      filePath: z.string().describe('file or directory path to extract'),
+      filePath: z
+        .string()
+        .describe('file or directory path to extract, full path'),
       fields: z.array(z.string()).describe('field names to extract'),
     }),
   });
@@ -728,28 +840,36 @@ export class ExtractAgent extends BaseAgent {
     signal?: AbortSignal;
     configurable?: Record<string, any>;
   }) {
+    const { store, model, messageEvent, chatOptions, signal, configurable } =
+      params;
     const config = await this.getConfig();
-    this.systemPrompt = config.systemPrompt;
-    // const { provider, modelName } = getProviderModel(config.fieldModel);
-    // const { provider: extractProvider, modelName: extractModelName } =
-    //   getProviderModel(config.extractModel);
+    this.systemPrompt = ExtractAgentSystemPrompt;
+    this.model = model;
+    if (!this.model) {
+      try {
+        const { provider, modelName } = getProviderModel(config.model);
+        this.model = await getChatModel(provider, modelName, chatOptions);
+      } catch {
+        console.error('model not found');
+      }
+    }
+
     const that = this;
     this.textSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
       chunkOverlap: 20,
     });
-    const fieldModel = params.model;
-    const extractModel = params.model;
-    if (config.embedding) {
-      const { provider: embeddingProvider, modelName: embeddingModelName } =
-        getProviderModel(config.embedding);
-      this.embedding = await getEmbeddingModel(
-        embeddingProvider,
-        embeddingModelName,
-      );
-    } else {
-      this.embedding = await getDefaultEmbeddingModel();
-    }
+
+    // if (config.embedding) {
+    //   const { provider: embeddingProvider, modelName: embeddingModelName } =
+    //     getProviderModel(config.embedding);
+    //   this.embedding = await getEmbeddingModel(
+    //     embeddingProvider,
+    //     embeddingModelName,
+    //   );
+    // } else {
+    //   this.embedding = await getDefaultEmbeddingModel();
+    // }
 
     async function callCheck(state: typeof MessagesAnnotation.State) {
       const promptTemplate = ChatPromptTemplate.fromMessages([
@@ -766,15 +886,14 @@ export class ExtractAgent extends BaseAgent {
           savePath: z
             .string()
             .optional()
-            .nullable()
             .describe('save path, Empty if not mentioned by the user'),
         }),
       });
       //const prompt = await promptTemplate.invoke({ messages: state.messages });
-      const llmWithTool = fieldModel.bindTools([fieldsTool]);
+      const llmWithTool = that.model.bindTools([fieldsTool]);
       const response = await promptTemplate
         .pipe(llmWithTool)
-        .invoke({ messages: state.messages });
+        .invoke({ messages: state.messages, configurable: { signal: signal } });
 
       return { messages: [response] };
     }
@@ -801,11 +920,13 @@ export class ExtractAgent extends BaseAgent {
       const { filePath, fields } = toolCall.args;
 
       const extractTool = new ExtractTool({
-        model: extractModel,
-        allFieldInLLM: config.allFieldInLLM,
-        allDocInLLM: config.allDocInLLM,
-        embedding: that.embedding,
+        model: model,
         messages: messages,
+        signal: signal,
+        // allFieldInLLM: config.allFieldInLLM,
+        // allDocInLLM: config.allDocInLLM,
+        // mode: config.mode,
+        // embedding: that.embedding,
       });
       const toolNode = new ToolNode([extractTool]);
       const result = await toolNode.streamEvents(
