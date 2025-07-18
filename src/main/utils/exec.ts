@@ -39,6 +39,7 @@ export const runCommand = async (
   }
 
   return new Promise((resolve, reject) => {
+    debugger;
     const commands = [];
     if (_file == 'cmd.exe') {
       commands.push(_file);
@@ -56,6 +57,8 @@ export const runCommand = async (
       ...process.env,
       PATH: process.env.PATH,
       HOME: os.homedir(),
+      LANG: 'zh_CN.UTF-8',
+      LC_ALL: 'zh_CN.UTF-8',
     };
     if (settingsManager.getProxy()) {
       env['HTTP_PROXY'] = settingsManager.getProxy();

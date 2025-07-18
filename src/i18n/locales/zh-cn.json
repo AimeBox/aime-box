@@ -82,7 +82,8 @@
     "newchat": "新建聊天",
     "export_image": "导出图片",
     "plannerChat": "计划聊天",
-    "open_workspace": "打开工作空间"
+    "open_workspace": "打开工作空间",
+    "chat_history": "Chat输入历史"
   },
   "language": {
     "english": "英语",

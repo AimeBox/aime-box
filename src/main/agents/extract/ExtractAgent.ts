@@ -413,6 +413,7 @@ export class ExtractTool extends BaseTool {
     }[],
   ): Promise<any | undefined> {
     if (doc.length == 0) return undefined;
+    const source = doc[0].metadata.source;
     const zodFields = this.toZod(fields);
 
     const fieldsMessage = fields
@@ -455,7 +456,6 @@ export class ExtractTool extends BaseTool {
     prompt.push(new AIMessage(thought));
     const extractionChain = this.model.withStructuredOutput(zodFields, {
       includeRaw: true,
-      method: 'json_object',
     });
 
     const result_2 = await extractionChain.invoke(thought, {
@@ -486,6 +486,8 @@ export class ExtractTool extends BaseTool {
     input: z.infer<typeof this.schema>,
     config?: RunnableConfig,
   ): Promise<IterableReadableStream<any>> {
+    const taskId = 'extract-' + new Date().getTime();
+    const workspace = config?.configurable?.workspace;
     //const { provider, modelName } = getProviderModel(this.model);
     //const model = await getChatModel(provider, modelName);
     const that = this;
@@ -556,6 +558,18 @@ export class ExtractTool extends BaseTool {
         } as NotificationMessage);
       }
       const rows = [];
+
+      if (workspace) {
+        fs.mkdirSync(path.join(workspace, taskId), { recursive: true });
+        await fs.promises.writeFile(
+          path.join(workspace, taskId, 'task-info.json'),
+          JSON.stringify({
+            taskId,
+            input,
+            files,
+          }),
+        );
+      }
       for (let index = 0; index < files.length; index++) {
         const file = files[index];
         const loader = getLoaderFromExt(path.extname(file), file);
@@ -585,6 +599,19 @@ export class ExtractTool extends BaseTool {
           try {
             const result = await that.extractFile(doc, fields);
             if (result) {
+              if (workspace) {
+                try {
+                  await fs.promises.appendFile(
+                    path.join(workspace, taskId, 'extract-result.jsonl'),
+                    JSON.stringify({
+                      file,
+                      result,
+                    }) + '\n',
+                  );
+                } catch (e) {
+                  console.error(e);
+                }
+              }
               let p = '';
               row.push(result['@thought']);
               // p += `| ${result['@thought']?.replaceAll('\n', ' ') || ''} `;

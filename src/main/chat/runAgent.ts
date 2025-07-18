@@ -65,7 +65,7 @@ export const runAgent = async (
       x.content = x.content.filter((x) => x.type != 'folder');
     }
 
-    if (isHumanMessage(x)) {
+    if (isHumanMessage(x) || isAIMessage(x)) {
       if (isArray(x.content)) {
         if (x.content.length == 1 && (x.content[0] as any)?.type == 'text') {
           x.content = (x.content[0] as any)?.text;

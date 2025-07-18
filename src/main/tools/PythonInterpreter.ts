@@ -60,7 +60,7 @@ export class PythonInterpreterTool extends BaseTool {
 
   name: string = 'python_interpreter';
 
-  description: string = `Evaluates python code in a sandbox environment. The environment resets on every execution.If need use pip install please set dependencies, you must send the whole script every time and print your outputs.`;
+  description: string = `Evaluates python code in a sandbox environment. The environment resets on every execution.If need use pip install please set dependencies, you must send the whole script every time and print your outputs. don't use emoji in script.`;
 
   pythonPath: string;
 

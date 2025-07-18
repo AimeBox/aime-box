@@ -78,8 +78,13 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   );
   const [openChatOptionsDrawer, setOpenChatOptionsDrawer] =
     useState<boolean>(false);
-  const [openChatHistoryDrawer, setOpenChatHistoryDrawer] =
-    useState<boolean>(false);
+  const [openChatHistoryDrawer, setOpenChatHistoryDrawer] = useState<{
+    open: boolean;
+    value: ChatMessage[];
+  }>({
+    open: false,
+    value: [],
+  });
   const [currentModel, setCurrentModel] = useState<string | undefined>(
     undefined,
   );
@@ -269,7 +274,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   }, [chatId]);
 
   const openHistory = (history: any) => {
-    setOpenChatHistoryDrawer(true);
+    setOpenChatHistoryDrawer({ open: true, value: history });
   };
 
   const onDelete = async (chatMessage: ChatMessage) => {
@@ -399,7 +404,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
       <FileDropZone onSelectedFiles={onSelectFile}>
         {currentChat && (
           <Splitter
-            className="flex flex-row h-full w-full"
+            className="flex flex-row w-full h-full"
             onResize={(size) => {
               setCanvasSize(size[1]);
             }}
@@ -407,7 +412,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
             <Splitter.Panel min={400}>
               <Splitter
                 layout="vertical"
-                className="h-full flex-1"
+                className="flex-1 h-full"
                 style={{
                   height: '100%',
                 }}
@@ -449,7 +454,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                             placement="bottomRight"
                             trigger="click"
                             content={
-                              <div className="flex flex-col w-full items-start">
+                              <div className="flex flex-col items-start w-full">
                                 {/* <Button
                               icon={<FaFileExport />}
                               type="text"
@@ -563,9 +568,9 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                   </div>
                 </Splitter.Panel>
                 <Splitter.Panel min={220} defaultSize={220}>
-                  <div className="  h-full p-4">
-                    <div className="flex flex-col gap-2 p-3 h-full border border-solid border-gray-200 dark:border-none  rounded-2xl bg-gray-100 dark:bg-gray-600 ">
-                      <div className="flex flex-row justify-between ">
+                  <div className="p-4 h-full">
+                    <div className="flex flex-col gap-2 p-3 h-full bg-gray-100 rounded-2xl border border-gray-200 border-solid dark:border-none dark:bg-gray-600">
+                      <div className="flex flex-row justify-between">
                         <div className="flex flex-row items-center">
                           <ProviderSelect
                             type="llm"
@@ -637,7 +642,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                           ))}
                         </div>
                       )}
-                      <div className="flex flex-col flex-1 gap-2 h-full ">
+                      <div className="flex flex-col flex-1 gap-2 h-full">
                         <div className="flex flex-col flex-1 h-full">
                           {/* <ChatQuickInput
                       onClick={(text) => {
@@ -828,9 +833,10 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
         onClose={() => setOpenChatOptionsDrawer(false)}
       />
       <ChatHistoryDrawer
-        open={openChatHistoryDrawer}
+        open={openChatHistoryDrawer.open}
+        value={openChatHistoryDrawer.value}
         width="50vw"
-        onClose={() => setOpenChatHistoryDrawer(false)}
+        onClose={() => setOpenChatHistoryDrawer({ open: false, value: [] })}
       ></ChatHistoryDrawer>
     </div>
   );
