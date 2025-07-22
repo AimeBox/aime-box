@@ -370,7 +370,7 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "Aime Box",
+      "owner": "AimeBox",
       "repo": "aime-box"
     }
   },

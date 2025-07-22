@@ -39,7 +39,6 @@ export const runCommand = async (
   }
 
   return new Promise((resolve, reject) => {
-    debugger;
     const commands = [];
     if (_file == 'cmd.exe') {
       commands.push(_file);

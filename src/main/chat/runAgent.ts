@@ -15,8 +15,9 @@ import {
 } from '@langchain/langgraph';
 import { v4 as uuidv4 } from 'uuid';
 import { notificationManager } from '../app/NotificationManager';
-import { isArray } from '../utils/is';
+import { isArray, isString } from '../utils/is';
 import { EventEmitter } from 'events';
+import { removeThinkTags } from '../utils/messages';
 
 export const runAgent = async (
   agent: any,
@@ -76,6 +77,18 @@ export const runAgent = async (
         ) {
           x.content = (x.content as any[]).map((x) => x.text).join('\n');
         }
+      }
+    }
+
+    if (isAIMessage(x)) {
+      if (isArray(x.content)) {
+        for (const item of x.content) {
+          if (item.type == 'text' && isString(item.text)) {
+            item.text = removeThinkTags(item.text);
+          }
+        }
+      } else if (isString(x.content)) {
+        x.content = removeThinkTags(x.content);
       }
     }
   });

@@ -399,6 +399,8 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
 
   const [canvasSize, setCanvasSize] = useState(0);
 
+  const [openMenu, setOpenMenu] = useState(false);
+
   return (
     <div className="h-full">
       <FileDropZone onSelectedFiles={onSelectFile}>
@@ -453,6 +455,8 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                           <Popover
                             placement="bottomRight"
                             trigger="click"
+                            open={openMenu}
+                            onOpenChange={setOpenMenu}
                             content={
                               <div className="flex flex-col items-start w-full">
                                 {/* <Button
@@ -470,6 +474,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                   type="text"
                                   block
                                   onClick={() => {
+                                    setOpenMenu(false);
                                     onOpenWorkspace();
                                   }}
                                 >
@@ -480,6 +485,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                   type="text"
                                   block
                                   onClick={() => {
+                                    setOpenMenu(false);
                                     onExportImage();
                                   }}
                                 >

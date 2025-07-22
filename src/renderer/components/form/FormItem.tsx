@@ -1,6 +1,7 @@
 import { isBoolean, isFunction } from '../../../main/utils/is';
 import { FormSchema } from '../../../types/form';
 import {
+  AutoComplete,
   Checkbox,
   Form,
   Input,
@@ -141,6 +142,9 @@ const FormModal = forwardRef((props: FormItemProps, ref) => {
         )}
         {props.schema.component === 'InstanceSelect' && (
           <InstanceSelect {...props.schema.componentProps}></InstanceSelect>
+        )}
+        {props.schema.component === 'AutoComplete' && (
+          <AutoComplete {...props.schema.componentProps}></AutoComplete>
         )}
       </Form.Item>
     )

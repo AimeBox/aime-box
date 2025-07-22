@@ -67,6 +67,7 @@ import { NotificationMessage } from '@/types/notification';
 import ExcelJS from 'exceljs';
 import { ExtractAgentSystemPrompt } from './prompt';
 import { removeThinkTags } from '@/main/utils/messages';
+import * as readline from 'readline';
 
 const fieldZod = z
   .array(
@@ -112,6 +113,10 @@ export class ExtractTool extends BaseTool {
       .string()
       .optional()
       .describe('File Save Path(.xlsx), Empty if not mentioned by the user'),
+    continueTaskId: z
+      .string()
+      .optional()
+      .describe('continue to extract, task id'),
   });
 
   name: string = 'extract_tool';
@@ -135,8 +140,11 @@ export class ExtractTool extends BaseTool {
 
   signal?: AbortSignal;
 
+  response_format?: string;
+
   constructor(params?: {
     model: BaseChatModel;
+    response_format?: string;
     messages?: BaseMessage[];
     signal?: AbortSignal;
     // allFieldInLLM: boolean;
@@ -145,6 +153,7 @@ export class ExtractTool extends BaseTool {
   }) {
     super({});
     this.model = params?.model;
+    this.response_format = params?.response_format;
     // this.allFieldInLLM = params?.allFieldInLLM ?? false;
     // this.allDocInLLM = params?.allDocInLLM ?? false;
     // this.mode = params?.mode ?? 'extract_segment';
@@ -456,18 +465,30 @@ export class ExtractTool extends BaseTool {
     prompt.push(new AIMessage(thought));
     const extractionChain = this.model.withStructuredOutput(zodFields, {
       includeRaw: true,
+      method: this.response_format,
     });
 
     const result_2 = await extractionChain.invoke(thought, {
       tags: ['ignore'],
       signal: this.signal,
+      timeout: 1000 * 30,
     });
-    console.log(result_2.parsed);
+    let data;
+    if (!result_2.parsed) {
+      if (result_2.raw.tool_calls && result_2.raw.tool_calls.length == 1) {
+        data = result_2.raw.tool_calls[0].args;
+      }
+    } else {
+      data = result_2.parsed;
+    }
+    console.log(data);
     return {
-      ...result_2.parsed,
+      ...data,
       '@thought': thought,
     };
   }
+
+  async continue() {}
 
   async _call(
     input: z.infer<typeof this.schema>,
@@ -486,7 +507,7 @@ export class ExtractTool extends BaseTool {
     input: z.infer<typeof this.schema>,
     config?: RunnableConfig,
   ): Promise<IterableReadableStream<any>> {
-    const taskId = 'extract-' + new Date().getTime();
+    const taskId = input.continueTaskId || 'extract-' + new Date().getTime();
     const workspace = config?.configurable?.workspace;
     //const { provider, modelName } = getProviderModel(this.model);
     //const model = await getChatModel(provider, modelName);
@@ -501,30 +522,41 @@ export class ExtractTool extends BaseTool {
 
     const { pathOrUrl, fields } = input;
     let type: 'url' | 'file' | 'directory';
-    if (isUrl(pathOrUrl)) {
-      type = 'url';
-    } else if (fs.statSync(pathOrUrl).isFile()) {
-      type = 'file';
-    } else if (fs.statSync(pathOrUrl).isDirectory()) {
-      type = 'directory';
-    } else {
-      throw new Error('Invalid path or url');
-    }
 
-    async function* generateStream() {
+    const files = [];
+
+    if (input.continueTaskId) {
+      const task_info = JSON.parse(
+        fs.readFileSync(
+          path.join(workspace, taskId, 'task-info.json'),
+          'utf-8',
+        ),
+      );
+      const { files: task_files } = task_info;
+      files.push(...task_files);
+    } else {
+      if (isUrl(pathOrUrl)) {
+        type = 'url';
+      } else if (fs.statSync(pathOrUrl).isFile()) {
+        type = 'file';
+      } else if (fs.statSync(pathOrUrl).isDirectory()) {
+        type = 'directory';
+      } else {
+        throw new Error('Invalid path or url');
+      }
       if (type === 'url') {
         const loader = new WebLoader();
         const docs = await loader.invoke(pathOrUrl);
-      }
-      const files = [];
-      if (type === 'file') {
+      } else if (type === 'file') {
         // const loader = getLoaderFromExt(path.extname(pathOrUrl), pathOrUrl);
         // const docs = await loader.load();
         files.push(pathOrUrl);
       } else if (type === 'directory') {
         files.push(...(await that.getFiles([pathOrUrl])));
       }
+    }
 
+    async function* generateStream() {
       yield `\n\nExtract Fields:\n${fields.map((x) => ` - \`${x.type}\` **${x.field}** : ${x.name} (${x.description})`).join('\n')}\n___\n`;
       const headers = ['name', 'path', 'thought'];
       yield `| name `;
@@ -559,7 +591,7 @@ export class ExtractTool extends BaseTool {
       }
       const rows = [];
 
-      if (workspace) {
+      if (workspace && !input.continueTaskId) {
         fs.mkdirSync(path.join(workspace, taskId), { recursive: true });
         await fs.promises.writeFile(
           path.join(workspace, taskId, 'task-info.json'),
@@ -570,15 +602,71 @@ export class ExtractTool extends BaseTool {
           }),
         );
       }
+      if (input.continueTaskId) {
+        const fileStream = fs.createReadStream(
+          path.join(workspace, taskId, 'extract-result.jsonl'),
+        );
+        const rl = readline.createInterface({
+          input: fileStream,
+          crlfDelay: Infinity,
+        });
+
+        for await (const line of rl) {
+          if (line.trim() !== '') {
+            try {
+              const obj = JSON.parse(line);
+              const row = [path.basename(obj.file), obj.file];
+              row.push(obj.result['@thought']);
+              for (const key of Object.keys(defaultFields)) {
+                row.push(obj.result[key]);
+              }
+              rows.push(row);
+            } catch (e) {
+              console.error(`Error parsing line: ${line}`, e);
+            }
+          }
+        }
+      }
+
       for (let index = 0; index < files.length; index++) {
         const file = files[index];
-        const loader = getLoaderFromExt(path.extname(file), file);
+
+        if (input.continueTaskId && rows.length > 0) {
+          const row = rows.find((x) => x[1] === file);
+          if (row) {
+            continue;
+          }
+        }
+
         let doc;
         try {
+          const loader = getLoaderFromExt(path.extname(file), file);
           doc = await loader.load();
         } catch (e) {
           console.error(e);
-          throw e;
+          const row = [path.basename(file), file];
+          yield `| [${path.basename(file)}](${file})`;
+          yield `| extract error: ${e.message}`;
+          row.push(e.message);
+          yield `|\n`;
+          rows.push(row);
+          if (workspace) {
+            try {
+              await fs.promises.appendFile(
+                path.join(workspace, taskId, 'extract-result.jsonl'),
+                JSON.stringify({
+                  file,
+                  result: {
+                    '@thought': e.message,
+                  },
+                }) + '\n',
+              );
+            } catch (e) {
+              console.error(e);
+            }
+          }
+
+          continue;
         }
 
         if (doc) {
@@ -770,6 +858,20 @@ export class ExtractAgent extends BaseAgent {
       },
       defaultValue: 32000,
     },
+    {
+      label: t('common.response_format'),
+      field: 'response_format',
+      component: 'Select',
+      componentProps: {
+        allowClear: true,
+        options: [
+          { label: 'json_object', value: 'json_object' },
+          // { label: 'functionCalling', value: 'functionCalling' },
+          // { label: 'jsonMode', value: 'jsonMode' },
+          { label: 'json_schema', value: 'json_schema' },
+        ],
+      },
+    },
     // {
     //   label: t('提取模型'),
     //   field: 'extractModel',
@@ -916,8 +1018,14 @@ export class ExtractAgent extends BaseAgent {
             .describe('save path, Empty if not mentioned by the user'),
         }),
       });
+
+      const continueTool = tool(async () => {}, {
+        name: 'continue_tool',
+        description: 'continue to extract',
+        schema: z.object({}),
+      });
       //const prompt = await promptTemplate.invoke({ messages: state.messages });
-      const llmWithTool = that.model.bindTools([fieldsTool]);
+      const llmWithTool = that.model.bindTools([fieldsTool, continueTool]);
       const response = await promptTemplate
         .pipe(llmWithTool)
         .invoke({ messages: state.messages, configurable: { signal: signal } });
@@ -934,6 +1042,11 @@ export class ExtractAgent extends BaseAgent {
         lastMessage.tool_calls[0].name == 'extract_tool'
       ) {
         return 'extract';
+      } else if (
+        lastMessage.tool_calls?.length == 1 &&
+        lastMessage.tool_calls[0].name == 'continue_tool'
+      ) {
+        return 'continue';
       }
       // Otherwise, we stop (reply to the user) using the special "__end__" node
       return '__end__';
@@ -948,6 +1061,7 @@ export class ExtractAgent extends BaseAgent {
 
       const extractTool = new ExtractTool({
         model: model,
+        response_format: config.response_format,
         messages: messages,
         signal: signal,
         // allFieldInLLM: config.allFieldInLLM,
@@ -973,10 +1087,70 @@ export class ExtractAgent extends BaseAgent {
       return { messages: [lastMessage] };
     }
 
+    async function continueNode(
+      { messages }: typeof MessagesAnnotation.State,
+      _config: RunnableConfig,
+    ) {
+      const lastMessage = messages[messages.length - 1] as AIMessage;
+      const toolCall = lastMessage.tool_calls.find(
+        (x) => x.name == 'continue_tool',
+      );
+
+      const workspace = _config?.configurable?.workspace;
+      const taskId = fs
+        .readdirSync(workspace)
+        .find((x) => x.startsWith('extract-'));
+      const task_info = JSON.parse(
+        fs.readFileSync(
+          path.join(workspace, taskId, 'task-info.json'),
+          'utf-8',
+        ),
+      );
+      const { pathOrUrl, fields, savePath } = task_info.input;
+
+      lastMessage.tool_calls = [
+        {
+          id: toolCall.id,
+          name: 'extract_tool',
+          type: toolCall.type,
+          args: {
+            pathOrUrl,
+            fields,
+            savePath,
+            continueTaskId: taskId,
+          },
+        },
+      ];
+      const extractTool = new ExtractTool({
+        model: model,
+        response_format: config.response_format,
+        messages: messages,
+        signal: signal,
+      });
+
+      const toolNode = new ToolNode([extractTool]);
+      const result = await toolNode.streamEvents(
+        {
+          messages: [lastMessage],
+        },
+        {
+          version: 'v2',
+          // tags: ['ignore'],
+        },
+      );
+
+      for await (const chunk of result) {
+        //console.log(chunk);
+      }
+
+      return { messages: [lastMessage] };
+    }
+
     const workflow = new StateGraph(MessagesAnnotation)
       .addNode('check', callCheck)
       .addEdge('__start__', 'check') // __start__ is a special name for the entrypoint
       .addNode('extract', extractNode)
+      .addNode('continue', continueNode)
       .addConditionalEdges('check', shouldExtract);
 
     // Finally, we compile it into a LangChain Runnable.
