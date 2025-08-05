@@ -177,8 +177,12 @@ export default function Tools() {
 
         if (isString(output)) {
           _output = output;
-        } else if (isArray(res)) {
-          _output = res;
+        } else if (
+          isArray(output) &&
+          output.length > 0 &&
+          isString(output[0])
+        ) {
+          _output = output.join('\n---\n');
         } else {
           _output = res?.toString() || '';
         }
@@ -196,8 +200,12 @@ export default function Tools() {
         const { output, time_cost, is_success } = res;
         if (isString(output)) {
           _output = output;
-        } else if (isArray(output)) {
-          _output = output;
+        } else if (
+          isArray(output) &&
+          output.length > 0 &&
+          isString(output[0])
+        ) {
+          _output = output.join('\n---\n');
         }
         _time_cost = time_cost;
       }
@@ -213,7 +221,7 @@ export default function Tools() {
     if (isString(res)) {
       output = res;
     } else if (isArray(res)) {
-      output = res;
+      output = res.join('\n');
     } else {
       output = res?.toString() || '';
     }

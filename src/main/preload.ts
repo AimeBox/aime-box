@@ -177,6 +177,7 @@ const electronHandler = {
       chatId: string;
       content: string;
       extend: ChatInputExtend | any | undefined;
+      is_hidden_message?: boolean;
     }) {
       ipcRenderer.send('chat:chat-resquest', input);
     },
@@ -193,14 +194,17 @@ const electronHandler = {
       const res = ipcRenderer.sendSync('chat:chat-resquest', input);
       return res;
     },
-    updateChatMessage(chatMessageId: string, content: string) {
-      const res = ipcRenderer.sendSync(
+    updateChatMessage: (
+      chatMessageId: string,
+      content: string,
+      additional_kwargs?: Record<string, any>,
+    ) =>
+      ipcRenderer.invoke(
         'chat:update-chatmessage',
         chatMessageId,
         content,
-      );
-      return res;
-    },
+        additional_kwargs,
+      ),
     deleteChatMessage(chatMessageId: string) {
       const res = ipcRenderer.sendSync(
         'chat:delete-chatmessage',

@@ -140,7 +140,6 @@ export default function ChatContent() {
       componentProps: {
         type: 'llm',
       },
-      required: true,
     },
     {
       component: 'Select',

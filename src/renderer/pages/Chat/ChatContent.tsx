@@ -36,6 +36,7 @@ import {
   FaEllipsisH,
   FaFile,
   FaFolder,
+  FaFolderOpen,
   FaPaperclip,
   FaPaperPlane,
   FaSeedling,
@@ -118,7 +119,6 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   const getChat = async (id: string) => {
     let res = await window.electron.chat.getChat(id);
     console.log(res);
-
     if (!res.model) {
       if (res.mode == 'agent' || res.mode == 'supervisor') {
         const agent = await window.electron.db.get('agent', res.agent);
@@ -178,7 +178,22 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
     await getChat(chat.id);
   }
   async function handleChatMessageChanged(chatMessage: ChatMessage) {
-    const chat = await getChat(chatMessage.chat.id);
+    const chatMessageId = chatMessage.id;
+    setCurrentChat((preChat) => {
+      if (preChat?.id == chatMessage.chatId) {
+        preChat.status = 'running';
+        const msg = preChat?.chatMessages.find((x) => x.id == chatMessageId);
+        if (msg) {
+          msg.content = chatMessage.content;
+          preChat.status == 'running';
+          return { ...preChat };
+        } else {
+          preChat.chatMessages.push(chatMessage);
+          return { ...preChat };
+        }
+      }
+      return preChat;
+    });
   }
 
   const scrollToBottom = useCallback((onlyIsBottom = false) => {
@@ -215,6 +230,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   };
 
   const handleChatFinish = async (chatMessage: ChatMessage) => {
+    console.log('handleChatFinish', chatMessage);
     const chat = await getChat(chatMessage.chat.id);
     if (chatMessage.role == 'tool' && chatMessage?.content?.length > 0) {
       const { tool_call_id } = chatMessage.content[0];
@@ -401,6 +417,16 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
 
   const [openMenu, setOpenMenu] = useState(false);
 
+  const onAskHumanSubmit = (value: any, toolMessage: ChatMessage) => {
+    console.log(value, toolMessage);
+    window.electron.chat.chatResquest({
+      chatId: currentChat.id,
+      content: value,
+      extend: { attachments: [] },
+      is_hidden_message: true,
+    });
+  };
+
   return (
     <div className="h-full">
       <FileDropZone onSelectedFiles={onSelectFile}>
@@ -437,16 +463,33 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                             className="flex-1 w-full text-lg"
                             onBlur={handleChangedTitle}
                           />
-                          <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400">
-                            <a href={`/${currentChat.id}`} target="_blank">
+                          <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400 items-center">
+                            <Button
+                              size="small"
+                              type="text"
+                              onClick={() => {
+                                onOpenWorkspace();
+                              }}
+                            >
                               {chatId}
-                            </a>
-                            <span>token: {currentChat.totalToken}</span>
-                            <span className="flex flex-row items-center">
-                              <FaAngleUp /> {currentChat.inputToken}
+                            </Button>
+                            <span>
+                              token:{' '}
+                              {currentChat.totalToken > 1000000
+                                ? `${(currentChat.totalToken / 1000000).toFixed(2)}M`
+                                : currentChat.totalToken}
                             </span>
                             <span className="flex flex-row items-center">
-                              <FaAngleDown /> {currentChat.outputToken}
+                              <FaAngleUp />{' '}
+                              {currentChat.inputToken > 1000000
+                                ? `${(currentChat.inputToken / 1000000).toFixed(2)}M`
+                                : currentChat.inputToken}
+                            </span>
+                            <span className="flex flex-row items-center">
+                              <FaAngleDown />{' '}
+                              {currentChat.outputToken > 1000000
+                                ? `${(currentChat.outputToken / 1000000).toFixed(2)}M`
+                                : currentChat.outputToken}
                             </span>
                           </small>
                         </div>
@@ -535,6 +578,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                       onToolClick={(
                                         toolCall,
                                         toolMessageContent,
+                                        toolMessage,
                                       ) => {
                                         console.log(
                                           toolCall,
@@ -545,6 +589,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                             title: toolCall.name,
                                             content: toolMessageContent,
                                             toolCall: toolCall,
+                                            toolMessage: toolMessage,
                                           });
                                         }
                                       }}
@@ -562,6 +607,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                       onOpenHistory={(history) => {
                                         openHistory(history);
                                       }}
+                                      onAskHumanSubmit={onAskHumanSubmit}
                                       value={chatMessage}
                                     />
                                   );

@@ -81,8 +81,13 @@ export interface ChatMessageProps {
   hideIcon?: boolean;
   hideActionBar?: boolean;
   size?: 'small' | 'medium';
-  onToolClick?: (toolCall: any, toolMessageContent: any) => void;
+  onToolClick?: (
+    toolCall: any,
+    toolMessageContent: any,
+    toolMessage: ChatMessage,
+  ) => void;
   onOpenHistory?: (messages: any) => void;
+  onAskHumanSubmit?: (value: any, toolMessage: ChatMessage) => void;
 }
 
 const ChatMessageBox = React.forwardRef(
@@ -102,6 +107,7 @@ const ChatMessageBox = React.forwardRef(
       size = 'small',
       onToolClick,
       onOpenHistory,
+      onAskHumanSubmit,
     }: ChatMessageProps,
     ref: React.ForwardedRef<any>,
   ) => {
@@ -173,7 +179,11 @@ const ChatMessageBox = React.forwardRef(
       return src;
     };
     const getTextContent = () => {
-      return value?.content
+      return (
+        isArray(value?.content)
+          ? value?.content
+          : [{ type: 'text', text: value?.content }]
+      )
         ?.filter((x) => Object.keys(x).includes('text'))
         .map((x) => x.text)
         .join('\n');
@@ -187,7 +197,11 @@ const ChatMessageBox = React.forwardRef(
     };
 
     const renderToolContent = (value: ChatMessage) => {
-      const toolContent = value?.content?.filter((x) => x.type == 'tool_call');
+      const toolContent = (
+        isArray(value?.content)
+          ? value?.content
+          : [{ type: 'text', text: value?.content }]
+      )?.filter((x) => x.type == 'tool_call');
       return (
         <div className="w-full">
           {toolContent.map((x) => {
@@ -215,13 +229,19 @@ const ChatMessageBox = React.forwardRef(
     ) => {
       if (toolCall.name == 'ask-human') {
         return (
-          <AskHumanMessage toolMessage={toolMessage} toolCall={toolCall} />
+          <AskHumanMessage
+            toolMessage={toolMessage}
+            toolCall={toolCall}
+            onSubmit={(value) => onAskHumanSubmit(value, toolMessage)}
+          />
         );
       }
       return (
         <motion.div
           className="flex flex-row gap-2 items-center p-0 px-2 bg-gray-100 rounded-2xl cursor-pointer w-fit"
-          onClick={() => onToolClick?.(toolCall, toolMessageContent)}
+          onClick={() =>
+            onToolClick?.(toolCall, toolMessageContent, toolMessage)
+          }
         >
           <div>
             {toolMessage?.status == 'success' && (
@@ -319,21 +339,22 @@ const ChatMessageBox = React.forwardRef(
                           value.role == 'user' ? 'items-end' : ''
                         } w-full mb-1`}
                       >
-                        {value?.content
-                          ?.filter((x) => x.type == 'text')
-                          .map((x) => {
-                            return (
-                              <div
-                                className={`${
-                                  value.role == 'user'
-                                    ? 'bg-gray-100 dark:bg-gray-800 p-4 rounded-se-2xl rounded-ss-2xl rounded-es-2xl ml-[64px] '
-                                    : 'w-full'
-                                }`}
-                              >
-                                <Markdown value={x.text} key={x} />
-                              </div>
-                            );
-                          })}
+                        {isArray(value?.content) &&
+                          value?.content
+                            ?.filter((x) => x.type == 'text')
+                            .map((x) => {
+                              return (
+                                <div
+                                  className={`${
+                                    value.role == 'user'
+                                      ? 'bg-gray-100 dark:bg-gray-800 p-4 rounded-se-2xl rounded-ss-2xl rounded-es-2xl ml-[64px] '
+                                      : 'w-full'
+                                  }`}
+                                >
+                                  <Markdown value={x.text} key={x} />
+                                </div>
+                              );
+                            })}
                       </div>
 
                       {/* {value?.additional_kwargs?.files && (
@@ -355,7 +376,10 @@ const ChatMessageBox = React.forwardRef(
                       </div> */}
 
                       {value.status != 'running' &&
-                        value?.content
+                        (isArray(value?.content)
+                          ? value?.content
+                          : [{ type: 'text', text: value?.content }]
+                        )
                           ?.filter((x) => x.type == 'tool_call')
                           .map((x) => {
                             try {

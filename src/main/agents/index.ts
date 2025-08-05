@@ -55,6 +55,7 @@ import { DataMaskingAgent } from './data_masking/DataMaskingAgent';
 import { BaseManager } from '../BaseManager';
 import { channel } from '../ipc/IpcController';
 import { getAssetPath, getDataPath } from '../utils/path';
+import { VibeAgent } from './claude_code';
 
 export interface AgentInfo extends Agent {
   static: boolean;
@@ -76,7 +77,7 @@ export class AgentManager extends BaseManager {
     //this.registerAgent(TranslateAgent);
     await this.registerAgent(PlannerAgent);
     await this.registerAgent(DataMaskingAgent);
-    await this.registerAgent(ManusAgent);
+    await this.registerAgent(VibeAgent);
 
     await this.registerAgentFromAssetPath();
 
@@ -185,7 +186,7 @@ export class AgentManager extends BaseManager {
 
   public async getAgent(id: string): Promise<AgentInfo> {
     const agent = await this.agentRepository.findOne({
-      where: { id },
+      where: [{ id: id.toLowerCase() }, { name: id.toLowerCase() }],
     });
     if (!agent) throw new Error('找不到该agent');
     let configSchema;

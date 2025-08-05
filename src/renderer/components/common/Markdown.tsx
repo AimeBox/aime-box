@@ -26,6 +26,9 @@ import { visit } from 'unist-util-visit';
 import { isString } from '@/main/utils/is';
 import { splitContextAndFiles } from '@/renderer/utils/ContentUtils';
 import { cn } from '@/lib/utils';
+import { Tag } from 'antd';
+import { Fa0, FaBolt } from 'react-icons/fa6';
+import ShinyText from '../ui/ShinyText/ShinyText';
 
 export interface MarkdownProps {
   value?: string;
@@ -50,11 +53,31 @@ function remarkEncodeLinks() {
 export function Markdown(props: MarkdownProps) {
   const [renderedContent, setRenderedContent] = useState<string | null>(null);
   const [thinkContent, setThinkContent] = useState<string | undefined>();
+  const [isThinking, setIsThinking] = useState<boolean>(false);
   const [files, setFiles] = useState<ChatInputAttachment[]>([]);
 
   useEffect(() => {
-    const { thinkContent, restContent } = splitThinkTag(props?.value);
-    const { context, attachments } = splitContextAndFiles(restContent);
+    let value = '';
+    let _thinkContent = '';
+    if (isString(props?.value)) {
+      if (props?.value?.startsWith('<think>')) {
+        if (!isThinking) {
+          setIsThinking(true);
+        }
+        if (props?.value?.includes('\n</think>\n')) {
+          setIsThinking(false);
+          const { thinkContent, restContent } = splitThinkTag(props?.value);
+          value = restContent;
+          _thinkContent = thinkContent;
+        }
+      } else {
+        value = props?.value;
+      }
+    } else {
+      console.log('markdown', props?.value);
+    }
+
+    const { context, attachments } = splitContextAndFiles(value || '');
 
     setFiles(attachments);
     setThinkContent(thinkContent);
@@ -111,13 +134,25 @@ export function Markdown(props: MarkdownProps) {
   }
 
   // useEffect(() => {}, [renderedContent]);
-  return thinkContent || renderedContent || (files && files.length > 0) ? (
+  return thinkContent ||
+    isThinking ||
+    renderedContent ||
+    (files && files.length > 0) ? (
     <>
-      {thinkContent && (
+      {isThinking && (
+        <Tag className="bg-gray-100 dark:bg-gray-800 flex items-center gap-2 w-[100px] rounded-xl p-2">
+          <ShinyText
+            text=" Thinking..."
+            speed={2}
+            className="font-bold whitespace-normal line-clamp-1 break-all"
+          />
+        </Tag>
+      )}
+      {/* {thinkContent && (
         <div className="pl-2 mb-4 italic text-gray-500 whitespace-pre-wrap border-l-4 border-gray-300">
           {thinkContent}
         </div>
-      )}
+      )} */}
       <div
         className={cn(
           'w-full text-sm break-all max-w-max break-words prose dark:prose-invert dark prose-hr:m-0 prose-td:whitespace-pre-line min-w-[100%]',

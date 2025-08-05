@@ -35,51 +35,72 @@ export class ElevenLabsProvider extends BaseProvider {
   }
 
   async getTTSModels(): Promise<string[]> {
-    return ['speech-02-hd', 'speech-02-turbo'];
+    return ['eleven_v3', 'eleven_multilingual_v2'];
   }
 
   async getSTTModels(): Promise<string[]> {
-    return ['speech-02-hd', 'speech-02-turbo'];
+    return ['scribe_v1'];
   }
 
-  async speech(modelName: string, text: string, config: any): Promise<Buffer> {
-    const url = `${this.provider.api_base || this.defaultApiBase}/t2a_v2?GroupId=${this.groupId}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: modelName,
+  async speech(
+    modelName: string,
+    text: string,
+    config: {
+      voiceDescription?: string;
+    },
+  ): Promise<Buffer> {
+    if (config?.voiceDescription) {
+      const { previews } = await this.elevenlabs.textToVoice.design({
+        modelId: 'eleven_multilingual_ttv_v2',
+        voiceDescription: config.voiceDescription,
         text: text,
-        stream: false,
-        language_boost: 'auto',
-        output_format: 'hex',
-        voice_setting: {
-          voice_id: 'male-qn-qingse',
-          speed: config.speed,
-          vol: 1,
-          pitch: 0,
-          emotion: config.emotion,
-          english_normalization: config.english_normalization,
-        },
-        audio_setting: {
-          sample_rate: 32000,
-          bitrate: 128000,
-          format: 'wav',
-        },
-      }),
-    });
-    if (!response.ok)
-      throw new Error(`generation audio fail: ${await response.text()}`);
-    const data = await response.json();
-    if (data.base_resp.status_code !== 0) {
-      throw new Error(`generation audio fail: ${data.base_resp.status_msg}`);
+      });
     }
-    const buffer = Buffer.from(data.data.audio, 'hex');
-    return buffer;
+    const response = await this.elevenlabs.textToSpeech.convert(
+      'JBFqnCBsd6RMkjVDRZzb',
+      {
+        text: text,
+        modelId: modelName,
+        outputFormat: 'mp3_44100_128',
+      },
+    );
+    const chunks: Buffer[] = [];
+
+    await pipeline(response, async function* (source: AsyncIterable<Buffer>) {
+      for await (const chunk of source) {
+        chunks.push(chunk);
+        yield; // 不需要实际传输数据
+      }
+    });
+
+    return Buffer.concat(chunks);
+  }
+
+  async transcriptions(
+    modelName: string,
+    filePath: string,
+    config: {
+      diarize: boolean;
+    } = {
+      diarize: false,
+    },
+  ): Promise<string> {
+    const result = await this.elevenlabs.speechToText.convert({
+      file: fs.createReadStream(filePath),
+      modelId: modelName || 'scribe_v1',
+      diarize: config.diarize,
+    });
+    if (result.transcripts) {
+      // Multichannel response
+      result.transcripts.forEach((transcript, index) => {
+        console.log(`Channel ${transcript.channel_index}: ${transcript.text}`);
+      });
+    } else {
+      // Single channel response
+      console.log(`Text: ${result.text}`);
+    }
+
+    return result.text;
   }
 
   async soundEffects(input: {
@@ -87,7 +108,7 @@ export class ElevenLabsProvider extends BaseProvider {
     durationSeconds: number;
     promptInfluence: number;
     outputFormat: TextToSoundEffectsConvertRequestOutputFormat;
-  }) {
+  }): Promise<Buffer> {
     const response = await this.elevenlabs.textToSoundEffects.convert({
       ...input,
       outputFormat: (input.outputFormat ||
@@ -103,5 +124,28 @@ export class ElevenLabsProvider extends BaseProvider {
     });
 
     return Buffer.concat(chunks);
+  }
+
+  async getVoiceList() {
+    const response = await this.elevenlabs.voices.getAll({ showLegacy: true });
+
+    return response.voices;
+  }
+
+  async voiceCloning(input: {
+    name: string;
+    files: string[];
+    description?: string;
+    labels?: string;
+    removeBackgroundNoise?: boolean;
+  }): Promise<any> {
+    const response = await this.elevenlabs.voices.ivc.create({
+      name: input.name,
+      files: input.files.map((file) => fs.createReadStream(file)),
+      description: input.description,
+      labels: input.labels,
+      removeBackgroundNoise: input.removeBackgroundNoise,
+    });
+    return response;
   }
 }

@@ -17,6 +17,10 @@ import FileView from './tool-views/FileView';
 import WebSearchView from './tool-views/WebSearchView';
 import CodeView from './tool-views/CodeView';
 import KnowledgebaseQueryView from './tool-views/KnowledgebaseQueryView';
+import TodoView from './tool-views/TodoView';
+import EditView from './tool-views/EditView';
+import TaskView from './tool-views/TaskView';
+import { ChatMessage } from '@/entity/Chat';
 
 export interface ChatToolViewProps {
   open: boolean;
@@ -24,7 +28,13 @@ export interface ChatToolViewProps {
   className?: string;
   toolName?: string;
   //toolCall: string;
-  value?: { title: string; content?: any; toolCall?: any; timeCost?: number };
+  value?: {
+    title: string;
+    content?: any;
+    toolCall?: any;
+    timeCost?: number;
+    toolMessage?: ChatMessage;
+  };
   chatId?: string;
 }
 
@@ -52,6 +62,18 @@ export default function ChatToolView(props: ChatToolViewProps) {
             content={value?.content}
           />
         );
+      case 'todo_write':
+        return <TodoView toolCall={value?.toolCall} content={value?.content} />;
+      case 'edit':
+        return <EditView toolCall={value?.toolCall} content={value?.content} />;
+      case 'task':
+        return (
+          <TaskView
+            toolCall={value?.toolCall}
+            content={value?.content}
+            toolMessage={value?.toolMessage}
+          />
+        );
       default:
         return (
           <>
@@ -72,6 +94,7 @@ export default function ChatToolView(props: ChatToolViewProps) {
                 <ReactJsonView src={value?.toolCall?.args} />
               )}
             </div>
+
             <div className="h-auto">{renderToolContent()}</div>
             {value?.timeCost && (
               <div className="flex flex-row gap-1 items-center text-xs text-gray-500">

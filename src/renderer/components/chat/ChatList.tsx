@@ -171,19 +171,6 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
                     {t('chat.fileChat')}
                   </Button>
                 )}
-                {!isPackaged && (
-                  <Button
-                    type="text"
-                    block
-                    icon={<FaRegMessage />}
-                    onClick={() => {
-                      setAddButtonOpen(false);
-                      onNewChat('planner');
-                    }}
-                  >
-                    {t('chat.plannerChat')}
-                  </Button>
-                )}
               </div>
             }
           >

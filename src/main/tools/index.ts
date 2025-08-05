@@ -103,6 +103,8 @@ import { Think } from './ThinkTool';
 import { BilibiliToolkit } from './social-media/BilibiliToolkit';
 import { KnowledgeBaseToolkit } from './KnowledgeBaseToolkit';
 import { AutoToolToolkit } from './AutoToolkit';
+import { BashTool } from './BashTool';
+import { TodoToolkit } from './TodoToolkit';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -566,6 +568,8 @@ export class ToolsManager extends BaseManager {
     }
     await this.registerTool(BrowserUseTool);
     await this.registerTool(TerminalTool);
+
+    await this.registerTool(BashTool);
     await this.registerTool(Calculator);
     await this.registerTool(DateTimeTool);
     await this.registerTool(Translate);
@@ -613,6 +617,8 @@ export class ToolsManager extends BaseManager {
     await this.registerTool(ElevenLabsToolkit);
     await this.registerTool(AutoToolToolkit);
     await this.registerTool(Think);
+
+    await this.registerTool(TodoToolkit);
   };
 
   @channel('tools:update')
@@ -660,33 +666,6 @@ export class ToolsManager extends BaseManager {
         return `![](${res})`;
       } else if (fs.existsSync(res)) {
         return `![](file:///${res.replace(/\\/g, '/').replace(/ /g, '%20')})`;
-      } else if (splitContextAndFiles(res)?.attachments.length > 0) {
-        const { context, attachments } = splitContextAndFiles(res);
-        let text = context;
-        attachments.forEach((attachment) => {
-          if (fs.existsSync(attachment.path) && attachment.type == 'file') {
-            if (
-              attachment.ext == '.png' ||
-              attachment.ext == '.jpg' ||
-              attachment.ext == '.jpeg' ||
-              attachment.ext == '.gif' ||
-              attachment.ext == '.webp' ||
-              attachment.ext == '.mp4' ||
-              attachment.ext == '.mp3' ||
-              attachment.ext == '.wav' ||
-              attachment.ext == '.ogg' ||
-              attachment.ext == '.flac' ||
-              attachment.ext == '.m4a'
-            ) {
-              text += `\n![](file:///${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
-            } else {
-              text += `\n[${attachment.name}](${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
-            }
-          } else if (attachment.type == 'folder') {
-            text += `\n[${attachment.name}](${attachment.path.replace(/\\/g, '/').replace(/ /g, '%20')})`;
-          }
-        });
-        return text;
       }
       return res;
     }
@@ -738,6 +717,13 @@ export class ToolsManager extends BaseManager {
     }
 
     return null;
+  }
+
+  @channel('tools:stop')
+  async stop(toolName: string) {
+    const tool = await this.toolRepository.findOne({
+      where: { name: toolName },
+    });
   }
 
   private objectToMarkDown = (input: any) => {

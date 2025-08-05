@@ -74,6 +74,11 @@ export class BrowserInstance extends BaseInstance {
   stop = async () => {
     if (this.browser_context) {
       await this.browser_context.close();
+      const b = this.browser_context.browser();
+      if (b) {
+        await b.close();
+      }
+
       this.eventEmitter.emit('close');
     }
   };

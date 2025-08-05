@@ -32,6 +32,9 @@ export class DeepSeekProvider extends BaseProvider {
       temperature: options?.temperature,
       streaming: options?.streaming,
     });
+    llm.metadata = {
+      max_context_length: 64 * 1000,
+    };
     return llm;
   }
 

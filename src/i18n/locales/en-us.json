@@ -98,7 +98,8 @@
     "chromeInstancePath": "ChromeInstance Path",
     "useVision": "Use Vision",
     "plannerModel": "Planner Model",
-    "userDataDir": "UserDataDir Path"
+    "userDataDir": "UserDataDir Path",
+    "instancId": "Instanc ID"
   },
   "common": {
     "edit": "Edit",

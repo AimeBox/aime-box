@@ -265,7 +265,7 @@ export const runAgent = async (
               const _msg = _messages.find(
                 (x) => x?.tool_call_id == msg.tool_call_id,
               );
-              if (_msg && _msg.status === undefined) {
+              if (_msg && _msg.status === undefined && !msg.content) {
                 const tooStart = _toolStart.find(
                   (x) => x.tool_call_id == msg.tool_call_id,
                 );

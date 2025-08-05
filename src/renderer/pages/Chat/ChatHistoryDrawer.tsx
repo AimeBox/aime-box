@@ -1,5 +1,15 @@
 import { ChatMessage } from '@/entity/Chat';
-import { Divider, Drawer, DrawerProps, Tag } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
+import {
+  Button,
+  ConfigProvider,
+  Divider,
+  Drawer,
+  DrawerProps,
+  List,
+  message,
+  Tag,
+} from 'antd';
 import { t } from 'i18next';
 import { useEffect, useState } from 'react';
 
@@ -29,22 +39,46 @@ export default function ChatHistoryDrawer(props: ChatHistoryDrawerProps) {
   }, [value]);
 
   return (
-    <Drawer title={t('chat.chat_history')} {...props}>
-      <div className="flex flex-col gap-2">
-        {messages?.map((item) => (
-          <div key={item.id}>
-            <Tag>{item.role}</Tag>
-            <div className="whitespace-pre-wrap break-all">{item.content}</div>
-
-            {item.tool_calls && item.tool_calls.length > 0 && (
-              <div className="whitespace-pre-wrap break-all">
-                {JSON.stringify(item.tool_calls, null, 2)}
+    <ConfigProvider
+      drawer={{
+        classNames: {
+          wrapper: 'p-4 !shadow-none',
+        },
+      }}
+    >
+      <Drawer
+        title={t('chat.chat_history')}
+        className="rounded-2xl shadow-lg"
+        {...props}
+      >
+        <List
+          dataSource={messages}
+          renderItem={(item) => (
+            <List.Item id={item.id} className="flex flex-col items-start">
+              <div className="flex flex-row gap-2 items-center justify-between w-full mb-2">
+                <Tag>{item.role}</Tag>
+                <Button
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => {
+                    navigator.clipboard.writeText(item.content);
+                    message.success(t('chat.copy_success'));
+                  }}
+                ></Button>
               </div>
-            )}
-            <Divider></Divider>
-          </div>
-        ))}
-      </div>
-    </Drawer>
+              <div className="whitespace-pre-wrap break-all w-full">
+                {item.content}
+              </div>
+
+              {item.tool_calls && item.tool_calls.length > 0 && (
+                <div className="whitespace-pre-wrap break-all w-full">
+                  {JSON.stringify(item.tool_calls, null, 2)}
+                </div>
+              )}
+            </List.Item>
+          )}
+        ></List>
+      </Drawer>
+    </ConfigProvider>
   );
 }

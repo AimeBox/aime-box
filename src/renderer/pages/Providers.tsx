@@ -203,6 +203,11 @@ export default function Connections() {
           api_base: 'https://api.moonshot.cn/v1',
           api_key: 'NULL',
         });
+      } else if (changedFields[0].value === 'bigmodel') {
+        form.setFieldsValue({
+          api_base: 'https://open.bigmodel.cn/api/paas/v4',
+          api_key: 'NULL',
+        });
       }
     }
   };

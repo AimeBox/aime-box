@@ -32,10 +32,11 @@ interface BasicFormProps extends FormProps {
   onFinish?: (value: any) => Promise<void>;
   onChange?: (value: any) => void;
   loading?: boolean;
+  showSubmit?: boolean;
   // onCancel?: (text: string | undefined) => void;
 }
 const BasicForm = forwardRef((props: BasicFormProps, ref) => {
-  const { loading = false, onChange, value } = props;
+  const { loading = false, onChange, value, showSubmit = true } = props;
   const [form] = Form.useForm();
   const [formModel, setFormModel] = useState(undefined);
   const [schemas, setSchemas] = useState(props.schemas);
@@ -44,6 +45,7 @@ const BasicForm = forwardRef((props: BasicFormProps, ref) => {
     updateSchema: (data: FormSchema | FormSchema[]) => {
       setSchemas(isArray(data) ? data : [data]);
     },
+    getForm: () => form,
   }));
   const onFinish = async () => {
     try {
@@ -102,11 +104,13 @@ const BasicForm = forwardRef((props: BasicFormProps, ref) => {
           />
         );
       })}
-      <div className="flex flex-row">
-        <Button type="primary" loading={loading} onClick={() => onFinish()}>
-          Submit
-        </Button>
-      </div>
+      {showSubmit && (
+        <div className="flex flex-row">
+          <Button type="primary" loading={loading} onClick={() => onFinish()}>
+            Submit
+          </Button>
+        </div>
+      )}
     </Form>
   );
 });

@@ -47,6 +47,7 @@ import { TogetherProvider } from './TogetherProvider';
 import { ElevenLabsProvider } from './ElevenLabsProvider';
 import { LmStudioProvider } from './LmStudioProvider';
 import { MoonshotProvider } from './MoonshotProvider';
+import { BigmodelProvider } from './BigmodelProvider';
 
 export interface ProviderInfo extends Providers {
   credits: {
@@ -223,6 +224,10 @@ export class ProvidersManager extends BaseManager {
         const moonshot = new MoonshotProvider({ provider: connection });
         const list = await moonshot.getModelList();
         return list;
+      } else if (connection?.type === ProviderType.BIGMODEL) {
+        const bigmodel = new BigmodelProvider({ provider: connection });
+        const list = await bigmodel.getModelList();
+        return list;
       }
     } catch (e) {
       console.log(e);
@@ -273,6 +278,8 @@ export class ProvidersManager extends BaseManager {
         return new LmStudioProvider({ provider: providerObj });
       case ProviderType.MOONSHOT:
         return new MoonshotProvider({ provider: providerObj });
+      case ProviderType.BIGMODEL:
+        return new BigmodelProvider({ provider: providerObj });
       default:
         return undefined;
     }

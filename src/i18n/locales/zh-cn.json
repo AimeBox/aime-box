@@ -165,7 +165,8 @@
     "mcp": "Mcp",
     "useVision": "使用视觉模型",
     "plannerModel": "计划模型",
-    "chromeInstancePath": "浏览器实例路径"
+    "chromeInstancePath": "浏览器实例路径",
+    "instancId": "实例Id"
   },
   "common": {
     "edit": "编辑",
