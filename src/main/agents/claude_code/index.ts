@@ -60,6 +60,9 @@ import { Agent } from '@/entity/Agent';
 import { isObject, isString } from '@/main/utils/is';
 import path from 'path';
 import fs from 'fs';
+import settingsManager from '@/main/settings';
+import os from 'os';
+import { appendPart, prependPart } from '@/main/utils/messages';
 
 export class VibeAgent extends BaseAgent {
   name: string = 'vibe_agent';
@@ -127,157 +130,6 @@ export class VibeAgent extends BaseAgent {
   }) {
     super(options);
   }
-
-  createTaskTool = (
-    tools: BaseTool[],
-    agents: BaseAgent[] = [],
-    signal: AbortSignal = undefined,
-  ) => {
-    let TaskSchema;
-    if (agents.length > 0) {
-      TaskSchema = z.object({
-        description: z
-          .string()
-          .describe('A short (3-5 word) description of the task'),
-        prompt: z.string().describe('The task for the agent to perform'),
-        subagent_type: z
-          .enum(['general-purpose', ...agents.map((agent) => agent.name)])
-          .describe('The type of specialized agent to use for this task'),
-      });
-    } else {
-      TaskSchema = z.object({
-        description: z
-          .string()
-          .describe('A short (3-5 word) description of the task'),
-        prompt: z.string().describe('The task for the agent to perform'),
-        subagent_type: z
-          .enum(['general-purpose'])
-          .describe('The type of specialized agent to use for this task'),
-      });
-    }
-
-    const TaskTool = tool(
-      async (
-        arg: z.infer<typeof TaskSchema>,
-        runManager?: CallbackManagerForToolRun,
-        config?: RunnableConfig,
-      ) => {
-        const { description, prompt, subagent_type } = arg;
-
-        const _agent: AgentInfo = await agentManager.getAgent(subagent_type);
-        if (subagent_type == 'general-purpose') {
-          return {
-            is_success: true,
-            res: `Now task`,
-          };
-        } else if (_agent) {
-          const _tools = await toolsManager.buildTools(_agent.tools);
-          const subAgent = await agentManager.buildAgent({
-            agent: _agent as Agent,
-            model: _agent.model,
-            signal,
-            tools: _tools,
-          });
-          const res: { messages: BaseMessage[] } = await subAgent.invoke(
-            {
-              messages: [new HumanMessage(prompt)],
-            },
-            {
-              ...(config || {}),
-              tags: ['ignore'],
-            },
-          );
-
-          return {
-            is_success: true,
-            messages: [
-              ...(_agent.prompt ? [new SystemMessage(_agent.prompt)] : []),
-              ...res.messages,
-            ],
-          };
-        } else {
-          return {
-            is_success: false,
-            error: `Agent "${subagent_type}" not found`,
-          };
-        }
-      },
-      {
-        name: 'task',
-        description: `Launch a new agent to handle complex, multi-step tasks autonomously.
-
-Available agent types and the tools they have access to:
-
-- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: \\_)
-${
-  agents.length > 0
-    ? `- ${agents
-        .map((agent) => {
-          return `${agent.name}: ${agent.description}`;
-        })
-        .join('\n')}\n`
-    : ''
-}
-
-When using the Task tool, you must specify a subagent_type parameter to select which agent type to use.
-
-When NOT to use the Agent tool:
-
-- If you want to read a specific file path, use the '${new FileRead().name}' or '${new GlobTool().name}' tool instead of the Agent tool, to find the match more quickly
-- If you are searching for a specific class definition like "class Foo", use the '${new GlobTool().name}' tool instead, to find the match more quickly
-- If you are searching for code within a specific file or set of 2-3 files, use the '${new FileRead().name}' tool instead of the Agent tool, to find the match more quickly
-- Other tasks that are not related to the agent descriptions above
-
-
-Usage notes:
-1. Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses
-2. When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.
-3. Each agent invocation is stateless. You will not be able to send additional messages to the agent, nor will the agent be able to communicate with you outside of its final report. Therefore, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.
-4. The agent's outputs should generally be trusted
-5. Clearly tell the agent whether you expect it to write code or just to do research (search, file reads, web fetches, etc.), since it is not aware of the user's intent
-6. If the agent description mentions that it should be used proactively, then you should try your best to use it without the user having to ask for it first. Use your judgement.
-
-Example usage:
-
-<example_agent_descriptions>
-"code-reviewer": use this agent after you are done writing a signficant piece of code
-"greeting-responder": use this agent when to respond to user greetings with a friendly joke
-</example_agent_description>
-
-<example>
-user: "Please write a function that checks if a number is prime"
-assistant: Sure let me write a function that checks if a number is prime
-assistant: First let me use the '${new FileWrite().name}' tool to write a function that checks if a number is prime
-assistant: I'm going to use the '${new FileWrite().name}' tool to write the following code:
-<code>
-function isPrime(n) {
- if (n <= 1) return false
- for (let i = 2; i * i <= n; i++) {
- if (n % i === 0) return false
- }
- return true
-}
-</code>
-<commentary>
-Since a signficant piece of code was written and the task was completed, now use the code-reviewer agent to review the code
-</commentary>
-assistant: Now let me use the code-reviewer agent to review the code
-assistant: Uses the 'task' tool to launch the with the code-reviewer agent
-</example>
-
-<example>
-user: "Hello"
-<commentary>
-Since the user is greeting, use the greeting-responder agent to respond with a friendly joke
-</commentary>
-assistant: "I'm going to use the 'task' tool to launch the with the greeting-responder agent"
-</example>`,
-        schema: TaskSchema,
-      },
-    );
-
-    return TaskTool;
-  };
 
   async createAgent(params: {
     store?: BaseStore;
@@ -371,7 +223,172 @@ assistant: "I'm going to use the 'task' tool to launch the with the greeting-res
     tools.push(new MemorySave());
     // tools.push(new MemoryRead());
 
-    const taskTool = await this.createTaskTool(tools, agents, signal);
+    const createTaskTool = async (
+      tools: BaseTool[],
+      agents: BaseAgent[] = [],
+    ) => {
+      let TaskSchema;
+      if (agents.length > 0) {
+        TaskSchema = z.object({
+          description: z
+            .string()
+            .describe('A short (3-5 word) description of the task'),
+          prompt: z.string().describe('The task for the agent to perform'),
+          subagent_type: z
+            .enum(['general-purpose', ...agents.map((agent) => agent.name)])
+            .describe('The type of specialized agent to use for this task'),
+        });
+      } else {
+        TaskSchema = z.object({
+          description: z
+            .string()
+            .describe('A short (3-5 word) description of the task'),
+          prompt: z.string().describe('The task for the agent to perform'),
+          subagent_type: z
+            .enum(['general-purpose'])
+            .describe('The type of specialized agent to use for this task'),
+        });
+      }
+
+      const TaskTool = tool(
+        async (
+          arg: z.infer<typeof TaskSchema>,
+          runManager?: CallbackManagerForToolRun,
+          config?: RunnableConfig,
+        ) => {
+          const { description, prompt, subagent_type } = arg;
+
+          const _agent: AgentInfo = await agentManager.getAgent(subagent_type);
+          if (subagent_type == 'general-purpose') {
+            return {
+              is_success: true,
+              res: `Now task`,
+            };
+          } else if (_agent) {
+            const _tools = await toolsManager.buildTools(_agent.tools);
+
+            const system_prompt = `${_agent.prompt}
+
+# Additional Instructions
+
+Here is useful information about the environment you are running in:
+<env>
+Working directory: ${cwd}
+Platform: ${process.platform}
+OS Version: ${os.version()}
+System Language: ${settingsManager.getLanguage()}
+Today's date: ${new Date().toISOString().split('T')[0]}
+</env>
+`;
+            _agent.prompt = system_prompt;
+            const subAgent = await agentManager.buildAgent({
+              agent: _agent as Agent,
+              model: _agent.model,
+              signal,
+              tools: _tools,
+            });
+            const res: { messages: BaseMessage[] } = await subAgent.invoke(
+              {
+                messages: [new HumanMessage(prompt)],
+              },
+              {
+                ...(config || {}),
+                tags: ['ignore'],
+              },
+            );
+
+            return {
+              is_success: true,
+              messages: [
+                ...(_agent.prompt ? [new SystemMessage(system_prompt)] : []),
+                ...res.messages,
+              ],
+            };
+          } else {
+            return {
+              is_success: false,
+              error: `Agent "${subagent_type}" not found`,
+            };
+          }
+        },
+        {
+          name: 'task',
+          description: `Launch a new agent to handle complex, multi-step tasks autonomously.
+
+Available agent types and the tools they have access to:
+
+- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: \\_)
+${
+  agents.length > 0
+    ? `- ${agents
+        .map((agent) => {
+          return `${agent.name}: ${agent.description}`;
+        })
+        .join('\n')}\n`
+    : ''
+}
+
+When using the Task tool, you must specify a subagent_type parameter to select which agent type to use.
+
+When NOT to use the Agent tool:
+
+- If you want to read a specific file path, use the '${new FileRead().name}' or '${new GlobTool().name}' tool instead of the Agent tool, to find the match more quickly
+- If you are searching for a specific class definition like "class Foo", use the '${new GlobTool().name}' tool instead, to find the match more quickly
+- If you are searching for code within a specific file or set of 2-3 files, use the '${new FileRead().name}' tool instead of the Agent tool, to find the match more quickly
+- Other tasks that are not related to the agent descriptions above
+
+
+Usage notes:
+1. Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses
+2. When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.
+3. Each agent invocation is stateless. You will not be able to send additional messages to the agent, nor will the agent be able to communicate with you outside of its final report. Therefore, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.
+4. The agent's outputs should generally be trusted
+5. Clearly tell the agent whether you expect it to write code or just to do research (search, file reads, web fetches, etc.), since it is not aware of the user's intent
+6. If the agent description mentions that it should be used proactively, then you should try your best to use it without the user having to ask for it first. Use your judgement.
+
+Example usage:
+
+<example_agent_descriptions>
+"code-reviewer": use this agent after you are done writing a signficant piece of code
+"greeting-responder": use this agent when to respond to user greetings with a friendly joke
+</example_agent_description>
+
+<example>
+user: "Please write a function that checks if a number is prime"
+assistant: Sure let me write a function that checks if a number is prime
+assistant: First let me use the '${new FileWrite().name}' tool to write a function that checks if a number is prime
+assistant: I'm going to use the '${new FileWrite().name}' tool to write the following code:
+<code>
+function isPrime(n) {
+ if (n <= 1) return false
+ for (let i = 2; i * i <= n; i++) {
+ if (n % i === 0) return false
+ }
+ return true
+}
+</code>
+<commentary>
+Since a signficant piece of code was written and the task was completed, now use the code-reviewer agent to review the code
+</commentary>
+assistant: Now let me use the code-reviewer agent to review the code
+assistant: Uses the 'task' tool to launch the with the code-reviewer agent
+</example>
+
+<example>
+user: "Hello"
+<commentary>
+Since the user is greeting, use the greeting-responder agent to respond with a friendly joke
+</commentary>
+assistant: "I'm going to use the 'task' tool to launch the with the greeting-responder agent"
+</example>`,
+          schema: TaskSchema,
+        },
+      );
+
+      return TaskTool;
+    };
+
+    const taskTool = await createTaskTool(tools, agents);
 
     tools.push(taskTool);
     const cwd = configurable?.workspace;
@@ -383,6 +400,7 @@ assistant: "I'm going to use the 'task' tool to launch the with the greeting-res
       ...{
         messages: Annotation<BaseMessage[]>,
         isCompressed: Annotation<boolean | undefined>,
+        todoReminders: Annotation<string | undefined>,
       },
     });
 
@@ -443,39 +461,10 @@ assistant: "I'm going to use the 'task' tool to launch the with the greeting-res
       });
     };
 
-    const prependPart = (messages: BaseMessage, part: any) => {
-      const user_input = isString(messages.content)
-        ? [{ type: 'text', text: messages.content }]
-        : [...messages.content];
-      let part_content = part;
-      if (isString(part_content)) {
-        part_content = [{ type: 'text', text: part }];
-      } else if (isObject(part_content)) {
-        part_content = [part];
-      }
-      messages.content = [...part_content, ...user_input];
-
-      return messages;
-    };
-
-    const appendPart = (messages: BaseMessage, part: any) => {
-      const user_input = isString(messages.content)
-        ? [{ type: 'text', text: messages.content }]
-        : [...messages.content];
-      let part_content = part;
-      if (isString(part_content)) {
-        part_content = [{ type: 'text', text: part }];
-      } else if (isObject(part_content)) {
-        part_content = [part];
-      }
-
-      messages.content = [...user_input, ...part_content];
-      return messages;
-    };
-
     const mainAgent = async ({
       messages,
       isCompressed,
+      todoReminders,
     }: typeof StateAnnotation.State) => {
       const memory = await new MemoryRead().invoke(
         {},
@@ -501,7 +490,9 @@ assistant: "I'm going to use the 'task' tool to launch the with the greeting-res
 
       const reminders_file = path.join(cwd, '.reminders.md');
 
-      let last_message = messages[messages.length - 1];
+      const last_message = messages[messages.length - 1];
+      const first_message = messages[0];
+
       if (
         fs.existsSync(reminders_file) &&
         (isCompressed || messages.length == 1)
@@ -518,14 +509,15 @@ ${fs.readFileSync(reminders_file, 'utf-8')}
 IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.
 </system-reminder>`;
 
-        if (isHumanMessage(last_message)) {
-          const msg = prependPart(last_message, systemReminder);
-          last_message = msg;
+        if (isHumanMessage(first_message)) {
+          const msg = prependPart(first_message, systemReminder);
+          messages[0] = msg;
         }
       }
 
+      let _todoReminders = `<system-reminder>This is a reminder that your todo list is currently empty. DO NOT mention this to the user explicitly because they are already aware. If you are working on tasks that would benefit from a todo list please use the '${TodoWrite.Name}' tool to create one. If not, please feel free to ignore. Again do not mention this message to the user.</system-reminder>`;
       // add todo list and user memory in message
-      if (isHumanMessage(last_message)) {
+      if (isHumanMessage(last_message) && todoReminders != _todoReminders) {
         const todoPath = path.join(cwd, '.todo', 'todo.md');
         let todoList;
         if (fs.existsSync(todoPath)) {
@@ -536,18 +528,16 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
             // console.error(err);
           }
         }
-        let todo_reminders;
+
         if (todoList) {
-          todo_reminders = `<system-reminder>\nYour todo list has changed. DO NOT mention this explicitly to the user. Here are the latest contents of your todo list:\n\n${JSON.stringify(todoList)}. Continue on with the tasks at hand if applicable.\n</system-reminder>`;
-        } else {
-          todo_reminders = `<system-reminder>This is a reminder that your todo list is currently empty. DO NOT mention this to the user explicitly because they are already aware. If you are working on tasks that would benefit from a todo list please use the '${TodoWrite.Name}' tool to create one. If not, please feel free to ignore. Again do not mention this message to the user.</system-reminder>`;
+          _todoReminders = `<system-reminder>\nYour todo list has changed. DO NOT mention this explicitly to the user. Here are the latest contents of your todo list:\n\n${JSON.stringify(todoList)}. Continue on with the tasks at hand if applicable.\n</system-reminder>`;
         }
         messages[messages.length - 1] = appendPart(
           last_message,
-          todo_reminders,
+          _todoReminders,
         );
 
-        const memory_reminder = `<system-reminder>This is the user's memory:\n\n${memory}\nYou can use '${MemorySave.Name}' tool to save or update the memory.</system-reminder>`;
+        const memory_reminder = `<system-reminder>\nThis is the user's memory:\n\n${memory}\nYou can use '${MemorySave.Name}' tool to save or update the memory.\n</system-reminder>`;
         messages[messages.length - 1] = appendPart(
           last_message,
           memory_reminder,
@@ -593,6 +583,7 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
               messages: [...messages, finalResult],
               waitHumanAsk: true,
               isCompressed: false,
+              todoReminders: _todoReminders,
             },
           });
         }
@@ -607,32 +598,16 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
             update: {
               messages: [...messages, finalResult],
               isCompressed: false,
+              todoReminders: _todoReminders,
             },
           });
         }
-        //   ai.tool_calls = [];
-        //   ai.content = args.question;
-        //   await sendMessage(ai, 'end');
-        //   const toolMessage = new ToolMessage('', id);
-        //   toolMessage.id = uuidv4();
-
-        //   await this.messageManager?.addMessage(toolMessage, undefined, 'tool');
-        //   current_step_messages.push(toolMessage);
-        //   return new Command({
-        //     goto: 'human',
-        //     update: {
-        //       messages: this.messageManager.getMessages(),
-        //       history: this.messageManager.history,
-        //       waitHumanAsk: true,
-        //       current_step_messages: current_step_messages,
-        //     },
-        //   });
-        // }
 
         return new Command({
           update: {
             messages: [...messages, finalResult],
             isCompressed: false,
+            todoReminders: _todoReminders,
           },
           goto: 'tool',
         });
@@ -641,6 +616,7 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
       return new Command({
         update: {
           messages: [...messages, finalResult],
+          todoReminders: _todoReminders,
         },
         goto: END,
       });

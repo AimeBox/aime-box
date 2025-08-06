@@ -160,6 +160,9 @@ export function Markdown(props: MarkdownProps) {
         )}
         dangerouslySetInnerHTML={{ __html: renderedContent }}
         key={renderedContent}
+        style={{
+          wordBreak: 'break-all',
+        }}
       />
       {files && files.length > 0 && (
         <div className="flex flex-wrap gap-2 p-1">

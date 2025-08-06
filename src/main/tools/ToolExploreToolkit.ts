@@ -14,15 +14,15 @@ export interface AutoToolParameters extends ToolParams {
 }
 
 export class SearchTool extends BaseTool {
-  toolKitName: string = 'auto_tool_toolkit';
+  static readonly Name: string = 'search_tool';
 
-  name: string = 'search';
+  toolKitName: string = 'tool_explore_toolkit';
+
+  name: string = 'search_tool';
 
   description: string = 'Search tool';
 
-  schema = z.object({
-    task: z.string(),
-  });
+  schema = z.object({});
 
   model: string;
 
@@ -36,8 +36,6 @@ export class SearchTool extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     config?: ToolRunnableConfig,
   ): Promise<any> {
-    const { provider, modelName } = getProviderModel(this.model);
-    const llm = await getChatModel(provider, modelName, { temperature: 0 });
     const alltools = [];
     for (const tool of toolsManager.tools) {
       if (tool.is_toolkit) {
@@ -52,6 +50,11 @@ export class SearchTool extends BaseTool {
     const tools = alltools.map((x) => {
       return `Tool Name: ${x.name}\n Tool Description: ${x.description}\n Tool Schema: ${JSON.stringify(x.schema)}\n`;
     });
+
+    return tools.map((x) => `<Tool>\n${x}\n</Tool>`).join('\n');
+
+    const { provider, modelName } = getProviderModel(this.model);
+    const llm = await getChatModel(provider, modelName, { temperature: 0 });
     const hum = `TASK: ${arg.task}\n\n---TOOL LIST---\n${tools.join('\n----\n')}\n---TOOL LIST---\n`;
     const msg = [
       new SystemMessage(
@@ -93,9 +96,11 @@ Do not output the tool arguments, just the tool name and reason.`,
 }
 
 export class ExtractTool extends BaseTool {
-  toolKitName: string = 'auto_tool_toolkit';
+  static readonly Name: string = 'extract_tool';
 
-  name: string = 'extract';
+  toolKitName: string = 'tool_explore_toolkit';
+
+  name: string = 'extract_tool';
 
   description: string = 'Extract tool';
 
@@ -105,16 +110,23 @@ export class ExtractTool extends BaseTool {
   });
 
   async _call(
-    arg: any,
+    arg: z.infer<typeof this.schema>,
     runManager?: CallbackManagerForToolRun,
     config?: ToolRunnableConfig,
   ): Promise<any> {
-    throw new Error('Method not implemented.');
+    const { toolName, toolArgs } = arg;
+    const toolInfo = await toolsManager.tools.find((x) => x.name === toolName);
+    if (!toolInfo) {
+      return 'Tool not found';
+    }
+    const tool = await toolsManager.buildTool(toolInfo);
+    const res = await tool.invoke(arg.toolArgs, config);
+    return res;
   }
 }
 
-export class AutoToolToolkit extends BaseToolKit {
-  name: string = 'auto_tool_toolkit';
+export class ToolExploreToolkit extends BaseToolKit {
+  name: string = 'tool_explore_toolkit';
 
   configSchema: FormSchema[] = [
     {

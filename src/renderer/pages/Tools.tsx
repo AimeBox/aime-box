@@ -362,10 +362,20 @@ export default function Tools() {
             component: 'JsonEditor',
           } as FormSchema);
         }
+      } else if (Object.entries(tool.schema.properties[x]).length == 0) {
+        c.push({
+          field: x,
+          label: x,
+          required: required.includes(x),
+          subLabel: tool.schema.properties[x].description,
+          component: 'JsonEditor',
+        } as FormSchema);
       } else if (
         !tool.schema.properties[x].type &&
         tool.schema.properties[x].anyOf
       ) {
+      } else {
+        console.log('无法显示', tool.schema.properties[x]);
       }
 
       // c.properties[x] = {

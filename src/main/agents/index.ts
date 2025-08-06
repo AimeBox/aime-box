@@ -273,9 +273,12 @@ export class AgentManager extends BaseManager {
           25,
           {},
         );
-
-        await this.agentRepository.save(ts);
+      } else {
+        ts.name = agent.name;
+        ts.description = agent.description;
       }
+      await this.agentRepository.save(ts);
+
       this.agents = this.agents.filter((x) => x.info.name != agent.name);
       const config = await agent.getConfig();
 

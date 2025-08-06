@@ -45,11 +45,7 @@ export default function EditView(props: EditViewProps) {
           {content.status == 'error' && (
             <Alert message={content.text} type="error" showIcon />
           )}
-          {content.status == 'success' && (
-            <pre>
-              <Markdown value={content.text} />
-            </pre>
-          )}
+          {content.status == 'success' && <Markdown value={content.text} />}
         </div>
       </div>
     </div>

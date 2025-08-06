@@ -646,15 +646,17 @@ const ChatMessageBox = React.forwardRef(
                             ></Button>
                           </>
                         )}
-                        <Tooltip title="断开上下文">
-                          <Button
-                            type="text"
-                            icon={<FaXmarksLines />}
-                            onClick={() => {
-                              onSetDivider?.(true);
-                            }}
-                          ></Button>
-                        </Tooltip>
+                        {editEnabled && (
+                          <Tooltip title="断开上下文">
+                            <Button
+                              type="text"
+                              icon={<FaXmarksLines />}
+                              onClick={() => {
+                                onSetDivider?.(true);
+                              }}
+                            ></Button>
+                          </Tooltip>
+                        )}
                         {value?.additional_kwargs?.history && (
                           <Button
                             type="text"
@@ -662,11 +664,13 @@ const ChatMessageBox = React.forwardRef(
                             onClick={() => openHistory()}
                           ></Button>
                         )}
-                        <Button
-                          type="text"
-                          icon={<FaTrashAlt></FaTrashAlt>}
-                          onClick={onDelete}
-                        ></Button>
+                        {editEnabled && (
+                          <Button
+                            type="text"
+                            icon={<FaTrashAlt></FaTrashAlt>}
+                            onClick={onDelete}
+                          ></Button>
+                        )}
                       </div>
 
                       {value.role == 'assistant' && (

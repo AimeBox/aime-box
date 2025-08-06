@@ -16,7 +16,7 @@ import {
   ChatPromptTemplate,
   SystemMessagePromptTemplate,
 } from '@langchain/core/prompts';
-import { isArray, isString } from './is';
+import { isArray, isObject, isString } from './is';
 
 const SystemPrompt: string = `You are a specialized summarization assistant. Your task is to create a concise but comprehensive summary of the conversation history.
 
@@ -183,8 +183,40 @@ const removeThinkTags = (text: string): string => {
   return text.replaceAll(/<think>([\s\S]*?)<\/think>/g, '');
 };
 
+const prependPart = (messages: BaseMessage, part: any) => {
+  const user_input = isString(messages.content)
+    ? [{ type: 'text', text: messages.content }]
+    : [...messages.content];
+  let part_content = part;
+  if (isString(part_content)) {
+    part_content = [{ type: 'text', text: part }];
+  } else if (isObject(part_content)) {
+    part_content = [part];
+  }
+  messages.content = [...part_content, ...user_input];
+
+  return messages;
+};
+
+const appendPart = (messages: BaseMessage, part: any) => {
+  const user_input = isString(messages.content)
+    ? [{ type: 'text', text: messages.content }]
+    : [...messages.content];
+  let part_content = part;
+  if (isString(part_content)) {
+    part_content = [{ type: 'text', text: part }];
+  } else if (isObject(part_content)) {
+    part_content = [part];
+  }
+
+  messages.content = [...user_input, ...part_content];
+  return messages;
+};
+
 export {
   checkAndSummarize,
   convertMessagesForNonFunctionCallingModels,
   removeThinkTags,
+  prependPart,
+  appendPart,
 };

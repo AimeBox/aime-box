@@ -122,6 +122,9 @@ export class Chat {
 
   @Column({ nullable: true })
   agent?: string;
+
+  @Column({ nullable: true, default: true })
+  message_edit_enable?: boolean = true;
 }
 
 @Entity('chat_message')

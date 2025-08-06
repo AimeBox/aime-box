@@ -102,7 +102,7 @@ import { ElevenLabsToolkit } from './ElevenLabsToolkit';
 import { Think } from './ThinkTool';
 import { BilibiliToolkit } from './social-media/BilibiliToolkit';
 import { KnowledgeBaseToolkit } from './KnowledgeBaseToolkit';
-import { AutoToolToolkit } from './AutoToolkit';
+import { ToolExploreToolkit } from './ToolExploreToolkit';
 import { BashTool } from './BashTool';
 import { TodoToolkit } from './TodoToolkit';
 
@@ -615,7 +615,7 @@ export class ToolsManager extends BaseManager {
     await this.registerTool(BilibiliToolkit);
     await this.registerTool(MinimaxToolkit);
     await this.registerTool(ElevenLabsToolkit);
-    await this.registerTool(AutoToolToolkit);
+    await this.registerTool(ToolExploreToolkit);
     await this.registerTool(Think);
 
     await this.registerTool(TodoToolkit);

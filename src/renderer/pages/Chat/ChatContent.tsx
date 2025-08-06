@@ -64,6 +64,7 @@ import { ChatInfo } from '@/main/chat';
 import FileDropZone from '@/renderer/components/common/FileDropZone';
 import ChatToolView from '@/renderer/components/chat/ChatToolView';
 import ChatHistoryDrawer from './ChatHistoryDrawer';
+import { formatNumber } from '@/main/utils/format';
 
 export interface ChatContentProps {
   chatId?: string;
@@ -474,22 +475,15 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                               {chatId}
                             </Button>
                             <span>
-                              token:{' '}
-                              {currentChat.totalToken > 1000000
-                                ? `${(currentChat.totalToken / 1000000).toFixed(2)}M`
-                                : currentChat.totalToken}
+                              token: {formatNumber(currentChat.totalToken)}
                             </span>
                             <span className="flex flex-row items-center">
                               <FaAngleUp />{' '}
-                              {currentChat.inputToken > 1000000
-                                ? `${(currentChat.inputToken / 1000000).toFixed(2)}M`
-                                : currentChat.inputToken}
+                              {formatNumber(currentChat.inputToken)}
                             </span>
                             <span className="flex flex-row items-center">
                               <FaAngleDown />{' '}
-                              {currentChat.outputToken > 1000000
-                                ? `${(currentChat.outputToken / 1000000).toFixed(2)}M`
-                                : currentChat.outputToken}
+                              {formatNumber(currentChat.outputToken)}
                             </span>
                           </small>
                         </div>
@@ -552,7 +546,9 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                           <div className="flex flex-col py-8 w-full h-full">
                             <div className="pb-10">
                               {currentChat?.chatMessages
-                                ?.filter((x) => x.role != 'tool')
+                                ?.filter(
+                                  (x) => x.role != 'tool' && !x.is_hidden,
+                                )
                                 .map((chatMessage: ChatMessage) => {
                                   const toolMessages =
                                     chatMessage?.tool_calls?.length == 0
@@ -574,6 +570,9 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                     <ChatMessageBox
                                       key={chatMessage.id}
                                       toolMessages={toolMessages}
+                                      editEnabled={
+                                        currentChat.message_edit_enable
+                                      }
                                       // onRedo={() => onRedo(chatMessage)}
                                       onToolClick={(
                                         toolCall,

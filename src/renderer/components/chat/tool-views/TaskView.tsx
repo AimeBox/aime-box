@@ -41,9 +41,7 @@ export default function TaskView(props: TaskViewProps) {
             <span className="text-gray-500">{toolCall.args.description}</span>
           </div>
 
-          <pre className="whitespace-pre-wrap break-all w-full">
-            {toolCall.args.prompt}
-          </pre>
+          <Markdown value={toolCall.args.prompt} />
         </div>
         <Divider />
 
@@ -61,8 +59,8 @@ export default function TaskView(props: TaskViewProps) {
                   }}
                 ></Button>
               </div>
-              <div className="whitespace-pre-wrap break-all w-full">
-                {item['kwargs'].content}
+              <div className="w-full">
+                <Markdown value={item['kwargs'].content} />
               </div>
 
               {item['kwargs'].tool_calls &&

@@ -311,11 +311,11 @@ export class ChatManager {
   }
 
   public async createChat(model: string, mode: ChatMode, agentName?: string) {
-    let _agentName = agentName;
-    if (mode == 'planner') {
-      _agentName = 'aime-manus';
+    const data = new Chat(uuidv4(), 'New Chat', model, mode, agentName);
+    const agent = await agentManager.getAgent(agentName);
+    if (agent) {
+      data.message_edit_enable = !agent.fixedThreadId;
     }
-    const data = new Chat(uuidv4(), 'New Chat', model, mode, _agentName);
     const res = await this.chatRepository.save(data);
     return res;
   }
@@ -402,7 +402,16 @@ export class ChatManager {
       where: { id: chatId },
       relations: { chatMessages: true, chatFiles: true },
     });
-    res.chatMessages = res.chatMessages?.filter((x) => x.is_hidden !== true);
+
+    const totalToken = res.chatMessages
+      .map((x) => x.total_tokens)
+      .reduce((acc, curr) => acc + curr, 0);
+    const inputToken = res.chatMessages
+      .map((x) => x.input_tokens)
+      .reduce((acc, curr) => acc + curr, 0);
+    const outputToken = res.chatMessages
+      .map((x) => x.output_tokens)
+      .reduce((acc, curr) => acc + curr, 0);
 
     if (res.chatMessages.length > 50) {
       res.chatMessages = res.chatMessages.slice(-50);
@@ -411,15 +420,9 @@ export class ChatManager {
     const output = {
       ...res,
       status: this.runningTasks.has(chatId) ? 'running' : 'idle',
-      totalToken: res.chatMessages
-        .map((x) => x.total_tokens)
-        .reduce((acc, curr) => acc + curr, 0),
-      inputToken: res.chatMessages
-        .map((x) => x.input_tokens)
-        .reduce((acc, curr) => acc + curr, 0),
-      outputToken: res.chatMessages
-        .map((x) => x.output_tokens)
-        .reduce((acc, curr) => acc + curr, 0),
+      totalToken: totalToken,
+      inputToken: inputToken,
+      outputToken: outputToken,
     };
     return output;
   }
@@ -517,13 +520,8 @@ export class ChatManager {
 
       for (let index = 0; index < chatMessages.length; index++) {
         const chatMessage = chatMessages[index];
-        if (
-          chatMessage.status == ChatStatus.SUCCESS ||
-          chatMessage.role == 'tool'
-        ) {
-          const message = this.toLangchainMessage([chatMessage]);
-          messages.push(...message);
-        }
+        const message = this.toLangchainMessage([chatMessage]);
+        messages.push(...message);
 
         if (chatMessage.divider) {
           messages = [];
@@ -798,6 +796,8 @@ export class ChatManager {
               chatId,
             },
           });
+
+          event(`chat:changed:${chatId}`, chat);
         } else if (agent.type == 'anp' || agent.type == 'a2a') {
           await this.chatRemoteAgent(agent, messages, {
             providerModel: chat.model,
