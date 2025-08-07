@@ -91,6 +91,7 @@
     "react-router-dom": "^7.3.0"
   },
   "devDependencies": {
+    "@ai-sdk/openai": "^2.0.4",
     "@ant-design/icons": "^5.6.1",
     "@anthropic-ai/sdk": "^0.36.3",
     "@asteasolutions/zod-to-openapi": "^7.3.0",
@@ -106,7 +107,7 @@
     "@lancedb/lancedb": "^0.12.0",
     "@langchain/anthropic": "^0.3.13",
     "@langchain/baidu-qianfan": "^0.1.0",
-    "@langchain/community": "^0.3.42",
+    "@langchain/community": "^0.3.45",
     "@langchain/core": "^0.3.55",
     "@langchain/deepseek": "^0.0.1",
     "@langchain/google-genai": "^0.2.13",
@@ -154,11 +155,12 @@
     "@typescript-eslint/parser": "^8.26.1",
     "@uiw/react-md-editor": "^4.0.5",
     "a2a-js": "^0.2.0",
+    "ai": "^5.0.5",
     "antd": "^5.24.0",
     "apache-arrow": "^17.0.0",
     "autoprefixer": "^10.4.20",
     "better-sqlite3": "^11.10.0",
-    "browser-use-js": "^1.0.8",
+    "browser-use-js": "^1.0.9",
     "browserslist-config-erb": "^0.0.3",
     "chalk": "^4.1.2",
     "chart.js": "^3.5.1",
@@ -242,11 +244,8 @@
     "react-icons": "^5.4.0",
     "react-infinite-scroll-component": "^6.1.0",
     "react-json-pretty": "^2.2.0",
-    "react-pdf": "^9.2.1",
-    "react-pdf-selection": "^0.6.20",
     "react-redux": "^9.2.0",
     "react-refresh": "^0.16.0",
-    "react-router-dom": "^6.16.0",
     "react-test-renderer": "^19.0.0",
     "rehype-code-titles": "^1.2.0",
     "rehype-format": "^5.0.1",
@@ -294,6 +293,7 @@
     "yahoo-finance": "^0.3.8",
     "yaml": "^2.8.0",
     "zhipuai-sdk-nodejs-v4": "^0.1.12",
+    "zod": "^3.25.76",
     "zod-to-json-schema": "^3.24.3"
   },
   "build": {
@@ -309,7 +309,8 @@
       "**/node_modules/sherpa-onnx-node/**/*",
       "**/node_modules/playwright/**/*",
       "**/node_modules/pdfjs-dist/**/*",
-      "**/node_modules/canvas/**/*"
+      "**/node_modules/canvas/**/*",
+      "**/node_modules/@browserbasehq/stagehand/**/*"
     ],
     "files": [
       "dist",

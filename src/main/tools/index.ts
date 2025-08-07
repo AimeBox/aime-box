@@ -105,6 +105,7 @@ import { KnowledgeBaseToolkit } from './KnowledgeBaseToolkit';
 import { ToolExploreToolkit } from './ToolExploreToolkit';
 import { BashTool } from './BashTool';
 import { TodoToolkit } from './TodoToolkit';
+import { BrowserToolkit } from './BrowserToolkit';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -567,6 +568,7 @@ export class ToolsManager extends BaseManager {
       await this.registerTool(NodejsVM);
     }
     await this.registerTool(BrowserUseTool);
+    await this.registerTool(BrowserToolkit);
     await this.registerTool(TerminalTool);
 
     await this.registerTool(BashTool);

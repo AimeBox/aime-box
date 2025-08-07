@@ -22,7 +22,8 @@ export class InstanceManager extends BaseManager {
 
   instanceInfos: Map<string, InstanceInfo> = new Map();
 
-  instances: Map<string, BaseInstance> = new Map();
+  instances: Map<string, { instance: BaseInstance; isRunWithLLM: boolean }> =
+    new Map();
 
   DEFAULT_BROWSER_INSTANCE_ID = 'default_browser';
 
@@ -109,27 +110,33 @@ export class InstanceManager extends BaseManager {
   public async delete(id: string) {
     let instance = this.instances.get(id);
     if (instance) {
-      await instance.stop();
+      await instance.instance.stop();
     } else {
       const _instance = await this.repository.findOneBy({ id: id });
-      instance = new BrowserInstance({ instances: _instance });
+      instance = {
+        instance: new BrowserInstance({ instances: _instance }),
+        isRunWithLLM: false,
+      };
     }
     this.instances.delete(id);
-    await instance.clear();
+    await instance?.instance?.clear();
 
     await this.repository.delete(id);
     this.instanceInfos.delete(id);
   }
 
   @channel('instances:run')
-  public async run(id: string): Promise<void> {
+  public async run(id: string, model?: string): Promise<void> {
     const instance = await this.repository.findOneBy({ id: id });
     if (instance.type === 'browser') {
       try {
         const browserInstance = new BrowserInstance({ instances: instance });
-        const browserContext = await browserInstance.run();
+        const browserContext = await browserInstance.run(model);
         this.instanceInfos.set(id, { ...instance, status: 'running' });
-        this.instances.set(id, browserInstance);
+        this.instances.set(id, {
+          instance: browserInstance,
+          isRunWithLLM: browserInstance.runWithLLM,
+        });
         browserInstance.on('close', () => {
           this.instanceInfos.set(id, { ...instance, status: 'stop' });
           this.instances.delete(id);
@@ -144,13 +151,13 @@ export class InstanceManager extends BaseManager {
   @channel('instances:stop')
   public async stop(id: string) {
     const instance = this.instances.get(id);
-    await instance?.stop();
+    await instance?.instance?.stop();
   }
 
-  public async getInstance(id: string) {
+  public async getInstance(id: string, model?: string) {
     let instance = this.instances.get(id);
     if (!instance) {
-      await this.run(id);
+      await this.run(id, model);
       instance = this.instances.get(id);
       if (!instance) {
         throw new Error('instance start failed');
@@ -159,10 +166,13 @@ export class InstanceManager extends BaseManager {
     return instance;
   }
 
-  public async getBrowserInstance(id?: string): Promise<BrowserInstance> {
-    return (await this.getInstance(
-      id || this.DEFAULT_BROWSER_INSTANCE_ID,
-    )) as BrowserInstance;
+  public async getBrowserInstance(
+    id?: string,
+    model?: string,
+  ): Promise<BrowserInstance> {
+    return (
+      await this.getInstance(id || this.DEFAULT_BROWSER_INSTANCE_ID, model)
+    ).instance as BrowserInstance;
   }
 }
 

@@ -312,10 +312,14 @@ export class ChatManager {
 
   public async createChat(model: string, mode: ChatMode, agentName?: string) {
     const data = new Chat(uuidv4(), 'New Chat', model, mode, agentName);
-    const agent = await agentManager.getAgent(agentName);
-    if (agent) {
-      data.message_edit_enable = !agent.fixedThreadId;
+
+    if (agentName) {
+      const agent = await agentManager.getAgent(agentName);
+      if (agent) {
+        data.message_edit_enable = !agent.fixedThreadId;
+      }
     }
+
     const res = await this.chatRepository.save(data);
     return res;
   }

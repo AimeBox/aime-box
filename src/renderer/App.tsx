@@ -12,7 +12,7 @@ import store from './store';
 import Home from './pages/Home';
 import Sidebar from './components/layout/Sidebar';
 import { ConfigProvider, notification, Progress } from 'antd';
-import { ThemeProvider, useTheme } from './components/theme/ThemeProvider';
+import { ThemeProvider } from './components/theme/ThemeProvider';
 import Providers from './pages/Providers';
 import i18n from '@/i18n';
 import Settings from './pages/Settings';
@@ -61,11 +61,11 @@ function TemplatePage(props: { children: ReactNode }) {
 }
 
 export default function App() {
-  const { theme, setTheme } = useTheme();
+  // const { theme, setTheme } = useTheme();
 
-  useEffect(() => {
-    console.log(theme);
-  }, [theme]);
+  // useEffect(() => {
+  //   console.log(theme);
+  // }, [theme]);
   return (
     <Provider store={store}>
       <ConfigProvider
