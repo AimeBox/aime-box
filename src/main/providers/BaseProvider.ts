@@ -46,7 +46,11 @@ export abstract class BaseProvider {
     return undefined;
   }
 
-  async transcriptions(modelName: string, filePath: string): Promise<string> {
+  async transcriptions(
+    modelName: string,
+    filePath: string,
+    config?: any,
+  ): Promise<string> {
     return undefined;
   }
 

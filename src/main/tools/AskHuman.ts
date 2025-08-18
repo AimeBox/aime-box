@@ -10,11 +10,13 @@ import { BaseTool } from './BaseTool';
 import type { ComponentType } from '@/types';
 
 export class AskHuman extends BaseTool {
+  static readonly Name: string = 'ask-human';
+
   schema = z.object({
     question: z.string().describe('Ask human questions'),
     form_items: z
       .array(
-        z.object({
+        z.strictObject({
           component: z.enum([
             'Input',
             'InputTextArea',
@@ -22,14 +24,20 @@ export class AskHuman extends BaseTool {
             'Switch',
             'DatePicker',
           ]),
-          componentProps: z.any().optional(),
+          componentProps: z
+            .any()
+            .optional()
+            .describe(
+              'Component Props: (eg. {options: [{label:string,value:string},...],mode: "multiple" | "tags" | undefined})',
+            ),
           field: z.string(),
           label: z.string(),
+          subLabel: z.string().optional(),
           defaultValue: z.string().optional(),
           required: z.boolean().default(false),
         }),
       )
-      .optional(),
+      .min(1),
   });
 
   name = 'ask-human';
@@ -39,7 +47,7 @@ export class AskHuman extends BaseTool {
     'componentProps: ',
     '- if `Input` : null',
     '- if `InputTextArea` : null',
-    '- if `Select` : {options:[{label:string,value:string},...],mode: "multiple" | "tags" | undefined}',
+    '- if `Select` : { options:[{label:string,value:string},...],mode: "multiple" | "tags" | undefined}',
     '- if `Switch` : null',
     '- if `File` : null',
     '- if `DatePicker` : null',

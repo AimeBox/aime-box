@@ -20,6 +20,7 @@ import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { BaseTool } from './BaseTool';
 import { instanceManager } from '../instances';
 import { FormSchema } from '@/types/form';
+import { convert } from 'html-to-text';
 
 export interface WebLoaderParameters extends ToolParams {
   // headless: boolean;
@@ -27,6 +28,8 @@ export interface WebLoaderParameters extends ToolParams {
 }
 
 export class WebLoader extends BaseTool {
+  static readonly Name = 'web_loader';
+
   schema = z.object({ url: z.string() });
 
   name: string = 'web_loader';
@@ -69,8 +72,6 @@ export class WebLoader extends BaseTool {
         return await response.text();
       }
 
-      const userDataDir = path.join(getDataPath(), 'User Data');
-      let html = null;
       //try {
       const browser_context = await instanceManager.getBrowserInstance();
       const page = await browser_context.browser_context.newPage();
@@ -94,6 +95,16 @@ export class WebLoader extends BaseTool {
       //   path: pdfPath,
       //   printBackground: false,
       // });
+
+      const html = await page.content();
+
+      const html_text = convert(html, {
+        wordwrap: false,
+        selectors: [
+          { selector: 'a', options: { ignoreHref: true } },
+          { selector: 'img', format: 'skip' },
+        ],
+      });
 
       const pdfBuffer = await page.pdf({
         displayHeaderFooter: false,

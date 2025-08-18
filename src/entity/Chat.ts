@@ -39,6 +39,10 @@ export class ChatOptions {
   streaming?: boolean = true;
 
   format?: string;
+
+  thinking?: boolean = false;
+
+  maxRetries?: number = undefined;
 }
 
 export interface IChatPlannerPlanStep {
@@ -114,9 +118,6 @@ export class Chat {
   @OneToMany((type) => ChatFile, (chatFile) => chatFile.chat) // note: we will create author property in the Photo class below
   chatFiles?: ChatFile[];
 
-  @OneToOne((type) => ChatPlanner, (chatPlanner) => chatPlanner.chat) // note: we will create author property in the Photo class below
-  chatPlanner?: IChatPlanner;
-
   @Column('json', { nullable: true })
   options?: any;
 
@@ -125,6 +126,15 @@ export class Chat {
 
   @Column({ nullable: true })
   agent?: string;
+
+  @Column({ nullable: true, default: true })
+  message_edit_enable?: boolean = true;
+
+  @Column({ nullable: true, default: false })
+  pinned?: boolean = false;
+
+  @Column({ nullable: true })
+  workspace?: string;
 }
 
 @Entity('chat_message')
@@ -239,6 +249,12 @@ export class ChatMessage {
   @Column({ nullable: true })
   name?: string;
 
+  @Column({ nullable: true })
+  is_hidden?: boolean = false;
+
+  @Column({ nullable: true })
+  is_llm_message?: boolean = false;
+
   public setUsage(usage_metadata: {
     total_tokens?: number;
     input_tokens?: number;
@@ -280,32 +296,4 @@ export class ChatFile {
 
   @Column('json', { nullable: true })
   additional_kwargs?: any;
-}
-
-@Entity('chat_planner')
-export class ChatPlanner implements IChatPlanner {
-  constructor(id?: string, chatId?: string) {
-    this.id = id || uuidv4();
-    this.chatId = chatId;
-  }
-
-  @PrimaryColumn()
-  id!: string;
-
-  @Column({ nullable: false })
-  chatId!: string;
-
-  @OneToOne(() => Chat, (chat) => chat.chatPlanner, {
-    nullable: false,
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
-  } as RelationOptions)
-  @JoinColumn()
-  chat!: Chat;
-
-  @Column({ nullable: true, type: 'json' })
-  plans?: any;
-
-  @Column({ nullable: true })
-  task?: string;
 }

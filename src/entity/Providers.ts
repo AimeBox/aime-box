@@ -12,6 +12,7 @@ export enum ProviderType {
   OPENROUTER = 'openrouter',
   SILICONFLOW = 'siliconflow',
   DEEPSEEK = 'deepseek',
+  BIGMODEL = 'bigmodel',
   BAIDU = 'baidu',
   LMSTUDIO = 'lmstudio',
   AZURE_OPENAI = 'azure_openai',
@@ -20,6 +21,7 @@ export enum ProviderType {
   REPLICATE = 'replicate',
   ELEVENLABS = 'elevenlabs',
   MOONSHOT = 'moonshot',
+  MODELSCOPE = 'modelscope',
 }
 
 @Entity('providers')

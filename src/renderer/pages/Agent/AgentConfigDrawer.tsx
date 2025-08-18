@@ -17,7 +17,7 @@ import {
   Tag,
 } from 'antd';
 import { t } from 'i18next';
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FaBook, FaTools, FaTrash, FaTrashAlt } from 'react-icons/fa';
 import { GlobalContext } from '@/renderer/context/GlobalContext';
 import BasicForm from '@/renderer/components/form/BasicForm';

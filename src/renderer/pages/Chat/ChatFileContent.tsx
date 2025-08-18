@@ -27,9 +27,9 @@ import { FaGear } from 'react-icons/fa6';
 // import { Editor, EditorRef } from '@/renderer/components/common/Editor';
 import { useEffect, useRef, useState } from 'react';
 import { t } from 'i18next';
-import DocumentView, {
-  DocumentViewRef,
-} from '@/renderer/components/common/DocumentView';
+// import DocumentView, {
+//   DocumentViewRef,
+// } from '@/renderer/components/common/DocumentView';
 import { isUrl } from '@/main/utils/is';
 import Link from 'antd/es/typography/Link';
 import { useLocation } from 'react-router-dom';
@@ -57,7 +57,7 @@ export default function ChatFileContent() {
   const [currentFileUrl, setCurrentFileUrl] = useState<string | undefined>(
     undefined,
   );
-  const documentRef = useRef<DocumentViewRef>(null);
+  // const documentRef = useRef<DocumentViewRef>(null);
 
   // const editorRef = useRef<EditorRef>(null);
   const onDelete = async (chatMessage: ChatMessage) => {};
@@ -200,12 +200,13 @@ export default function ChatFileContent() {
     <Splitter className="flex flex-row h-full">
       <Splitter.Panel min={360}>
         {currentFile && currentFile.file?.ext == '.pdf' && (
-          <DocumentView
-            ref={documentRef}
-            files={files.map((file) => file.file)}
-            className="flex justify-center items-center w-full h-full"
-            onLoadSuccess={onFileLoaded}
-          />
+          // <DocumentView
+          //   ref={documentRef}
+          //   files={files.map((file) => file.file)}
+          //   className="flex justify-center items-center w-full h-full"
+          //   onLoadSuccess={onFileLoaded}
+          // />
+          <></>
         )}
         {currentFile &&
           (currentFile.file?.ext == '.mp4' ||

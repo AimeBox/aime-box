@@ -30,6 +30,8 @@ export interface WebSearchToolParameters extends ToolParams {
 }
 
 export class WebSearchTool extends BaseTool {
+  static readonly Name = 'web_search';
+
   schema = z.object({
     query: z.string().describe('The query to search the web for.'),
   });

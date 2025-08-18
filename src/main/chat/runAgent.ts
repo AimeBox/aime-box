@@ -15,8 +15,9 @@ import {
 } from '@langchain/langgraph';
 import { v4 as uuidv4 } from 'uuid';
 import { notificationManager } from '../app/NotificationManager';
-import { isArray } from '../utils/is';
+import { isArray, isString } from '../utils/is';
 import { EventEmitter } from 'events';
+import { removeThinkTags } from '../utils/messages';
 
 export const runAgent = async (
   agent: any,
@@ -65,7 +66,7 @@ export const runAgent = async (
       x.content = x.content.filter((x) => x.type != 'folder');
     }
 
-    if (isHumanMessage(x)) {
+    if (isHumanMessage(x) || isAIMessage(x)) {
       if (isArray(x.content)) {
         if (x.content.length == 1 && (x.content[0] as any)?.type == 'text') {
           x.content = (x.content[0] as any)?.text;
@@ -76,6 +77,18 @@ export const runAgent = async (
         ) {
           x.content = (x.content as any[]).map((x) => x.text).join('\n');
         }
+      }
+    }
+
+    if (isAIMessage(x)) {
+      if (isArray(x.content)) {
+        for (const item of x.content) {
+          if (item.type == 'text' && isString(item.text)) {
+            item.text = removeThinkTags(item.text);
+          }
+        }
+      } else if (isString(x.content)) {
+        x.content = removeThinkTags(x.content);
       }
     }
   });
@@ -250,9 +263,9 @@ export const runAgent = async (
           for (const msg of data.output.messages) {
             if (isToolMessage(msg)) {
               const _msg = _messages.find(
-                (x) => x?.tool_call_id == msg.tool_call_id,
+                (x) => x?.tool_call_id == msg.tool_call_id && isAIMessage(x),
               );
-              if (_msg && _msg.status === undefined) {
+              if (_msg && _msg.status === undefined && !msg.content) {
                 const tooStart = _toolStart.find(
                   (x) => x.tool_call_id == msg.tool_call_id,
                 );

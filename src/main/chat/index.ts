@@ -10,11 +10,10 @@ import {
 } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
 import { concat } from '@langchain/core/utils/stream';
-
 // import AppDataSource from '../../data-source';
 
 import { In, Like, Repository } from 'typeorm';
-import * as fs from 'node:fs/promises';
+import fs from 'fs';
 import ExcelJS, { config } from 'exceljs';
 import {
   BaseMessage,
@@ -35,7 +34,6 @@ import {
   ChatFile,
   ChatMessage,
   ChatOptions,
-  ChatPlanner,
   ChatStatus,
 } from '../../entity/Chat';
 import { Providers } from '../../entity/Providers';
@@ -74,7 +72,6 @@ import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { createSupervisor } from '@langchain/langgraph-supervisor';
 import { Agent } from '@/entity/Agent';
 import { AgentExecutor } from 'langchain/agents';
-import { writeFile } from 'node:fs/promises';
 import { runAgent } from './runAgent';
 import {
   Command,
@@ -89,6 +86,7 @@ import {
 } from '@langchain/langgraph';
 import { isArray, isString } from '../utils/is';
 import { LanggraphCheckPoints, LanggraphWrites } from '@/entity/CheckPoints';
+import { removeThinkTags } from '../utils/messages';
 // const repository = dbManager.dataSource.getRepository(Chat);
 
 export interface ChatInfo extends Chat {
@@ -106,8 +104,6 @@ export class ChatManager {
 
   chatFileRepository: Repository<ChatFile>;
 
-  chatPlannerRepository: Repository<ChatPlanner>;
-
   chatMessageRepository: Repository<ChatMessage>;
 
   providersRepository: Repository<Providers>;
@@ -117,8 +113,6 @@ export class ChatManager {
   constructor() {
     this.chatRepository = dbManager.dataSource.getRepository(Chat);
     this.chatFileRepository = dbManager.dataSource.getRepository(ChatFile);
-    this.chatPlannerRepository =
-      dbManager.dataSource.getRepository(ChatPlanner);
     this.chatMessageRepository =
       dbManager.dataSource.getRepository(ChatMessage);
     this.providersRepository = dbManager.dataSource.getRepository(Providers);
@@ -144,7 +138,7 @@ export class ChatManager {
         mode: ChatMode,
         providerModel?: string,
         agentName?: string,
-      ) => await this.createChat(providerModel, mode, agentName),
+      ) => await this.createChat(event, providerModel, mode, agentName),
     );
     ipcMain.handle(
       'chat:update',
@@ -156,6 +150,9 @@ export class ChatManager {
         options?: ChatOptions,
       ) => this.updateChat(event, chatId, title, model, options),
     );
+    ipcMain.handle('chat:change-workspace', (event, chatId: string) =>
+      this.changeChatWorkspace(event, chatId),
+    );
     ipcMain.handle('chat:delete', (event, chatId: string) =>
       this.deleteChat(event, chatId),
     );
@@ -163,12 +160,19 @@ export class ChatManager {
       'chat:chat-resquest',
       async (
         event,
-        input: { chatId: string; content: string; extend: any; config: any },
+        input: {
+          chatId: string;
+          content: string;
+          extend: any;
+          config: any;
+          is_hidden_message?: boolean;
+        },
       ) => {
         const res = await this.chatResquest(
           input.chatId,
           input.content,
           input.extend,
+          input.is_hidden_message,
           (key, value) => {
             event.sender.send(key, value);
           },
@@ -204,9 +208,14 @@ export class ChatManager {
     ipcMain.handle('chat:openWorkspace', async (event, chatId: string) =>
       this.openWorkspace(chatId),
     );
-    ipcMain.on(
+    ipcMain.handle(
       'chat:update-chatmessage',
-      async (event, chatMessageId: string, content: string) => {
+      async (
+        event,
+        chatMessageId: string,
+        content: string,
+        additional_kwargs?: Record<string, any>,
+      ) => {
         const res = await this.chatMessageRepository.findOne({
           where: { id: chatMessageId },
         });
@@ -219,10 +228,11 @@ export class ChatManager {
           } else {
             res.content.unshfit({ type: 'text', text: content });
           }
+          if (additional_kwargs) res.additional_kwargs = additional_kwargs;
 
           await this.chatMessageRepository.save(res);
         }
-        event.returnValue = res;
+        return res;
       },
     );
     ipcMain.handle(
@@ -289,25 +299,40 @@ export class ChatManager {
     ipcMain.handle('chat:clear', (event, chatId: string) =>
       this.clearChat(chatId),
     );
-    ipcMain.on(
+    ipcMain.handle(
       'chat:split-multi-line',
       async (event, input: { msg: string }) => {
         try {
-          event.returnValue = await this.splitMultiLine(input.msg);
+          return await this.splitMultiLine(input.msg);
         } catch {
-          event.returnValue = undefined;
+          return undefined;
         }
       },
     );
   }
 
-  public async createChat(model: string, mode: ChatMode, agentName?: string) {
-    let _agentName = agentName;
-    if (mode == 'planner') {
-      _agentName = 'aime-manus';
+  public async createChat(
+    event: IpcMainInvokeEvent,
+    model: string,
+    mode: ChatMode,
+    agentName?: string,
+  ) {
+    const defaultLLM = await settingsManager.getSettings()?.defaultLLM;
+    if (!model) {
+      model = defaultLLM;
     }
-    const data = new Chat(uuidv4(), 'New Chat', model, mode, _agentName);
+
+    const data = new Chat(uuidv4(), 'New Chat', model, mode, agentName);
+
+    if (agentName) {
+      const agent = await agentManager.getAgent(agentName);
+      if (agent) {
+        data.message_edit_enable = !agent.fixedThreadId;
+      }
+    }
+
     const res = await this.chatRepository.save(data);
+    event.sender.send(`chat:list-changed`, { action: 'add', chat: res });
     return res;
   }
 
@@ -342,13 +367,9 @@ export class ChatManager {
   }
 
   public async deleteChat(event: IpcMainInvokeEvent, chatId: string) {
+    await this.clearChat(chatId);
     const res = await this.chatRepository.delete(chatId);
-    await dbManager.delete('langgraph_checkpoints', {
-      thread_id: chatId,
-    });
-    await dbManager.delete('langgraph_writes', {
-      thread_id: chatId,
-    });
+    event.sender.send(`chat:list-changed`, { action: 'delete', chatId });
     return res;
   }
 
@@ -396,27 +417,35 @@ export class ChatManager {
   public async getChat(chatId: string): Promise<ChatInfo> {
     const res = await this.chatRepository.findOne({
       where: { id: chatId },
-      relations: { chatMessages: true, chatFiles: true, chatPlanner: true },
+      relations: { chatMessages: true, chatFiles: true },
     });
+
+    const totalToken = res.chatMessages
+      .map((x) => x.total_tokens)
+      .reduce((acc, curr) => acc + curr, 0);
+    const inputToken = res.chatMessages
+      .map((x) => x.input_tokens)
+      .reduce((acc, curr) => acc + curr, 0);
+    const outputToken = res.chatMessages
+      .map((x) => x.output_tokens)
+      .reduce((acc, curr) => acc + curr, 0);
+
+    if (res.chatMessages.length > 50) {
+      res.chatMessages = res.chatMessages.slice(-50);
+    }
 
     const output = {
       ...res,
       status: this.runningTasks.has(chatId) ? 'running' : 'idle',
-      totalToken: res.chatMessages
-        .map((x) => x.total_tokens)
-        .reduce((acc, curr) => acc + curr, 0),
-      inputToken: res.chatMessages
-        .map((x) => x.input_tokens)
-        .reduce((acc, curr) => acc + curr, 0),
-      outputToken: res.chatMessages
-        .map((x) => x.output_tokens)
-        .reduce((acc, curr) => acc + curr, 0),
+      totalToken: totalToken,
+      inputToken: inputToken,
+      outputToken: outputToken,
     };
     return output;
   }
 
   public async autoGenerationTitle(chat: Chat, content: string) {
-    const prompt = `Create a concise, 3-5 word phrase as a header for the following query, strictly adhering to the 3-5 word limit and avoiding the use of the word 'title', don't think`;
+    const prompt = `Create a concise, 3-5 word phrase as a header for the following query, strictly adhering to the 3-5 word limit and avoiding the use of the word 'title'`;
     chat.options = undefined;
     const defaultTitleLLM = settingsManager.getSettings()?.defaultTitleLLM;
     if (defaultTitleLLM) {
@@ -424,15 +453,15 @@ export class ChatManager {
         const { provider, modelName } = getProviderModel(defaultTitleLLM);
         const llm = await getChatModel(provider, modelName, {
           temperature: 0,
-          maxTokens: 100,
         });
+
         const res = await llm.invoke([
           new SystemMessage({ content: prompt }),
           new HumanMessage({ content: content }),
         ]);
         let res_content: string | undefined = res?.content?.toString();
         if (res_content) {
-          res_content = res_content.replace(/<think>[\s\S]*?<\/think>\n\n/, '');
+          res_content = removeThinkTags(res_content);
         }
         return res_content?.trim().replace('\n', '');
       } catch (err) {
@@ -462,7 +491,7 @@ export class ChatManager {
             attachment.ext == '.png' ||
             attachment.ext == '.jpeg')
         ) {
-          const imageData = await fs.readFile(attachment.path);
+          const imageData = await fs.promises.readFile(attachment.path);
           res.content.push({
             type: 'image_url',
             image_url: {
@@ -494,6 +523,7 @@ export class ChatManager {
     chatId: string,
     content: string,
     extend: ChatInputExtend,
+    is_hidden_message?: boolean = false,
     event: Function,
   ) {
     const chat = await this.getChat(chatId);
@@ -507,13 +537,8 @@ export class ChatManager {
 
       for (let index = 0; index < chatMessages.length; index++) {
         const chatMessage = chatMessages[index];
-        if (
-          chatMessage.status == ChatStatus.SUCCESS ||
-          chatMessage.role == 'tool'
-        ) {
-          const message = this.toLangchainMessage([chatMessage]);
-          messages.push(...message);
-        }
+        const message = this.toLangchainMessage([chatMessage]);
+        messages.push(...message);
 
         if (chatMessage.divider) {
           messages = [];
@@ -549,6 +574,8 @@ export class ChatManager {
       input_content.content,
       ChatStatus.SUCCESS,
     );
+    insertData.is_hidden = is_hidden_message || false;
+    insertData.is_llm_message = true;
 
     await this.chatMessageRepository.save(insertData);
     let lastMesssageId = insertData.id;
@@ -655,11 +682,20 @@ export class ChatManager {
         event(`chat:message-changed:${chatId}`, msg);
       },
       handleMessageUpdate: async (message: BaseMessage) => {
-        event(`chat:message-changed:${chatId}`, {
-          chatId,
-          chatMessageId: message.id,
-          content: message.content,
+        const msg = await this.chatMessageRepository.findOne({
+          where: { id: message.id, chatId: chatId },
+          relations: { chat: true },
         });
+
+        if (!msg) return;
+        if (isString(message.content)) {
+          msg.content = [{ type: 'text', text: message.content }];
+        } else {
+          msg.content = message.content;
+        }
+        await this.chatMessageRepository.manager.save(msg);
+
+        event(`chat:message-changed:${chatId}`, msg);
       },
       handleMessageStream: async (message: AIMessage | ToolMessage) => {
         event(`chat:message-stream:${chatId}`, {
@@ -670,13 +706,19 @@ export class ChatManager {
       },
       handleMessageFinished: async (message: AIMessage | ToolMessage) => {
         const msg = await this.chatMessageRepository.findOne({
-          where: { id: message.id },
+          where: { id: message.id, chatId: chatId },
           relations: { chat: true },
         });
+
+        if (!msg) return;
 
         if (isAIMessage(message)) {
           msg.content = [{ type: 'text', text: message.content }];
           msg.tool_calls = message?.tool_calls || [];
+
+          if (message.tool_calls.find((x) => !x.id)) {
+            message.additional_kwargs['error'] = 'Tool call id is required';
+          }
         } else if (isToolMessage(message)) {
           msg.content = [
             {
@@ -687,6 +729,10 @@ export class ChatManager {
               status: message.status,
             },
           ];
+        }
+        for (const additional_kwarg of Object.keys(message.additional_kwargs)) {
+          msg.additional_kwargs[additional_kwarg] =
+            message.additional_kwargs[additional_kwarg];
         }
         msg.status = message.additional_kwargs['error']
           ? ChatStatus.ERROR
@@ -734,7 +780,9 @@ export class ChatManager {
         event(`chat:message-changed:${chatId}`, msg);
       },
     };
-    await fs.mkdir(this.getChatPath(chatId), { recursive: true });
+    await fs.promises.mkdir(await this.getChatPath(chatId), {
+      recursive: true,
+    });
     try {
       if (chat.mode == 'agent' && chat.agent) {
         // agent 模式
@@ -745,7 +793,7 @@ export class ChatManager {
             options: chat.options,
             callbacks,
             signal: controller.signal,
-            configurable: { workspace: this.getChatPath(chatId), chatId },
+            configurable: { workspace: await this.getChatPath(chatId), chatId },
           });
         } else if (agent.type == 'react') {
           await this.chatReact(agent, messages, {
@@ -753,7 +801,7 @@ export class ChatManager {
             options: chat.options,
             callbacks,
             signal: controller.signal,
-            configurable: { workspace: this.getChatPath(chatId), chatId },
+            configurable: { workspace: await this.getChatPath(chatId), chatId },
           });
         } else if (agent.type == 'built-in') {
           await this.chatBuiltIn(agent, messages, {
@@ -764,35 +812,24 @@ export class ChatManager {
             signal: controller.signal,
             fixedThreadId: agent.fixedThreadId,
             configurable: {
-              workspace: this.getChatPath(chatId),
+              workspace: await this.getChatPath(chatId),
               thread_id: agent.fixedThreadId === true ? chatId : undefined,
               recursionLimit:
                 agent.config?.recursionLimit || agent?.recursionLimit || 25,
               chatId,
             },
           });
+
+          event(`chat:changed:${chatId}`, chat);
         } else if (agent.type == 'anp' || agent.type == 'a2a') {
           await this.chatRemoteAgent(agent, messages, {
             providerModel: chat.model,
             options: chat.options,
             callbacks,
             signal: controller.signal,
-            configurable: { workspace: this.getChatPath(chatId), chatId },
+            configurable: { workspace: await this.getChatPath(chatId), chatId },
           });
         }
-      } else if (chat.mode == 'planner' && chat.agent) {
-        const agent = await agentManager.getAgent(chat.agent);
-        await this.chatPlanner(agent, messages, {
-          providerModel: chat.model,
-          options: chat.options,
-          callbacks,
-          signal: controller.signal,
-          configurable: {
-            workspace: this.getChatPath(chatId),
-            thread_id: chatId,
-            chatId,
-          },
-        });
       } else {
         // 普通chat模式
         await this.chat(
@@ -801,7 +838,7 @@ export class ChatManager {
           chat.options,
           callbacks,
           controller.signal,
-          { workspace: this.getChatPath(chatId) },
+          { workspace: await this.getChatPath(chatId) },
         );
       }
     } catch (err) {
@@ -815,6 +852,20 @@ export class ChatManager {
         m.additional_kwargs['error'] = err.message;
       }
       await this.chatMessageRepository.save(msgs);
+
+      if (err.message == 'Aborted') {
+        const aborted_msg = new ChatMessage(
+          uuidv4(),
+          lastMesssageId,
+          chat,
+          modelName,
+          'user',
+          [{ type: 'text', text: '[Request interrupted by user]' }],
+          ChatStatus.SUCCESS,
+        );
+        aborted_msg.is_hidden = true;
+        await this.chatMessageRepository.save(aborted_msg);
+      }
 
       console.error(err);
     }
@@ -851,7 +902,11 @@ export class ChatManager {
     }
   }
 
-  getChatPath(chatId: string) {
+  async getChatPath(chatId: string) {
+    const chat = await this.getChat(chatId);
+    if (chat.workspace) {
+      return chat.workspace;
+    }
     return path.join(getDataPath(), 'chats', chatId);
   }
 
@@ -861,7 +916,9 @@ export class ChatManager {
       notificationManager.sendNotification('Chat mode is not file', 'error');
       return;
     }
-    await fs.mkdir(this.getChatPath(chatId), { recursive: true });
+    await fs.promises.mkdir(await this.getChatPath(chatId), {
+      recursive: true,
+    });
 
     const chatFiles = [];
     for (let index = 0; index < files.length; index++) {
@@ -1122,69 +1179,6 @@ export class ChatManager {
     });
   }
 
-  public async chatPlanner(
-    agent: Agent,
-    messages: BaseMessage[],
-    config: {
-      providerModel: string;
-      options?: ChatOptions | undefined;
-      callbacks?: any | undefined;
-      signal?: AbortSignal | undefined;
-      configurable?: Record<string, any> | undefined;
-    },
-  ) {
-    const handlerMessageCreated = config?.callbacks?.['handleMessageCreated'];
-    //const handlerMessageUpdated = callbacks?.['handleMessageUpdated'];
-    const handlerMessageFinished = config?.callbacks?.['handleMessageFinished'];
-    const handlerMessageStream = config?.callbacks?.['handleMessageStream'];
-    const handlerMessageError = config?.callbacks?.['handleMessageError'];
-    const handlerCustomMessage = async (message?: any) => {};
-
-    const { provider, modelName } = getProviderModel(
-      config?.providerModel || agent.model,
-    );
-    const providerInfo = await providersManager.getProviders();
-    const providerType = providerInfo.find((x) => x.name == provider)?.type;
-    const tools = await toolsManager.buildTools(agent?.tools);
-
-    const model = await getChatModel(provider, modelName, config?.options);
-    const reactAgent = await agentManager.buildAgent({
-      agent,
-      store: new InMemoryStore(),
-      model: config?.providerModel,
-    });
-
-    await runAgent(reactAgent, messages, {
-      signal: config?.signal,
-      configurable: config?.configurable,
-      modelName,
-      providerType,
-      recursionLimit: agent.recursionLimit,
-      callbacks: {
-        handlerMessageCreated,
-        handlerMessageFinished,
-        handlerMessageStream,
-        handlerMessageError,
-        handlerCustomMessage,
-      },
-    });
-    const state = await reactAgent.getState({
-      configurable: config?.configurable,
-    });
-
-    let chatPlanner = await this.chatPlannerRepository.findOne({
-      where: { chatId: config?.configurable.thread_id },
-    });
-
-    if (!chatPlanner) {
-      chatPlanner = new ChatPlanner(uuidv4(), config?.configurable.thread_id);
-    }
-    chatPlanner.task = state.values.task;
-    chatPlanner.plans = state.values.plans;
-    await this.chatPlannerRepository.save(chatPlanner);
-    console.log(state);
-  }
-
   public async chatRemoteAgent(
     agent: Agent,
     messages: BaseMessage[],
@@ -1351,7 +1345,7 @@ export class ChatManager {
 
     const _image = image.substring(image.indexOf(',') + 1);
     const imageBuffer = Buffer.from(_image, 'base64');
-    await writeFile(_savePath, imageBuffer);
+    await fs.promises.writeFile(_savePath, imageBuffer);
   }
 
   public async clearChat(chatId: string) {
@@ -1364,19 +1358,17 @@ export class ChatManager {
       await dbManager.dataSource.getRepository(LanggraphCheckPoints);
     const writes = await dbManager.dataSource.getRepository(LanggraphWrites);
 
-    const checkPointsData = await checkPoints.find({
-      where: { thread_id: chatId },
-    });
-    const writesData = await writes.find({
-      where: { thread_id: chatId },
-    });
+    await checkPoints.delete({ thread_id: chatId });
 
-    await checkPoints.remove(checkPointsData);
-    await writes.remove(writesData);
-    const workspace = path.join(getDataPath(), 'chats', chatId);
+    await writes.delete({ thread_id: chatId });
+
+    const workspace = await this.getChatPath(chatId);
     try {
-      if ((await fs.stat(workspace)).isDirectory()) {
-        await fs.rm(workspace, { recursive: true });
+      if (
+        fs.existsSync(workspace) &&
+        (await fs.promises.stat(workspace)).isDirectory()
+      ) {
+        await fs.promises.rm(workspace, { recursive: true });
       }
     } catch {}
   }
@@ -1408,12 +1400,47 @@ export class ChatManager {
   }
 
   public async openWorkspace(chatId: string) {
+    const chat = await this.getChat(chatId);
+    if (chat.workspace) {
+      if (
+        fs.existsSync(chat.workspace) &&
+        (await fs.promises.stat(chat.workspace)).isDirectory()
+      ) {
+        await shell.openPath(chat.workspace);
+      }
+
+      return;
+    }
+
     const workspace = path.join(getDataPath(), 'chats', chatId);
     try {
-      if ((await fs.stat(workspace)).isDirectory()) {
+      if (
+        fs.existsSync(workspace) &&
+        (await fs.promises.stat(workspace)).isDirectory()
+      ) {
         await shell.openPath(workspace);
       }
     } catch {}
+  }
+
+  public async changeChatWorkspace(event: IpcMainInvokeEvent, chatId: string) {
+    const _chat = await this.chatRepository.findOne({
+      where: { id: chatId },
+    });
+    if (_chat) {
+      const res = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        title: 'Select Workspace',
+        defaultPath: _chat.workspace || undefined,
+      });
+      if (res && !res.canceled && res.filePaths.length == 1) {
+        _chat.workspace = res.filePaths[0].replace(/\\/g, '/');
+        await this.chatRepository.save(_chat);
+        event.sender.send(`chat:changed:${chatId}`, _chat);
+        return undefined;
+      }
+    }
+    return undefined;
   }
 }
 

@@ -36,7 +36,7 @@ export const removeEmptyValues = (
 
 export const downloadFile = async (
   url: string,
-  savePath: string,
+  savePath?: string,
 ): Promise<string> => {
   try {
     const response = await fetch(url);
@@ -127,5 +127,5 @@ export const truncateText = (
   const front = text.slice(0, halfLength);
   const back = text.slice(-halfLength);
 
-  return `${front}\n...[text is too long]...\n${back}`;
+  return `${front}\n...[truncated]...\n${back}`;
 };

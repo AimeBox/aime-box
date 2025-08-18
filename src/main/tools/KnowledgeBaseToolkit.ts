@@ -5,7 +5,7 @@ import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import { z } from 'zod';
 import { kbManager } from '../knowledgebase';
 import { dbManager } from '../db';
-import { Repository } from 'typeorm';
+import { Or, Repository } from 'typeorm';
 import { KnowledgeBase } from '@/entity/KnowledgeBase';
 
 export interface KnowledgeBaseParameters extends ToolParams {
@@ -20,7 +20,7 @@ export class KnowledgeBaseSave extends BaseTool {
   description: string = 'Save knowledge base item';
 
   schema = z.object({
-    kbNameOrId: z.string(),
+    kb_name_or_id: z.string(),
     content: z.string(),
   });
 
@@ -83,16 +83,55 @@ export class KnowledgeBaseQuery extends BaseTool {
   description: string = 'Query knowledge base';
 
   schema = z.object({
-    kbNameOrId: z.string(),
+    kb_name_or_id: z.string(),
     query: z.string(),
   });
 
-  protected _call(
-    arg: any,
+  kbRepository: Repository<KnowledgeBase>;
+
+  constructor(params?: KnowledgeBaseParameters) {
+    super(params);
+    this.kbRepository = dbManager.dataSource.getRepository(KnowledgeBase);
+  }
+
+  private escapeXmlAttribute(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema>,
     runManager?: CallbackManagerForToolRun,
     config?: ToolRunnableConfig,
   ): Promise<any> {
-    throw new Error('Method not implemented.');
+    if (!input.kb_name_or_id) {
+      return 'kb_name_or_id is required';
+    }
+
+    const kb = await this.kbRepository.findOne({
+      where: [{ name: input.kb_name_or_id }, { id: input.kb_name_or_id }],
+    });
+    if (!kb) {
+      return `Knowledge base "${input.kb_name_or_id}" not found`;
+    }
+
+    const result = await kbManager.query(kb.id, input.query, {
+      k: 10,
+    });
+    const output = result
+      .filter(
+        (x) => x.score > 0.5 && (!x.reranker_score || x.reranker_score > 0.5),
+      )
+      .map(
+        (x) =>
+          `<content title="${this.escapeXmlAttribute(x.document.metadata.title || '')}" src="${this.escapeXmlAttribute(x.document.metadata.source || '')}">\n${x.document.pageContent}\n</content>`,
+      );
+    if (output.length > 0) return output.join('\n');
+    return 'No match';
   }
 }
 
@@ -113,7 +152,7 @@ export class KnowledgeBaseList extends BaseTool {
   }
 
   async _call(
-    arg: any,
+    input: z.infer<typeof this.schema>,
     runManager?: CallbackManagerForToolRun,
     config?: ToolRunnableConfig,
   ): Promise<any> {

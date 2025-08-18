@@ -56,6 +56,8 @@ export const runCommand = async (
       ...process.env,
       PATH: process.env.PATH,
       HOME: os.homedir(),
+      LANG: 'zh_CN.UTF-8',
+      LC_ALL: 'zh_CN.UTF-8',
     };
     if (settingsManager.getProxy()) {
       env['HTTP_PROXY'] = settingsManager.getProxy();

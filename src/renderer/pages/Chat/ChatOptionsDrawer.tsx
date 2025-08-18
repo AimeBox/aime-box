@@ -37,11 +37,11 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
     () => [
       {
         key: 'base',
-        label: t('chat.chat_options.base_setting'),
+        label: t('chat.base_setting'),
       },
       {
         key: 'pre_prompt',
-        label: t('chat.chat_options.pre_prompt_setting'),
+        label: t('chat.pre_prompt'),
       },
     ],
     [],
@@ -98,7 +98,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
       }}
     >
       <Drawer
-        title={t('chat.chat_options.config')}
+        title={t('chat.chat_options')}
         className="rounded-2xl shadow-lg"
         {...props}
         styles={{ body: { padding: 0 } }}
@@ -118,7 +118,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                   <div className="flex flex-row justify-between">
                     <div className="flex flex-row gap-2 items-center">
                       <FaBook></FaBook>
-                      <strong>{t('chat.chat_options.system_prompt')}</strong>
+                      <strong>{t('chat.system_prompt')}</strong>
                     </div>
                     <div>
                       <Button
@@ -146,7 +146,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                           onChange({ system: undefined });
                         }}
                       >
-                        {t('chat.chat_options.reset')}
+                        {t('chat.reset')}
                       </Button>
                     </div>
                   </div>
@@ -167,7 +167,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                   <div className="flex flex-row justify-between">
                     <div className="flex flex-row gap-2 items-center">
                       <FaTools></FaTools>
-                      <strong>{t('chat.chat_options.tools')}</strong>
+                      <strong>{t('chat.chat_tools')}</strong>
                     </div>
                     <div>
                       {props?.value?.toolNames?.length > 0 && (
@@ -213,11 +213,11 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                     ))}
                   </div>
                 </div>
-                {/* <div className="flex flex-col gap-2 p-4 bg-gray-100 rounded-2xl">
+                <div className="flex flex-col gap-2 p-4 bg-gray-100 rounded-2xl">
                   <div className="flex flex-row justify-between">
                     <div className="flex flex-row gap-2 items-center">
                       <FaTools></FaTools>
-                      <strong>{t('chat.chat_options.agents')}</strong>
+                      <strong>{t('chat.chat_agent')}</strong>
                     </div>
                     <div>
                       {props?.value?.agentNames?.length > 0 && (
@@ -261,13 +261,13 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                       </Tag>
                     ))}
                   </div>
-                </div> */}
+                </div>
 
                 <div className="flex flex-col gap-2 p-4 bg-gray-100 rounded-2xl">
                   <div className="flex flex-row justify-between">
                     <div className="flex flex-row gap-2 items-center">
                       <FaBook></FaBook>
-                      <strong>{t('chat.chat_options.knowledge_base')}</strong>
+                      <strong>{t('chat.knowledgebase')}</strong>
                     </div>
                     <div>
                       <Button
@@ -317,11 +317,11 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                   <div className="flex flex-row justify-between p-4">
                     <div className="flex flex-row gap-2 items-center">
                       <FaTools></FaTools>
-                      <strong>{t('chat.chat_options.config')}</strong>
+                      <strong>{t('chat.chat_config')}</strong>
                     </div>
                     <div>
                       <Button size="small" type="text">
-                        {t('chat.chat_options.reset')}
+                        {t('chat.reset')}
                       </Button>
                     </div>
                   </div>
@@ -340,7 +340,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                         checked={props?.value?.streaming}
                         onChange={(v) => onChange({ streaming: v })}
                       ></Switch>
-                      {t('chat.chat_options.streaming')}
+                      {t('chat.streaming')}
                     </div>
 
                     <div className="flex flex-row gap-2 items-center">
@@ -350,9 +350,7 @@ export default function ChatOptionsDrawer(props: ChatOptionsDrawerProps) {
                           onChange({ temperature: v ? 0.5 : undefined })
                         }
                       ></Switch>
-                      <div className="w-20">
-                        {t('chat.chat_options.temperature')}
-                      </div>
+                      <div className="w-20">{t('chat.chat_temperature')}</div>
                       {insideValue?.temperature !== undefined && (
                         <Slider
                           value={insideValue?.temperature}

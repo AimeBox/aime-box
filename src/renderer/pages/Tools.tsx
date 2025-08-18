@@ -136,7 +136,7 @@ export default function Tools() {
     toolSettingModalRef.current.openModal(false);
   };
   const onSearch = async (text: string) => {
-    const res = await window.electron.tools.getList(text);
+    const res = await window.electron.tools.getList(text, selectedFilterTag);
     setTools(res);
   };
   const onShowToolSetting = (tool: ToolInfo) => {
@@ -162,48 +162,48 @@ export default function Tools() {
   const invoke = async (toolName, value) => {
     console.log(toolName, value);
     let _output: string | string[] = '';
-    let _time_cost = undefined;
-    if (selectedFilterTag == 'built-in') {
-      if (currentTool) {
-        isInvoking({ ...invoking, [toolName]: true });
-        setToolCall({ id: uuidv4(), args: value, name: toolName });
-        const res = await window.electron.tools.invoke(
-          toolName,
-          value,
-          'markdown',
-        );
-        console.log(res);
-        const { output, time_cost, is_success } = res;
-
-        if (isString(output)) {
-          _output = output;
-        } else if (isArray(res)) {
-          _output = res;
-        } else {
-          _output = res?.toString() || '';
-        }
-        _time_cost = time_cost;
-      }
-    } else if (selectedFilterTag == 'mcp') {
-      if (currentMcp) {
-        isInvoking({ ...invoking, [toolName]: true });
-        const res = await window.electron.tools.invoke(
-          `${toolName}`,
-          value,
-          'markdown',
-        );
-        console.log(res);
-        const { output, time_cost, is_success } = res;
-        if (isString(output)) {
-          _output = output;
-        } else if (isArray(output)) {
-          _output = output;
-        }
-        _time_cost = time_cost;
-      }
+    //let _time_cost;
+    //if (!currentTool) return;
+    isInvoking({ ...invoking, [toolName]: true });
+    setToolCall({ id: uuidv4(), args: value, name: toolName });
+    const res = await window.electron.tools.invoke(
+      `${toolName}`,
+      value,
+      'markdown',
+    );
+    console.log(res);
+    const { output, time_cost, is_success } = res;
+    if (isString(output)) {
+      _output = output;
+    } else if (isArray(output) && output.length > 0 && isString(output[0])) {
+      _output = output.join('\n---\n');
+    } else {
+      _output = res?.toString() || '';
     }
+    //_time_cost = time_cost;
+
+    // if (selectedFilterTag == 'built-in') {
+    //   const res = await window.electron.tools.invoke(
+    //     toolName,
+    //     value,
+    //     'markdown',
+    //   );
+    //   console.log(res);
+    //   const { output, time_cost, is_success } = res;
+
+    //   if (isString(output)) {
+    //     _output = output;
+    //   } else if (isArray(output) && output.length > 0 && isString(output[0])) {
+    //     _output = output.join('\n---\n');
+    //   } else {
+    //     _output = res?.toString() || '';
+    //   }
+    //   _time_cost = time_cost;
+    // } else if (selectedFilterTag == 'mcp') {
+
+    // }
     setInvokeOutput(_output);
-    setTimeCost(_time_cost);
+    setTimeCost(time_cost);
     delete invoking[toolName];
     isInvoking(invoking);
   };
@@ -213,7 +213,7 @@ export default function Tools() {
     if (isString(res)) {
       output = res;
     } else if (isArray(res)) {
-      output = res;
+      output = res.join('\n');
     } else {
       output = res?.toString() || '';
     }
@@ -354,10 +354,20 @@ export default function Tools() {
             component: 'JsonEditor',
           } as FormSchema);
         }
+      } else if (Object.entries(tool.schema.properties[x]).length == 0) {
+        c.push({
+          field: x,
+          label: x,
+          required: required.includes(x),
+          subLabel: tool.schema.properties[x].description,
+          component: 'JsonEditor',
+        } as FormSchema);
       } else if (
         !tool.schema.properties[x].type &&
         tool.schema.properties[x].anyOf
       ) {
+      } else {
+        console.log('无法显示', tool.schema.properties[x]);
       }
 
       // c.properties[x] = {
@@ -591,7 +601,7 @@ export default function Tools() {
                       </div>
                     }
                     subTitle={<small>{item.description}</small>}
-                    href={`/tools?id=${item.name}`}
+                    href={`?id=${item.name}`}
                     // onClick={() => {
                     //   navigate(`/tools?id=${item.name}`);
                     // }}
@@ -603,7 +613,7 @@ export default function Tools() {
                           type="text"
                           icon={<FaEdit />}
                           onClick={() => {
-                            navigate(`/tools?id=${item.name}`);
+                            navigate(`?id=${item.name}`);
                             onShowToolSetting(item);
                           }}
                         />

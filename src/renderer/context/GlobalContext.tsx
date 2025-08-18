@@ -112,7 +112,9 @@ export function GlobalContextProvider({
   >([]);
   //const [tools, setTools] = useState<ToolInfo[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const [api, contextHolder] = notification.useNotification();
+  const [api, contextHolder] = notification.useNotification({
+    bottom: 64,
+  });
   const [messageApi, messageContextHolder] = message.useMessage();
 
   // const onCancel = () => {

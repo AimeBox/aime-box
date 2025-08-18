@@ -31,6 +31,8 @@ import { AzureOpenAIProvider } from '../providers/AzureOpenAIProvider';
 import { TongyiProvider } from '../providers/TongyiProvider';
 import { TogetherProvider } from '../providers/TogetherProvider';
 import { MoonshotProvider } from '../providers/MoonshotProvider';
+import { BigmodelProvider } from '../providers/BigmodelProvider';
+import { ModelScopeProvider } from '../providers/ModelScopeProvider';
 
 export async function getChatModel(
   providerName: string,
@@ -104,6 +106,13 @@ export async function getChatModel(
     llm = new MinimaxProvider({ provider }).getChatModel(model.name, options);
   } else if (provider?.type === ProviderType.MOONSHOT) {
     llm = new MoonshotProvider({ provider }).getChatModel(model.name, options);
+  } else if (provider?.type === ProviderType.BIGMODEL) {
+    llm = new BigmodelProvider({ provider }).getChatModel(model.name, options);
+  } else if (provider?.type === ProviderType.MODELSCOPE) {
+    llm = new ModelScopeProvider({ provider }).getChatModel(
+      model.name,
+      options,
+    );
   } else {
     throw new Error(`provider "${providerName}" not support`);
   }

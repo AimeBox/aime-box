@@ -14,8 +14,14 @@ export const ToolTag = {
 } as const;
 
 export abstract class BaseTool extends StructuredTool {
+  static readonly Name: string = this.name!;
+
   static lc_name() {
     return this.name;
+  }
+
+  async isEnabled?(): Promise<boolean> {
+    return true;
   }
 
   officialLink?: string;

@@ -36,6 +36,7 @@ import {
   FaEllipsisH,
   FaFile,
   FaFolder,
+  FaFolderOpen,
   FaPaperclip,
   FaPaperPlane,
   FaSeedling,
@@ -48,6 +49,7 @@ import {
   FaFileExport,
   FaGear,
   FaRegFaceLaugh,
+  FaRegFolder,
   FaTowerObservation,
 } from 'react-icons/fa6';
 import { useLocation } from 'react-router-dom';
@@ -63,6 +65,8 @@ import { ChatInfo } from '@/main/chat';
 import FileDropZone from '@/renderer/components/common/FileDropZone';
 import ChatToolView from '@/renderer/components/chat/ChatToolView';
 import ChatHistoryDrawer from './ChatHistoryDrawer';
+import { formatNumber } from '@/main/utils/format';
+import ChatInput from '@/renderer/components/chat/ChatInput';
 
 export interface ChatContentProps {
   chatId?: string;
@@ -72,14 +76,20 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   const { chatId } = props;
 
   const location = useLocation();
+
   const [emojiOpen, setEmojiOpen] = useState<boolean>(false);
   const [currentChat, setCurrentChat] = useState<ChatInfo | undefined>(
     undefined,
   );
   const [openChatOptionsDrawer, setOpenChatOptionsDrawer] =
     useState<boolean>(false);
-  const [openChatHistoryDrawer, setOpenChatHistoryDrawer] =
-    useState<boolean>(false);
+  const [openChatHistoryDrawer, setOpenChatHistoryDrawer] = useState<{
+    open: boolean;
+    value: ChatMessage[];
+  }>({
+    open: false,
+    value: [],
+  });
   const [currentModel, setCurrentModel] = useState<string | undefined>(
     undefined,
   );
@@ -113,7 +123,6 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   const getChat = async (id: string) => {
     let res = await window.electron.chat.getChat(id);
     console.log(res);
-
     if (!res.model) {
       if (res.mode == 'agent' || res.mode == 'supervisor') {
         const agent = await window.electron.db.get('agent', res.agent);
@@ -150,18 +159,16 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
     return res;
   };
 
-  const onChat = async () => {
-    if (!chatInputMessage?.trim()) {
+  const onChat = async (text?: string, attachments?: ChatInputAttachment[]) => {
+    if (!text?.trim() || !chatId) {
       return;
     }
-
     window.electron.chat.chatResquest({
-      chatId: currentChat.id,
-      content: chatInputMessage.trim(),
-      extend: { attachments: attachments },
+      chatId: chatId,
+      content: text.trim(),
+      extend: { attachments },
     });
-    // Ref.current?.clear();
-    setChatInputMessage(undefined);
+    setChatInputMessage('');
     setAttachments([]);
     scrollToBottom(false);
   };
@@ -173,7 +180,22 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
     await getChat(chat.id);
   }
   async function handleChatMessageChanged(chatMessage: ChatMessage) {
-    const chat = await getChat(chatMessage.chat.id);
+    const chatMessageId = chatMessage.id;
+    setCurrentChat((preChat) => {
+      if (preChat?.id == chatMessage.chatId) {
+        preChat.status = 'running';
+        const msg = preChat?.chatMessages.find((x) => x.id == chatMessageId);
+        if (msg) {
+          msg.content = chatMessage.content;
+          preChat.status == 'running';
+          return { ...preChat };
+        } else {
+          preChat.chatMessages.push(chatMessage);
+          return { ...preChat };
+        }
+      }
+      return preChat;
+    });
   }
 
   const scrollToBottom = useCallback((onlyIsBottom = false) => {
@@ -210,6 +232,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   };
 
   const handleChatFinish = async (chatMessage: ChatMessage) => {
+    console.log('handleChatFinish', chatMessage);
     const chat = await getChat(chatMessage.chat.id);
     if (chatMessage.role == 'tool' && chatMessage?.content?.length > 0) {
       const { tool_call_id } = chatMessage.content[0];
@@ -248,6 +271,10 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
     closeCanvas();
     if (chatId) {
       getChat(chatId);
+      const { message } = location.state || {};
+      if (message && (message.text || message.attachments?.length > 0)) {
+        onChat(message.text, message.attachments);
+      }
       scrollToBottom();
     } else {
       setCurrentChat(undefined);
@@ -269,7 +296,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   }, [chatId]);
 
   const openHistory = (history: any) => {
-    setOpenChatHistoryDrawer(true);
+    setOpenChatHistoryDrawer({ open: true, value: history });
   };
 
   const onDelete = async (chatMessage: ChatMessage) => {
@@ -296,10 +323,8 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   };
 
   const onSelectFile = async (files: string[] = []) => {
-    if (files.length == 0) {
-      const res = await window.electron.app.showOpenDialog({
-        properties: ['openFile', 'multiSelections'],
-      });
+    try {
+      const res = await window.electron.app.getPathInfo(files);
       if (res && res.length > 0) {
         const _attachments = [];
         for (const item of res) {
@@ -316,34 +341,17 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
 
         setAttachments([...attachments, ..._attachments]);
       }
-    } else {
-      try {
-        const res = await window.electron.app.getPathInfo(files);
-        if (res && res.length > 0) {
-          const _attachments = [];
-          for (const item of res) {
-            if (attachments.find((x) => x.path == item.path)) {
-              continue;
-            }
-            _attachments.push({
-              path: item.path,
-              name: item.name,
-              type: item.type,
-              ext: item.ext,
-            });
-          }
-
-          setAttachments([...attachments, ..._attachments]);
-        }
-      } catch (err) {
-        message.error(err);
-      }
+    } catch (err) {
+      message.error(err);
     }
   };
 
   const onExport = async () => {};
   const onOpenWorkspace = async () => {
     const res = await window.electron.chat.openWorkspace(currentChat.id);
+  };
+  const onChangeWorkspace = async () => {
+    const res = await window.electron.chat.changeWorkspace(currentChat.id);
   };
   const onExportImage = async () => {
     try {
@@ -394,12 +402,39 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
 
   const [canvasSize, setCanvasSize] = useState(0);
 
+  const [openMenu, setOpenMenu] = useState(false);
+
+  const onAskHumanSubmit = (value: any, toolMessage: ChatMessage) => {
+    console.log(value, toolMessage);
+    window.electron.chat.chatResquest({
+      chatId: currentChat.id,
+      content: value,
+      extend: { attachments: [] },
+      is_hidden_message: true,
+    });
+  };
+
+  const chatInputHandleReplace = (value: string) => {
+    const textarea = document.getElementById(
+      'chat-input',
+    ) as HTMLTextAreaElement;
+
+    console.log(textarea.value, textarea.selectionStart, textarea.selectionEnd);
+
+    const insertionText = value; // 你要替换或插入的字符
+
+    const beforeCursor = textarea.value.substring(0, textarea.selectionStart);
+    const afterCursor = textarea.value.substring(textarea.selectionEnd);
+
+    setChatInputMessage(beforeCursor + insertionText + afterCursor);
+  };
+
   return (
     <div className="h-full">
       <FileDropZone onSelectedFiles={onSelectFile}>
         {currentChat && (
           <Splitter
-            className="flex flex-row h-full w-full"
+            className="flex flex-row w-full h-full"
             onResize={(size) => {
               setCanvasSize(size[1]);
             }}
@@ -407,7 +442,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
             <Splitter.Panel min={400}>
               <Splitter
                 layout="vertical"
-                className="h-full flex-1"
+                className="flex-1 h-full"
                 style={{
                   height: '100%',
                 }}
@@ -430,16 +465,26 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                             className="flex-1 w-full text-lg"
                             onBlur={handleChangedTitle}
                           />
-                          <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400">
-                            <a href={`/${currentChat.id}`} target="_blank">
+                          <small className="flex flex-row gap-2 ml-3 text-xs text-gray-400 items-center">
+                            <Button
+                              size="small"
+                              type="text"
+                              onClick={() => {
+                                onOpenWorkspace();
+                              }}
+                            >
                               {chatId}
-                            </a>
-                            <span>token: {currentChat.totalToken}</span>
-                            <span className="flex flex-row items-center">
-                              <FaAngleUp /> {currentChat.inputToken}
+                            </Button>
+                            <span>
+                              token: {formatNumber(currentChat.totalToken)}
                             </span>
                             <span className="flex flex-row items-center">
-                              <FaAngleDown /> {currentChat.outputToken}
+                              <FaAngleUp />{' '}
+                              {formatNumber(currentChat.inputToken)}
+                            </span>
+                            <span className="flex flex-row items-center">
+                              <FaAngleDown />{' '}
+                              {formatNumber(currentChat.outputToken)}
                             </span>
                           </small>
                         </div>
@@ -448,8 +493,10 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                           <Popover
                             placement="bottomRight"
                             trigger="click"
+                            open={openMenu}
+                            onOpenChange={setOpenMenu}
                             content={
-                              <div className="flex flex-col w-full items-start">
+                              <div className="flex flex-col items-start w-full">
                                 {/* <Button
                               icon={<FaFileExport />}
                               type="text"
@@ -461,20 +508,36 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                               {t('chat.export')}
                             </Button> */}
                                 <Button
-                                  icon={<FaFolder />}
+                                  icon={<FaRegFolder />}
                                   type="text"
                                   block
+                                  className="justify-start"
                                   onClick={() => {
+                                    setOpenMenu(false);
                                     onOpenWorkspace();
                                   }}
                                 >
                                   {t('chat.open_workspace')}
                                 </Button>
                                 <Button
-                                  icon={<FaFileExport />}
+                                  icon={<FaFolder />}
                                   type="text"
                                   block
+                                  className="justify-start"
                                   onClick={() => {
+                                    setOpenMenu(false);
+                                    onChangeWorkspace();
+                                  }}
+                                >
+                                  {t('chat.change_workspace')}
+                                </Button>
+                                <Button
+                                  icon={<FaFileExport />}
+                                  type="text"
+                                  className="justify-start"
+                                  block
+                                  onClick={() => {
+                                    setOpenMenu(false);
                                     onExportImage();
                                   }}
                                 >
@@ -498,7 +561,9 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                           <div className="flex flex-col py-8 w-full h-full">
                             <div className="pb-10">
                               {currentChat?.chatMessages
-                                ?.filter((x) => x.role != 'tool')
+                                ?.filter(
+                                  (x) => x.role != 'tool' && !x.is_hidden,
+                                )
                                 .map((chatMessage: ChatMessage) => {
                                   const toolMessages =
                                     chatMessage?.tool_calls?.length == 0
@@ -520,10 +585,14 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                     <ChatMessageBox
                                       key={chatMessage.id}
                                       toolMessages={toolMessages}
+                                      editEnabled={
+                                        currentChat.message_edit_enable
+                                      }
                                       // onRedo={() => onRedo(chatMessage)}
                                       onToolClick={(
                                         toolCall,
                                         toolMessageContent,
+                                        toolMessage,
                                       ) => {
                                         console.log(
                                           toolCall,
@@ -534,6 +603,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                             title: toolCall.name,
                                             content: toolMessageContent,
                                             toolCall: toolCall,
+                                            toolMessage: toolMessage,
                                           });
                                         }
                                       }}
@@ -551,6 +621,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                       onOpenHistory={(history) => {
                                         openHistory(history);
                                       }}
+                                      onAskHumanSubmit={onAskHumanSubmit}
                                       value={chatMessage}
                                     />
                                   );
@@ -563,118 +634,22 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                   </div>
                 </Splitter.Panel>
                 <Splitter.Panel min={220} defaultSize={220}>
-                  <div className="  h-full p-4">
-                    <div className="flex flex-col gap-2 p-3 h-full border border-solid border-gray-200 dark:border-none  rounded-2xl bg-gray-100 dark:bg-gray-600 ">
-                      <div className="flex flex-row justify-between ">
-                        <div className="flex flex-row items-center">
+                  <ChatInput
+                    isRunning={currentChat?.status == 'running'}
+                    onChat={onChat}
+                    chatInputValue={chatInputMessage}
+                    attachments={attachments}
+                    onAttachmentsChanged={setAttachments}
+                    onCancel={() => onCancel(currentChat.id)}
+                    footer={
+                      <div className="flex flex-row items-center justify-between w-full pr-2">
+                        <div className="flex flex-row items-center gap-2">
                           <ProviderSelect
                             type="llm"
                             value={currentModel}
                             onChange={onChangeCurrentModel}
                             style={{ width: '200px' }}
-                            className="mr-2"
                           />
-                          <Popconfirm
-                            icon={null}
-                            open={emojiOpen}
-                            onOpenChange={setEmojiOpen}
-                            title={
-                              <EmojiPicker
-                                className="!border-none"
-                                onEmojiClick={(v) => {
-                                  //editorRef.current?.insertText(v.emoji);
-                                  setEmojiOpen(false);
-                                }}
-                              />
-                            }
-                            onConfirm={() => {}}
-                            okText="Yes"
-                            cancelText="No"
-                          >
-                            <Button
-                              icon={<FaRegFaceLaugh />}
-                              type="text"
-                              onClick={() => {
-                                setEmojiOpen(!emojiOpen);
-                              }}
-                            />
-                          </Popconfirm>
-
-                          <Button
-                            icon={<FaPaperclip />}
-                            type="text"
-                            onClick={() => {
-                              onSelectFile([]);
-                            }}
-                          ></Button>
-                          <ChatQuickInput
-                            onClick={(text) => {
-                              //editorRef.current?.insertText(text);
-                              setChatInputMessage(text);
-                            }}
-                            className="ml-2"
-                          />
-                        </div>
-
-                        <div>
-                          <Button
-                            icon={<FaGear />}
-                            type="text"
-                            onClick={() => {
-                              setOpenChatOptionsDrawer(true);
-                            }}
-                          />
-                        </div>
-                      </div>
-                      {attachments.length > 0 && (
-                        <div className="flex flex-row flex-wrap gap-2 w-full">
-                          {attachments.map((attachment) => (
-                            <ChatAttachment
-                              key={attachment.path}
-                              value={attachment}
-                              onDelete={() => onDeleteAttachment(attachment)}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      <div className="flex flex-col flex-1 gap-2 h-full ">
-                        <div className="flex flex-col flex-1 h-full">
-                          {/* <ChatQuickInput
-                      onClick={(text) => {
-                        editorRef.current?.insertText(text);
-                        setChatInputMessage(text);
-                      }}
-                      className="mb-1"
-                    /> */}
-                          <div className="flex-1 w-full h-full text-sm bg-transparent outline-none resize-none">
-                            <Input.TextArea
-                              className="w-full !h-full !outline-none !shadow-none !bg-transparent dark:text-white"
-                              rows={1}
-                              value={chatInputMessage}
-                              variant="borderless"
-                              placeholder="Type a message"
-                              onChange={(e) => {
-                                setChatInputMessage(e.target.value);
-                              }}
-                              onKeyPress={(e) => {
-                                if (e.key == 'Enter' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  onChat();
-                                }
-                              }}
-                              // onPressEnter={(e) => {
-                              //   if (!e.shiftKey) {
-                              //     e.preventDefault();
-                              //     onChat();
-                              //   }
-                              // }}
-                            ></Input.TextArea>
-                            {/* <FileDropZone></FileDropZone> */}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-row justify-between items-center w-full">
-                        <div className="flex gap-2 items-center">
                           <Tooltip
                             placement="top"
                             title={
@@ -758,6 +733,13 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                               </Tag>
                             </Button>
                           </Tooltip>
+                          <Button
+                            icon={<FaGear />}
+                            type="text"
+                            onClick={() => {
+                              setOpenChatOptionsDrawer(true);
+                            }}
+                          />
                           <Tooltip placement="top" title="Clear All Message">
                             <Popconfirm
                               title="Delete All Message?"
@@ -769,26 +751,16 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                             </Popconfirm>
                           </Tooltip>
                         </div>
-                        {currentChat.status == 'running' && (
-                          <Button
-                            type="primary"
-                            icon={<FaStop />}
-                            onClick={() => {
-                              onCancel(currentChat.id);
-                            }}
-                          />
-                        )}
-                        {currentChat.status != 'running' && (
-                          <Button
-                            type="primary"
-                            disabled={!chatInputMessage?.trim()}
-                            icon={<FaPaperPlane />}
-                            onClick={onChat}
-                          />
-                        )}
+                        {/* <Button
+                          icon={<FaPaperclip />}
+                          type="text"
+                          onClick={() => {
+                            onSelectFile([]);
+                          }}
+                        ></Button> */}
                       </div>
-                    </div>
-                  </div>
+                    }
+                  />
                 </Splitter.Panel>
               </Splitter>
             </Splitter.Panel>
@@ -828,9 +800,10 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
         onClose={() => setOpenChatOptionsDrawer(false)}
       />
       <ChatHistoryDrawer
-        open={openChatHistoryDrawer}
+        open={openChatHistoryDrawer.open}
+        value={openChatHistoryDrawer.value}
         width="50vw"
-        onClose={() => setOpenChatHistoryDrawer(false)}
+        onClose={() => setOpenChatHistoryDrawer({ open: false, value: [] })}
       ></ChatHistoryDrawer>
     </div>
   );

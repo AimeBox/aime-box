@@ -92,9 +92,6 @@ export default function KnowledgeBasePage() {
       label: 'Embedding',
       field: 'embedding',
       required: true,
-
-      subLabel: '设置后将无法更改',
-
       component: <ProviderSelect type="embedding" />,
       ifShow({ values }) {
         return !values.id;

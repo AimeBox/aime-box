@@ -282,7 +282,99 @@ export class ReplicateTextToVideo extends BaseTool {
     return `<file>${filePath}</file>`;
   }
 }
+export class ReplicateMultiImageToVideo extends BaseTool {
+  toolKitName: string = 'replicate';
 
+  name: string = 'replicate_multi_image_to_video';
+
+  description: string =
+    'generate the video from the images and prompt, support fisrt image and end image';
+
+  officialLink: string = REPLICATE_OFFICIAL_LINK;
+
+  tags?: string[] = [ToolTag.VIDEO];
+
+  schema = z.object({
+    prompt: z.string(),
+    model: z.enum(['bytedance/seedance-1-lite']),
+    first_image: z.string().describe('first image file path or url'),
+    end_image: z.string().describe('end image file path or url').optional(),
+    duration: z.number().optional(),
+    aspect_ratio: z
+      .enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21'])
+      .default('1:1')
+      .optional(),
+    config: z.any({}).optional(),
+  });
+
+  params: ReplicateParameters;
+
+  constructor(params?: ReplicateParameters) {
+    super();
+    this.params = params;
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager?: CallbackManagerForToolRun,
+    parentConfig?: ToolRunnableConfig,
+  ): Promise<any> {
+    const provider = (await providersManager.getProvider(
+      this.params?.providerId,
+    )) as ReplicateProvider;
+
+    let body: any = input;
+
+    body = { ...body, ...(input.config || {}) };
+
+    if (body.first_image) {
+      if (isUrl(body.first_image)) {
+        console.log('first_image', body.first_image);
+      } else if (fs.existsSync(body.first_image)) {
+        const fileInput = await fs.promises.readFile(body.first_image);
+        body.first_image = fileInput;
+      }
+    }
+
+    if (body.end_image) {
+      if (isUrl(body.end_image)) {
+        console.log('end_image', body.end_image);
+      } else if (fs.existsSync(body.end_image)) {
+        const fileInput = await fs.promises.readFile(body.end_image);
+        body.end_image = fileInput;
+      }
+    }
+
+    if (input.model == 'bytedance/seedance-1-lite') {
+      body['image'] = body.first_image;
+      delete body.first_image;
+      if (body.end_image) {
+        body['last_frame_image'] = body.end_image;
+        delete body.end_image;
+      }
+    }
+
+    delete body.model;
+
+    //  = {
+    //   fps: 24,
+    //   prompt: 'a woman walks in the park',
+    //   duration: 5,
+    //   resolution: '720p',
+    //   aspect_ratio: '16:9',
+    //   camera_fixed: false,
+    // };
+
+    const output = await provider.replicate.run(input.model, {
+      input: body,
+    });
+    const url = output.url();
+    const text = url.toString();
+    const ext = path.extname(text);
+    const filePath = await saveFile(text, uuidv4() + ext, parentConfig);
+    return `<file>${filePath}</file>`;
+  }
+}
 export class ReplicateMusicGeneration extends BaseTool {
   toolKitName: string = 'replicate';
 
@@ -591,6 +683,7 @@ export class ReplicateToolkit extends BaseToolKit {
     return [
       new ReplicateImageEditing(this.params),
       new ReplicateImageGeneration(this.params),
+      new ReplicateMultiImageToVideo(this.params),
       new ReplicateTextToVideo(this.params),
       new ReplicateMusicGeneration(this.params),
       new ReplicatetSpeechGeneration(this.params),

@@ -19,6 +19,8 @@ import minimaxIcon from '../../../../assets/model-logos/minimax.png';
 import replicateIcon from '../../../../assets/model-logos/replicate.png';
 import elevenlabsIcon from '../../../../assets/model-logos/elevenlabs.png';
 import moonshotIcon from '../../../../assets/model-logos/moonshot.png';
+import bigmodelIcon from '../../../../assets/model-logos/bigmodel.png';
+import modelscopeIcon from '../../../../assets/model-logos/modelscope.jpeg';
 
 import { pathToFileURL } from 'url';
 import { cn } from '@/lib/utils';
@@ -48,6 +50,8 @@ const logos = {
   replicate: replicateIcon,
   elevenlabs: elevenlabsIcon,
   moonshot: moonshotIcon,
+  bigmodel: bigmodelIcon,
+  modelscope: modelscopeIcon,
 };
 // eslint-disable-next-line react/function-component-definition
 const ProviderIcon: React.FC<ProviderIconProps> = ({

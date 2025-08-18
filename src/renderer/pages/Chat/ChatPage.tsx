@@ -25,7 +25,6 @@ import Content from '@/renderer/components/layout/Content';
 import { ChatMode } from '@/types/chat';
 import { Chat } from '@/entity/Chat';
 import ChatFileContent from './ChatFileContent';
-import ChatPlannerContent from './ChatPlannerContent';
 
 export default function ChatPage() {
   const chatListRef = useRef<ChatListRef | null>(null);
@@ -33,6 +32,7 @@ export default function ChatPage() {
   const [chatId, setChatId] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
   useEffect(() => {
     // ?mode=default
     if (location.search) {
@@ -55,9 +55,6 @@ export default function ChatPage() {
 
   const onNewChat = async (mode: ChatMode) => {
     const chat = await window.electron.chat.create(mode);
-    if (chatListRef.current) {
-      chatListRef.current.getData(true);
-    }
     if (chat) {
       navigate(`/chat/${chat.id}?mode=${mode}`);
     }
@@ -73,9 +70,6 @@ export default function ChatPage() {
               <Route path="*" element={<ChatContent chatId={chatId} />} />
             )}
             {mode == 'file' && <Route path="*" element={<ChatFileContent />} />}
-            {mode == 'planner' && (
-              <Route path="*" element={<ChatPlannerContent />} />
-            )}
           </Routes>
         </div>
       </div>

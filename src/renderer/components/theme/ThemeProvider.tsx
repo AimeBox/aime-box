@@ -1,6 +1,6 @@
 import { GlobalSettings } from '@/main/settings';
 import { State } from '@/renderer/store';
-import { changeTheme, setSettings } from '@/renderer/store/settingsSlice';
+import { setSettings } from '@/renderer/store/settingsSlice';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 

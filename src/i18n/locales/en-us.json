@@ -15,22 +15,12 @@
   "DefaultLLM": "Default LLM",
   "PluginsManage": "Plugins Manage",
   "theme": "Theme",
-  "chat.delete": "Delete",
-  "chat.editTitle": "Edit Title",
   "kb.rerank_score": "rerank score",
   "kb.score": "score",
-  "chat.newchat": "New Chat",
-  "chat.chat_options.tools": "Tools",
-  "chat.chat_options.base_setting": "Base",
-  "chat.chat_options.temperature": "temperature",
-  "chat.chat_options.streaming": "streaming",
-  "chat.chat_options.system_prompt": "system prompt",
-  "chat.chat_options.knowledge_base": "knowledge base",
   "tool.add_tool": "Add Tool",
   "tools.show_all": "All",
-  "chat.chat_options.clear": "clear",
   "delete": "Delete",
-  "chat.chat_options.agents": "Agents",
+
   "selectFile": "Select File",
   "selectFolder": "Select Folder",
   "knowledge": {
@@ -53,16 +43,28 @@
     "create_prompt": "Create Prompt"
   },
   "chat": {
-    "chat_options": {
-      "tools": "tools"
-    },
+    "prompts": "Prompts",
+    "model_not_selected": "Model not selected",
     "export": "Export",
     "knowledgebase": "KnowledgeBase",
     "tool": "Tools",
     "fileChat": "File Chat",
     "export_image": "Export Image",
     "plannerChat": "Planner Chat",
-    "open_workspace": "Open Workspace"
+    "open_workspace": "Open Workspace",
+    "chat_history": "Chat Input History",
+    "change_workspace": "Change Workspace",
+    "chat_agent": "agents",
+    "chat_tools": "tools",
+    "chat_config": "chat config",
+    "chat_options": "Chat Options",
+    "chat_temperature": "temperature",
+    "system_prompt": "system prompt",
+    "streaming": "streaming",
+    "new_chat": "New Chat",
+    "reset": "reset",
+    "pre_prompt": "Pre Prompt",
+    "base_setting": "Base Setting"
   },
   "language": {
     "english": "English",
@@ -97,7 +99,8 @@
     "chromeInstancePath": "ChromeInstance Path",
     "useVision": "Use Vision",
     "plannerModel": "Planner Model",
-    "userDataDir": "UserDataDir Path"
+    "userDataDir": "UserDataDir Path",
+    "instancId": "Instanc ID"
   },
   "common": {
     "edit": "Edit",
@@ -191,7 +194,9 @@
     "braveApiKey": "Brave Api Key",
     "instances_manager": "Instances Manager",
     "instances": "Instances",
-    "instances_create": "Create Instance"
+    "instances_create": "Create Instance",
+    "secrets": "Secrets",
+    "secrets_create": "Create Secrets"
   },
   "providers": {
     "manager_model": "Manager Model"

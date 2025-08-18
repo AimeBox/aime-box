@@ -7,10 +7,12 @@ import { GlobalSettings } from '@/main/settings';
 import { isUrl } from '@/main/utils/is';
 import i18n from '@/i18n';
 import ProviderSelect from '@/renderer/components/providers/ProviderSelect';
+import { useDispatch } from 'react-redux';
+import { setSettings } from '@/renderer/store/settingsSlice';
 
 export default function DefaultModelSettings() {
   const [settings, setSetings] = useState<GlobalSettings>();
-
+  const dispatch = useDispatch();
   const getData = () => {
     const settings = window.electron.setting.getSettings();
     setSetings(settings);
@@ -24,6 +26,8 @@ export default function DefaultModelSettings() {
     if (key === 'defaultTTS') {
       await window.electron.app.resetTTS();
     }
+    const settings = window.electron.setting.getSettings();
+    dispatch(setSettings(settings));
   };
 
   useEffect(() => {

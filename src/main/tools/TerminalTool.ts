@@ -14,6 +14,8 @@ import { BaseTool } from './BaseTool';
 import { platform } from 'process';
 import { FormSchema } from '@/types/form';
 import { truncateText } from '../utils/common';
+import path from 'path';
+import fs from 'fs';
 
 export interface TerminalToolParameters extends ToolParams {
   ask_human_input: boolean;
@@ -25,9 +27,23 @@ export class TerminalTool extends BaseTool {
     platform == 'win32'
       ? {
           command: z.string(),
+          directory: z
+            .string()
+            .optional()
+            .describe(
+              '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
+            ),
           terminal: z.enum(['cmd.exe', 'pwsh.exe']).optional(),
         }
-      : { command: z.string() },
+      : {
+          command: z.string(),
+          directory: z
+            .string()
+            .optional()
+            .describe(
+              '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
+            ),
+        },
   );
 
   name: string = 'terminal';
@@ -85,8 +101,27 @@ export class TerminalTool extends BaseTool {
     console.log(`Executing command:\n ${input.command}`);
     let cwd;
     const workspace = config?.configurable?.workspace;
+
+    if (input.directory) {
+      if (!fs.existsSync(input.directory)) {
+        throw new Error(`Directory ${input.directory} does not exist`);
+      }
+      if (
+        fs.existsSync(input.directory) &&
+        !fs.statSync(input.directory).isDirectory()
+      ) {
+        throw new Error(`Directory ${input.directory} is not a directory`);
+      }
+    }
     if (workspace) {
       cwd = workspace;
+      if (input.directory) {
+        cwd = path.join(cwd, input.directory);
+      }
+    } else {
+      if (input.directory) {
+        cwd = input.directory;
+      }
     }
 
     if (this.ask_human_input) {

@@ -9,6 +9,7 @@ import {
   mergeMessageRuns,
   isAIMessage,
   AIMessage,
+  isHumanMessage,
 } from '@langchain/core/messages';
 import tokenCounter from './tokenCounter';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -16,7 +17,7 @@ import {
   ChatPromptTemplate,
   SystemMessagePromptTemplate,
 } from '@langchain/core/prompts';
-import { isArray, isString } from './is';
+import { isArray, isObject, isString } from './is';
 
 const SystemPrompt: string = `You are a specialized summarization assistant. Your task is to create a concise but comprehensive summary of the conversation history.
 
@@ -183,8 +184,90 @@ const removeThinkTags = (text: string): string => {
   return text.replaceAll(/<think>([\s\S]*?)<\/think>/g, '');
 };
 
+const prependPart = (messages: BaseMessage, part: any) => {
+  const user_input = isString(messages.content)
+    ? [{ type: 'text', text: messages.content }]
+    : [...messages.content];
+  let part_content = part;
+  if (isString(part_content)) {
+    part_content = [{ type: 'text', text: part }];
+  } else if (isObject(part_content)) {
+    part_content = [part];
+  }
+  messages.content = [...part_content, ...user_input];
+
+  return messages;
+};
+
+const appendPart = (messages: BaseMessage, part: any) => {
+  const user_input = isString(messages.content)
+    ? [{ type: 'text', text: messages.content }]
+    : [...messages.content];
+  let part_content = part;
+  if (isString(part_content)) {
+    part_content = [{ type: 'text', text: part }];
+  } else if (isObject(part_content)) {
+    part_content = [part];
+  }
+
+  messages.content = [...user_input, ...part_content];
+  return messages;
+};
+
+const fixMessages = (messages: BaseMessage[]) => {
+  const _messages = messages.filter((x) => {
+    if (isToolMessage(x)) {
+      if (!x.tool_call_id) {
+        return false;
+      }
+      if (
+        !messages.find(
+          (z) =>
+            isAIMessage(z) && z.tool_calls?.find((t) => t.id == x.tool_call_id),
+        )
+      ) {
+        return false;
+      }
+    } else if (isAIMessage(x)) {
+      if (x.tool_calls && x.tool_calls.length > 0) {
+        if (x.tool_calls.filter((z) => !z.id).length > 0) {
+          return false;
+        }
+        const tool_call_ids = x.tool_calls.map((t) => t.id);
+        const tool_call_ids_in_tool_messages = messages
+          .filter((m) => isToolMessage(m))
+          .map((m) => m.tool_call_id);
+
+        if (
+          tool_call_ids.some((z) => !tool_call_ids_in_tool_messages.includes(z))
+        ) {
+          return false;
+        }
+      }
+    } else if (isHumanMessage(x)) {
+      if (!x.content || (isString(x.content) && x.content.trim() == '')) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  _messages.forEach((x) => {
+    if (isAIMessage(x)) {
+      if (!x.content) {
+        x.content = '';
+      }
+    }
+  });
+
+  return _messages;
+};
+
 export {
   checkAndSummarize,
   convertMessagesForNonFunctionCallingModels,
   removeThinkTags,
+  prependPart,
+  appendPart,
+  fixMessages,
 };
