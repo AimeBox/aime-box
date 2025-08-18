@@ -27,6 +27,7 @@ export interface ChatListProps {
   onNewChat?: (mode: 'default' | 'planner' | 'file') => void;
   className?: string;
   showSearch?: boolean;
+  showAddButton?: boolean;
 }
 // const ChatListComponent = function ({
 //   onNewChat,
@@ -36,7 +37,12 @@ export interface ChatListProps {
 // };
 
 const ChatList = React.forwardRef((props: ChatListProps, ref) => {
-  const { onNewChat, className, showSearch = true } = props;
+  const {
+    onNewChat,
+    className,
+    showSearch = true,
+    showAddButton = true,
+  } = props;
   const location = useLocation();
   const [chats, setChats] = useState<ChatInfo[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -144,42 +150,44 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
           getData();
         }}
         addButton={
-          <Popover
-            placement="rightTop"
-            trigger="click"
-            open={addButtonOpen}
-            onOpenChange={setAddButtonOpen}
-            content={
-              <div className="flex flex-col">
-                <Button
-                  type="text"
-                  block
-                  icon={<FaRegMessage />}
-                  onClick={() => {
-                    setAddButtonOpen(false);
-                    onNewChat('default');
-                  }}
-                >
-                  {t('chat.new_chat')}
-                </Button>
-                {!isPackaged && (
+          showAddButton ? (
+            <Popover
+              placement="rightTop"
+              trigger="click"
+              open={addButtonOpen}
+              onOpenChange={setAddButtonOpen}
+              content={
+                <div className="flex flex-col">
                   <Button
                     type="text"
                     block
                     icon={<FaRegMessage />}
                     onClick={() => {
                       setAddButtonOpen(false);
-                      onNewChat('file');
+                      onNewChat('default');
                     }}
                   >
-                    {t('chat.fileChat')}
+                    {t('chat.new_chat')}
                   </Button>
-                )}
-              </div>
-            }
-          >
-            <Button icon={<FaPlus />} className=""></Button>
-          </Popover>
+                  {!isPackaged && (
+                    <Button
+                      type="text"
+                      block
+                      icon={<FaRegMessage />}
+                      onClick={() => {
+                        setAddButtonOpen(false);
+                        onNewChat('file');
+                      }}
+                    >
+                      {t('chat.fileChat')}
+                    </Button>
+                  )}
+                </div>
+              }
+            >
+              <Button icon={<FaPlus />} className=""></Button>
+            </Popover>
+          ) : undefined
         }
       >
         <div className="flex flex-col gap-1">

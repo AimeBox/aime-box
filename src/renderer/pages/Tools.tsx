@@ -601,7 +601,7 @@ export default function Tools() {
                       </div>
                     }
                     subTitle={<small>{item.description}</small>}
-                    href={`/tools?id=${item.name}`}
+                    href={`?id=${item.name}`}
                     // onClick={() => {
                     //   navigate(`/tools?id=${item.name}`);
                     // }}
@@ -613,7 +613,7 @@ export default function Tools() {
                           type="text"
                           icon={<FaEdit />}
                           onClick={() => {
-                            navigate(`/tools?id=${item.name}`);
+                            navigate(`?id=${item.name}`);
                             onShowToolSetting(item);
                           }}
                         />
