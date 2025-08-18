@@ -66,6 +66,7 @@ import FileDropZone from '@/renderer/components/common/FileDropZone';
 import ChatToolView from '@/renderer/components/chat/ChatToolView';
 import ChatHistoryDrawer from './ChatHistoryDrawer';
 import { formatNumber } from '@/main/utils/format';
+import ChatInput from '@/renderer/components/chat/ChatInput';
 
 export interface ChatContentProps {
   chatId?: string;
@@ -157,18 +158,16 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
     return res;
   };
 
-  const onChat = async () => {
-    if (!chatInputMessage?.trim()) {
+  const onChat = async (text?: string, attachments?: ChatInputAttachment[]) => {
+    if (!text?.trim()) {
       return;
     }
-
     window.electron.chat.chatResquest({
       chatId: currentChat.id,
-      content: chatInputMessage.trim(),
-      extend: { attachments: attachments },
+      content: text.trim(),
+      extend: { attachments },
     });
-    // Ref.current?.clear();
-    setChatInputMessage(undefined);
+    setChatInputMessage('');
     setAttachments([]);
     scrollToBottom(false);
   };
@@ -652,7 +651,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                   </div>
                 </Splitter.Panel>
                 <Splitter.Panel min={220} defaultSize={220}>
-                  <div className="p-4 h-full">
+                  {/* <div className="p-4 h-full">
                     <div className="flex flex-col gap-2 p-3 h-full bg-gray-100 rounded-2xl border border-gray-200 border-solid dark:border-none dark:bg-gray-600">
                       <div className="flex flex-row justify-between">
                         <div className="flex flex-row items-center">
@@ -699,13 +698,6 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                               onSelectFile([]);
                             }}
                           ></Button>
-                          {/* <ChatQuickInput
-                            onClick={(text) => {
-                              //editorRef.current?.insertText(text);
-                              setChatInputMessage(text);
-                            }}
-                            className="ml-2"
-                          /> */}
                         </div>
 
                         <div>
@@ -731,13 +723,6 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                       )}
                       <div className="flex flex-col flex-1 gap-2 h-full">
                         <div className="flex flex-col flex-1 h-full">
-                          {/* <ChatQuickInput
-                      onClick={(text) => {
-                        editorRef.current?.insertText(text);
-                        setChatInputMessage(text);
-                      }}
-                      className="mb-1"
-                    /> */}
                           <div className="flex-1 w-full h-full text-sm bg-transparent outline-none resize-none">
                             <Input.TextArea
                               id="chat-input"
@@ -755,14 +740,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                   onChat();
                                 }
                               }}
-                              // onPressEnter={(e) => {
-                              //   if (!e.shiftKey) {
-                              //     e.preventDefault();
-                              //     onChat();
-                              //   }
-                              // }}
                             ></Input.TextArea>
-                            {/* <FileDropZone></FileDropZone> */}
                           </div>
                         </div>
                       </div>
@@ -881,7 +859,134 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                         )}
                       </div>
                     </div>
-                  </div>
+                  </div> */}
+                  <ChatInput
+                    isRunning={currentChat?.status == 'running'}
+                    onChat={onChat}
+                    chatInputValue={chatInputMessage}
+                    attachments={attachments}
+                    onAttachmentsChanged={setAttachments}
+                    onCancel={() => onCancel(currentChat.id)}
+                    footer={
+                      <div className="flex flex-row items-center justify-between w-full pr-2">
+                        <div className="flex flex-row items-center gap-2">
+                          <ProviderSelect
+                            type="llm"
+                            value={currentModel}
+                            onChange={onChangeCurrentModel}
+                            style={{ width: '200px' }}
+                          />
+                          <Tooltip
+                            placement="top"
+                            title={
+                              <div className="flex flex-col">
+                                <strong>{t('chat.tool')}</strong>
+                                {currentChat?.options?.toolNames?.join(',')}
+                              </div>
+                            }
+                          >
+                            <Button
+                              className="flex flex-row items-center rounded-full"
+                              color={
+                                currentChat?.options?.toolNames?.length > 0
+                                  ? 'primary'
+                                  : 'default'
+                              }
+                              variant={
+                                currentChat?.options?.toolNames?.length > 0
+                                  ? 'filled'
+                                  : 'outlined'
+                              }
+                              onClick={() => {
+                                tools.open(
+                                  currentChat?.options?.toolNames || [],
+                                );
+                                tools.onSelect = (_tools) => {
+                                  onChatOptionsChanged({
+                                    toolNames: _tools.map((x) => x.name),
+                                  });
+                                };
+                              }}
+                            >
+                              {t('chat.tool')}
+                              <Tag className="mr-0 rounded-full">
+                                +{' '}
+                                {currentChat?.options?.toolNames?.length > 0
+                                  ? currentChat?.options?.toolNames?.length
+                                  : 'add'}
+                              </Tag>
+                            </Button>
+                          </Tooltip>
+                          <Tooltip
+                            placement="top"
+                            title={
+                              <div className="flex flex-col">
+                                <strong>{t('chat.knowledgebase')}</strong>
+                                {currentChat?.options?.toolNames?.join(',')}
+                              </div>
+                            }
+                          >
+                            <Button
+                              className="flex flex-row items-center rounded-full"
+                              color={
+                                currentChat?.options?.kbList?.length > 0
+                                  ? 'primary'
+                                  : 'default'
+                              }
+                              variant={
+                                currentChat?.options?.kbList?.length > 0
+                                  ? 'filled'
+                                  : 'outlined'
+                              }
+                              onClick={() => {
+                                knowledgeBase.open(
+                                  currentChat?.options?.kbList || [],
+                                );
+
+                                knowledgeBase.onSelect = (kbs) => {
+                                  onChatOptionsChanged({
+                                    kbList: kbs.map((kb) => kb.id),
+                                  });
+                                };
+                              }}
+                            >
+                              {t('chat.knowledgebase')}
+                              <Tag className="mr-0 rounded-full">
+                                +{' '}
+                                {currentChat?.options?.kbList?.length > 0
+                                  ? currentChat?.options?.kbList?.length
+                                  : 'add'}
+                              </Tag>
+                            </Button>
+                          </Tooltip>
+                          <Button
+                            icon={<FaGear />}
+                            type="text"
+                            onClick={() => {
+                              setOpenChatOptionsDrawer(true);
+                            }}
+                          />
+                          <Tooltip placement="top" title="Clear All Message">
+                            <Popconfirm
+                              title="Delete All Message?"
+                              onConfirm={onClearChatMessages}
+                              okText="Yes"
+                              cancelText={t('cancel')}
+                            >
+                              <Button icon={<FaTrashAlt />} type="text" />
+                            </Popconfirm>
+                          </Tooltip>
+                        </div>
+                        <Button
+                          icon={<FaPaperclip />}
+                          type="text"
+                          onClick={() => {
+                            onSelectFile([]);
+                          }}
+                        ></Button>
+                      </div>
+                    }
+                  />
                 </Splitter.Panel>
               </Splitter>
             </Splitter.Panel>
