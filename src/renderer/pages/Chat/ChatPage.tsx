@@ -55,9 +55,6 @@ export default function ChatPage() {
 
   const onNewChat = async (mode: ChatMode) => {
     const chat = await window.electron.chat.create(mode);
-    if (chatListRef.current) {
-      chatListRef.current.getData(true);
-    }
     if (chat) {
       navigate(`/chat/${chat.id}?mode=${mode}`);
     }

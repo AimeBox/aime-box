@@ -118,15 +118,21 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
       return updatedChats;
     });
   };
+  const handleChatListChanged = (data: { action: string; chatId: string }) => {
+    console.log('chat:list-changed', data);
+    if (data.action === 'add') {
+      getData(true);
+    }
+  };
   useEffect(() => {
     window.electron.ipcRenderer.on('chat:title-changed', handleTitleChanged);
     window.electron.ipcRenderer.on('chat:start', handleChatChanged);
     window.electron.ipcRenderer.on('chat:end', handleChatChanged);
+    window.electron.ipcRenderer.on('chat:list-changed', handleChatListChanged);
+
     return () => {
-      window.electron.ipcRenderer.removeListener(
-        'chat:title-changed',
-        handleTitleChanged,
-      );
+      window.electron.ipcRenderer.removeAllListeners('chat:title-changed');
+      window.electron.ipcRenderer.removeAllListeners('chat:list-changed');
     };
   }, []);
 

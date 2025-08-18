@@ -138,7 +138,7 @@ export class ChatManager {
         mode: ChatMode,
         providerModel?: string,
         agentName?: string,
-      ) => await this.createChat(providerModel, mode, agentName),
+      ) => await this.createChat(event, providerModel, mode, agentName),
     );
     ipcMain.handle(
       'chat:update',
@@ -311,7 +311,12 @@ export class ChatManager {
     );
   }
 
-  public async createChat(model: string, mode: ChatMode, agentName?: string) {
+  public async createChat(
+    event: IpcMainInvokeEvent,
+    model: string,
+    mode: ChatMode,
+    agentName?: string,
+  ) {
     const defaultLLM = await settingsManager.getSettings()?.defaultLLM;
     if (!model) {
       model = defaultLLM;
@@ -327,6 +332,7 @@ export class ChatManager {
     }
 
     const res = await this.chatRepository.save(data);
+    event.sender.send(`chat:list-changed`, { action: 'add', chat: res });
     return res;
   }
 
@@ -363,6 +369,7 @@ export class ChatManager {
   public async deleteChat(event: IpcMainInvokeEvent, chatId: string) {
     await this.clearChat(chatId);
     const res = await this.chatRepository.delete(chatId);
+    event.sender.send(`chat:list-changed`, { action: 'delete', chatId });
     return res;
   }
 
