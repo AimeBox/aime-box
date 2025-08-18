@@ -160,7 +160,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
                     onNewChat('default');
                   }}
                 >
-                  {t('chat.newchat')}
+                  {t('chat.new_chat')}
                 </Button>
                 {!isPackaged && (
                   <Button

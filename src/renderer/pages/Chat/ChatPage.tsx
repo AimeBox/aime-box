@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [chatId, setChatId] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
   useEffect(() => {
     // ?mode=default
     if (location.search) {

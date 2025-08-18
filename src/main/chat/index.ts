@@ -312,6 +312,11 @@ export class ChatManager {
   }
 
   public async createChat(model: string, mode: ChatMode, agentName?: string) {
+    const defaultLLM = await settingsManager.getSettings()?.defaultLLM;
+    if (!model) {
+      model = defaultLLM;
+    }
+
     const data = new Chat(uuidv4(), 'New Chat', model, mode, agentName);
 
     if (agentName) {

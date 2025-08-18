@@ -3,6 +3,7 @@ import {
   MemoryRouter as Router,
   Routes,
   Route,
+  Navigate,
 } from 'react-router-dom';
 import 'tailwindcss/tailwind.css';
 import icon from '../../assets/icon.png';
@@ -87,6 +88,7 @@ export default function App() {
           <Router>
             <TemplatePage>
               <Routes>
+                <Route path="/" element={<Navigate to="/home" replace />} />
                 <Route path="/home" element={<Home />} />
                 <Route path="/agent/*" element={<AgentPage />} />
                 <Route path="/prompts/*" element={<PromptsPage />} />

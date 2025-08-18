@@ -25,6 +25,7 @@ export interface ChatInputProps {
   onAttachmentsChanged?: (attachments: ChatInputAttachment[]) => void;
   submitIcon?: React.ReactNode;
   chatInputValue?: string;
+  attachmentEnabled?: boolean;
 }
 
 const ChatInput = React.forwardRef((props: ChatInputProps, ref) => {
@@ -35,6 +36,7 @@ const ChatInput = React.forwardRef((props: ChatInputProps, ref) => {
     isRunning = false,
     attachments: initialAttachments = [],
     chatInputValue: initialChatInputValue = '',
+    attachmentEnabled = true,
   } = props;
   const [attachments, setAttachments] =
     useState<ChatInputAttachment[]>(initialAttachments);
@@ -58,6 +60,29 @@ const ChatInput = React.forwardRef((props: ChatInputProps, ref) => {
     const _attachments = attachments.filter((x) => x.path != attachment.path);
     setAttachments(_attachments);
     props.onAttachmentsChanged?.(_attachments);
+  };
+
+  const onSelectFile = async () => {
+    const res = await window.electron.app.showOpenDialog({
+      properties: ['openFile', 'multiSelections'],
+    });
+    if (res && res.length > 0) {
+      const _attachments = [];
+      for (const item of res) {
+        if (attachments.find((x) => x.path == item.path)) {
+          continue;
+        }
+        _attachments.push({
+          path: item.path,
+          name: item.name,
+          type: item.type,
+          ext: item.ext,
+        });
+      }
+      const new_attachments = [...attachments, ..._attachments];
+      setAttachments(new_attachments);
+      props.onAttachmentsChanged?.(new_attachments);
+    }
   };
 
   return (
@@ -190,23 +215,34 @@ const ChatInput = React.forwardRef((props: ChatInputProps, ref) => {
             </Tooltip>
           </div> */}
           {footer || <div></div>}
-          {isRunning && (
-            <Button
-              type="primary"
-              icon={<FaStop />}
-              onClick={() => {
-                onCancel();
-              }}
-            />
-          )}
-          {!isRunning && (
-            <Button
-              type="primary"
-              disabled={!chatInputValue?.trim()}
-              icon={props.submitIcon || <FaArrowUp />}
-              onClick={onChat}
-            />
-          )}
+          <div className="flex flex-row items-center gap-2">
+            {attachmentEnabled && (
+              <Button
+                icon={<FaPaperclip />}
+                type="text"
+                onClick={() => {
+                  onSelectFile();
+                }}
+              ></Button>
+            )}
+            {isRunning && (
+              <Button
+                type="primary"
+                icon={<FaStop />}
+                onClick={() => {
+                  onCancel();
+                }}
+              />
+            )}
+            {!isRunning && (
+              <Button
+                type="primary"
+                disabled={!chatInputValue?.trim()}
+                icon={props.submitIcon || <FaArrowUp />}
+                onClick={onChat}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>

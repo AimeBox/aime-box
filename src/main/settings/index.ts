@@ -269,7 +269,7 @@ class SettingsManager {
       }
 
       // 确保所有类型的值都存储为字符串
-      if (value === null) {
+      if (value === null || value === undefined) {
         entity.value = null;
       } else if (typeof value === 'boolean') {
         entity.value = value.toString();
