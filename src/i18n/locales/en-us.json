@@ -63,7 +63,8 @@
     "export_image": "Export Image",
     "plannerChat": "Planner Chat",
     "open_workspace": "Open Workspace",
-    "chat_history": "Chat Input History"
+    "chat_history": "Chat Input History",
+    "change_workspace": "Change Workspace"
   },
   "language": {
     "english": "English",
@@ -193,7 +194,9 @@
     "braveApiKey": "Brave Api Key",
     "instances_manager": "Instances Manager",
     "instances": "Instances",
-    "instances_create": "Create Instance"
+    "instances_create": "Create Instance",
+    "secrets": "Secrets",
+    "secrets_create": "Create Secrets"
   },
   "providers": {
     "manager_model": "Manager Model"

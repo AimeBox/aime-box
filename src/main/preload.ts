@@ -88,7 +88,7 @@ const electronHandler = {
       const res = ipcRenderer.sendSync('db:insert', tableName, data);
       return res;
     },
-    update(tableName: string, data: any[], condition: any) {
+    update(tableName: string, data: any[] | any, condition: any) {
       const res = ipcRenderer.sendSync('db:update', tableName, data, condition);
       return res;
     },
@@ -140,6 +140,8 @@ const electronHandler = {
   chat: {
     openWorkspace: (chatId: string) =>
       ipcRenderer.invoke('chat:openWorkspace', chatId),
+    changeWorkspace: (chatId: string) =>
+      ipcRenderer.invoke('chat:change-workspace', chatId),
     getChatPage: (input: {
       filter?: string;
       skip: number;
@@ -405,6 +407,8 @@ const electronHandler = {
     delete: (id: string) => ipcRenderer.invoke('instances:delete', id),
     run: (id: string) => ipcRenderer.invoke('instances:run', id),
     stop: (id: string) => ipcRenderer.invoke('instances:stop', id),
+    getBrowserExecutables: () =>
+      ipcRenderer.invoke('instances:getBrowserExecutables'),
   },
 };
 

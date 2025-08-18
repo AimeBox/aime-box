@@ -861,14 +861,14 @@ export class ExtractAgent extends BaseAgent {
     {
       label: t('common.response_format'),
       field: 'response_format',
-      component: 'Select',
+      component: 'AutoComplete',
       componentProps: {
         allowClear: true,
         options: [
-          { label: 'json_object', value: 'json_object' },
+          // { label: 'json_object', value: 'json_object' },
           // { label: 'functionCalling', value: 'functionCalling' },
-          // { label: 'jsonMode', value: 'jsonMode' },
-          { label: 'json_schema', value: 'json_schema' },
+          { label: 'JsonMode', value: 'jsonMode' },
+          { label: 'JsonSchema', value: 'jsonSchema' },
         ],
       },
     },

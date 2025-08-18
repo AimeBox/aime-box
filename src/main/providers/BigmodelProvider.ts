@@ -19,7 +19,7 @@ export class BigmodelProvider extends BaseProvider {
   }
 
   getChatModel(modelName: string, options: ChatOptions): BaseChatModel {
-    const llm = new ChatOpenAI({
+    let llm = new ChatOpenAI({
       apiKey: this.provider.api_key,
       modelName: modelName,
       configuration: {
@@ -67,6 +67,12 @@ export class BigmodelProvider extends BaseProvider {
         enable:
           this.provider.models?.find((z) => z.name == 'glm-4.1v-thinking-flash')
             ?.enable || false,
+      },
+      {
+        name: 'glm-4.5v',
+        enable:
+          this.provider.models?.find((z) => z.name == 'glm-4.5v')?.enable ||
+          false,
       },
     ];
   }

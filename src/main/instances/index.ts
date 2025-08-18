@@ -10,7 +10,7 @@ import { BaseInstance } from './BaseInstance';
 import { notificationManager } from '../app/NotificationManager';
 import path from 'path';
 import { getDataPath } from '../utils/path';
-import { chromePath } from 'chrome-paths';
+import chromePath from 'chrome-paths';
 import { getEdgePath } from 'edge-paths';
 
 export interface InstanceInfo extends Instances {
@@ -173,6 +173,14 @@ export class InstanceManager extends BaseManager {
     return (
       await this.getInstance(id || this.DEFAULT_BROWSER_INSTANCE_ID, model)
     ).instance as BrowserInstance;
+  }
+
+  @channel('instances:getBrowserExecutables')
+  public async getBrowserExecutables() {
+    return {
+      chrome: chromePath?.chrome,
+      edge: getEdgePath(),
+    };
   }
 }
 

@@ -15,15 +15,26 @@ import {
 } from 'react-icons/fa';
 import { InstanceInfo } from '@/main/instances';
 import { transformFlatObjectToNested } from '@/renderer/utils/common';
+import { FaEdge } from 'react-icons/fa6';
 
 export default function InstancesManager() {
   const [messageApi, contextHolder] = message.useMessage();
   const [instances, setInstances] = useState<InstanceInfo[]>([]);
   const [currentInstance, setCurrentInstance] = useState<any>();
+  const [browserExecutables, setBrowserExecutables] = useState<
+    | {
+        chrome?: string;
+        edge?: string;
+      }
+    | undefined
+  >();
 
   const getData = async () => {
     const instances = await window.electron.instances.getList();
-    console.log(instances);
+    const browserExecutables =
+      await window.electron.instances.getBrowserExecutables();
+    setBrowserExecutables(browserExecutables);
+    console.log(instances, browserExecutables);
     setInstances(instances);
   };
 
@@ -86,11 +97,27 @@ export default function InstancesManager() {
       },
     },
     {
+      label: 'Mode',
+      field: 'config.mode',
+      component: 'Select',
+      defaultValue: 'local',
+      componentProps: {
+        options: [
+          { label: 'Local', value: 'local' },
+          { label: 'CDP', value: 'cdp' },
+          { label: 'WSS', value: 'wss' },
+        ],
+      },
+      ifShow: ({ values }) => {
+        return values.type === 'browser';
+      },
+    },
+    {
       label: 'CDP URL',
       field: 'config.cdpUrl',
       component: 'Input',
       ifShow: ({ values }) => {
-        return values.type === 'browser';
+        return values.type === 'browser' && values['config.mode'] === 'cdp';
       },
     },
     {
@@ -98,13 +125,25 @@ export default function InstancesManager() {
       field: 'config.wssUrl',
       component: 'Input',
       ifShow: ({ values }) => {
-        return values.type === 'browser';
+        return values.type === 'browser' && values['config.mode'] === 'wss';
       },
     },
     {
       label: 'Chrome Executable Path',
       field: 'config.executablePath',
-      component: 'Input',
+      component: 'AutoComplete',
+      componentProps: {
+        options: [
+          browserExecutables?.edge && {
+            label: `[Edge]${browserExecutables?.edge}`,
+            value: browserExecutables?.edge,
+          },
+          browserExecutables?.chrome && {
+            label: `[Chrome]${browserExecutables?.chrome}`,
+            value: browserExecutables?.chrome,
+          },
+        ],
+      },
       ifShow: ({ values }) => {
         return values.type === 'browser';
       },
@@ -112,7 +151,7 @@ export default function InstancesManager() {
     {
       label: 'User Data Path',
       field: 'config.userDataPath',
-      component: 'Input',
+      component: 'Folder',
       ifShow: ({ values }) => {
         return values.type === 'browser';
       },
@@ -127,7 +166,7 @@ export default function InstancesManager() {
         title={t('settings.instances_manager')}
         ref={modalRef}
         schemas={schemas}
-        formProps={{ layout: 'horizontal' }}
+        formProps={{ layout: 'vertical' }}
         onFinish={(values: any) => {
           const data = transformFlatObjectToNested(values);
           console.log(data);

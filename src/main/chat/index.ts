@@ -10,11 +10,10 @@ import {
 } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
 import { concat } from '@langchain/core/utils/stream';
-
 // import AppDataSource from '../../data-source';
 
 import { In, Like, Repository } from 'typeorm';
-import * as fs from 'node:fs/promises';
+import fs from 'fs';
 import ExcelJS, { config } from 'exceljs';
 import {
   BaseMessage,
@@ -73,7 +72,6 @@ import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { createSupervisor } from '@langchain/langgraph-supervisor';
 import { Agent } from '@/entity/Agent';
 import { AgentExecutor } from 'langchain/agents';
-import { writeFile } from 'node:fs/promises';
 import { runAgent } from './runAgent';
 import {
   Command,
@@ -151,6 +149,9 @@ export class ChatManager {
         model: string,
         options?: ChatOptions,
       ) => this.updateChat(event, chatId, title, model, options),
+    );
+    ipcMain.handle('chat:change-workspace', (event, chatId: string) =>
+      this.changeChatWorkspace(event, chatId),
     );
     ipcMain.handle('chat:delete', (event, chatId: string) =>
       this.deleteChat(event, chatId),
@@ -478,7 +479,7 @@ export class ChatManager {
             attachment.ext == '.png' ||
             attachment.ext == '.jpeg')
         ) {
-          const imageData = await fs.readFile(attachment.path);
+          const imageData = await fs.promises.readFile(attachment.path);
           res.content.push({
             type: 'image_url',
             image_url: {
@@ -702,6 +703,10 @@ export class ChatManager {
         if (isAIMessage(message)) {
           msg.content = [{ type: 'text', text: message.content }];
           msg.tool_calls = message?.tool_calls || [];
+
+          if (message.tool_calls.find((x) => !x.id)) {
+            message.additional_kwargs['error'] = 'Tool call id is required';
+          }
         } else if (isToolMessage(message)) {
           msg.content = [
             {
@@ -763,7 +768,9 @@ export class ChatManager {
         event(`chat:message-changed:${chatId}`, msg);
       },
     };
-    await fs.mkdir(this.getChatPath(chatId), { recursive: true });
+    await fs.promises.mkdir(await this.getChatPath(chatId), {
+      recursive: true,
+    });
     try {
       if (chat.mode == 'agent' && chat.agent) {
         // agent 模式
@@ -774,7 +781,7 @@ export class ChatManager {
             options: chat.options,
             callbacks,
             signal: controller.signal,
-            configurable: { workspace: this.getChatPath(chatId), chatId },
+            configurable: { workspace: await this.getChatPath(chatId), chatId },
           });
         } else if (agent.type == 'react') {
           await this.chatReact(agent, messages, {
@@ -782,7 +789,7 @@ export class ChatManager {
             options: chat.options,
             callbacks,
             signal: controller.signal,
-            configurable: { workspace: this.getChatPath(chatId), chatId },
+            configurable: { workspace: await this.getChatPath(chatId), chatId },
           });
         } else if (agent.type == 'built-in') {
           await this.chatBuiltIn(agent, messages, {
@@ -793,7 +800,7 @@ export class ChatManager {
             signal: controller.signal,
             fixedThreadId: agent.fixedThreadId,
             configurable: {
-              workspace: this.getChatPath(chatId),
+              workspace: await this.getChatPath(chatId),
               thread_id: agent.fixedThreadId === true ? chatId : undefined,
               recursionLimit:
                 agent.config?.recursionLimit || agent?.recursionLimit || 25,
@@ -808,7 +815,7 @@ export class ChatManager {
             options: chat.options,
             callbacks,
             signal: controller.signal,
-            configurable: { workspace: this.getChatPath(chatId), chatId },
+            configurable: { workspace: await this.getChatPath(chatId), chatId },
           });
         }
       } else {
@@ -819,7 +826,7 @@ export class ChatManager {
           chat.options,
           callbacks,
           controller.signal,
-          { workspace: this.getChatPath(chatId) },
+          { workspace: await this.getChatPath(chatId) },
         );
       }
     } catch (err) {
@@ -883,7 +890,11 @@ export class ChatManager {
     }
   }
 
-  getChatPath(chatId: string) {
+  async getChatPath(chatId: string) {
+    const chat = await this.getChat(chatId);
+    if (chat.workspace) {
+      return chat.workspace;
+    }
     return path.join(getDataPath(), 'chats', chatId);
   }
 
@@ -893,7 +904,9 @@ export class ChatManager {
       notificationManager.sendNotification('Chat mode is not file', 'error');
       return;
     }
-    await fs.mkdir(this.getChatPath(chatId), { recursive: true });
+    await fs.promises.mkdir(await this.getChatPath(chatId), {
+      recursive: true,
+    });
 
     const chatFiles = [];
     for (let index = 0; index < files.length; index++) {
@@ -1320,7 +1333,7 @@ export class ChatManager {
 
     const _image = image.substring(image.indexOf(',') + 1);
     const imageBuffer = Buffer.from(_image, 'base64');
-    await writeFile(_savePath, imageBuffer);
+    await fs.promises.writeFile(_savePath, imageBuffer);
   }
 
   public async clearChat(chatId: string) {
@@ -1337,10 +1350,13 @@ export class ChatManager {
 
     await writes.delete({ thread_id: chatId });
 
-    const workspace = path.join(getDataPath(), 'chats', chatId);
+    const workspace = await this.getChatPath(chatId);
     try {
-      if ((await fs.stat(workspace)).isDirectory()) {
-        await fs.rm(workspace, { recursive: true });
+      if (
+        fs.existsSync(workspace) &&
+        (await fs.promises.stat(workspace)).isDirectory()
+      ) {
+        await fs.promises.rm(workspace, { recursive: true });
       }
     } catch {}
   }
@@ -1372,12 +1388,47 @@ export class ChatManager {
   }
 
   public async openWorkspace(chatId: string) {
+    const chat = await this.getChat(chatId);
+    if (chat.workspace) {
+      if (
+        fs.existsSync(chat.workspace) &&
+        (await fs.promises.stat(chat.workspace)).isDirectory()
+      ) {
+        await shell.openPath(chat.workspace);
+      }
+
+      return;
+    }
+
     const workspace = path.join(getDataPath(), 'chats', chatId);
     try {
-      if ((await fs.stat(workspace)).isDirectory()) {
+      if (
+        fs.existsSync(workspace) &&
+        (await fs.promises.stat(workspace)).isDirectory()
+      ) {
         await shell.openPath(workspace);
       }
     } catch {}
+  }
+
+  public async changeChatWorkspace(event: IpcMainInvokeEvent, chatId: string) {
+    const _chat = await this.chatRepository.findOne({
+      where: { id: chatId },
+    });
+    if (_chat) {
+      const res = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        title: 'Select Workspace',
+        defaultPath: _chat.workspace || undefined,
+      });
+      if (res && !res.canceled && res.filePaths.length == 1) {
+        _chat.workspace = res.filePaths[0].replace(/\\/g, '/');
+        await this.chatRepository.save(_chat);
+        event.sender.send(`chat:changed:${chatId}`, _chat);
+        return undefined;
+      }
+    }
+    return undefined;
   }
 }
 

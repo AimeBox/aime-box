@@ -49,6 +49,7 @@ import {
   FaFileExport,
   FaGear,
   FaRegFaceLaugh,
+  FaRegFolder,
   FaTowerObservation,
 } from 'react-icons/fa6';
 import { useLocation } from 'react-router-dom';
@@ -367,6 +368,9 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   const onOpenWorkspace = async () => {
     const res = await window.electron.chat.openWorkspace(currentChat.id);
   };
+  const onChangeWorkspace = async () => {
+    const res = await window.electron.chat.changeWorkspace(currentChat.id);
+  };
   const onExportImage = async () => {
     try {
       const dataUrl = await domtoimage.toJpeg(
@@ -426,6 +430,21 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
       extend: { attachments: [] },
       is_hidden_message: true,
     });
+  };
+
+  const chatInputHandleReplace = (value: string) => {
+    const textarea = document.getElementById(
+      'chat-input',
+    ) as HTMLTextAreaElement;
+
+    console.log(textarea.value, textarea.selectionStart, textarea.selectionEnd);
+
+    const insertionText = value; // 你要替换或插入的字符
+
+    const beforeCursor = textarea.value.substring(0, textarea.selectionStart);
+    const afterCursor = textarea.value.substring(textarea.selectionEnd);
+
+    setChatInputMessage(beforeCursor + insertionText + afterCursor);
   };
 
   return (
@@ -507,9 +526,10 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                               {t('chat.export')}
                             </Button> */}
                                 <Button
-                                  icon={<FaFolder />}
+                                  icon={<FaRegFolder />}
                                   type="text"
                                   block
+                                  className="justify-start"
                                   onClick={() => {
                                     setOpenMenu(false);
                                     onOpenWorkspace();
@@ -518,8 +538,21 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                   {t('chat.open_workspace')}
                                 </Button>
                                 <Button
+                                  icon={<FaFolder />}
+                                  type="text"
+                                  block
+                                  className="justify-start"
+                                  onClick={() => {
+                                    setOpenMenu(false);
+                                    onChangeWorkspace();
+                                  }}
+                                >
+                                  {t('chat.change_workspace')}
+                                </Button>
+                                <Button
                                   icon={<FaFileExport />}
                                   type="text"
+                                  className="justify-start"
                                   block
                                   onClick={() => {
                                     setOpenMenu(false);
@@ -640,10 +673,13 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                                 onEmojiClick={(v) => {
                                   //editorRef.current?.insertText(v.emoji);
                                   setEmojiOpen(false);
+                                  chatInputHandleReplace(v.emoji);
                                 }}
                               />
                             }
-                            onConfirm={() => {}}
+                            onConfirm={(e) => {
+                              console.log(e);
+                            }}
                             okText="Yes"
                             cancelText="No"
                           >
@@ -663,13 +699,13 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                               onSelectFile([]);
                             }}
                           ></Button>
-                          <ChatQuickInput
+                          {/* <ChatQuickInput
                             onClick={(text) => {
                               //editorRef.current?.insertText(text);
                               setChatInputMessage(text);
                             }}
                             className="ml-2"
-                          />
+                          /> */}
                         </div>
 
                         <div>
@@ -704,6 +740,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                     /> */}
                           <div className="flex-1 w-full h-full text-sm bg-transparent outline-none resize-none">
                             <Input.TextArea
+                              id="chat-input"
                               className="w-full !h-full !outline-none !shadow-none !bg-transparent dark:text-white"
                               rows={1}
                               value={chatInputMessage}

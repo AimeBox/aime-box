@@ -152,14 +152,13 @@ Usage:
       .number()
       .optional()
       .describe(
-        'The line number to start reading from. Only provide if the file is too large to read at once.',
+        'The line number to start reading from. Only provide if the file is too large to read at once',
       ),
     limit: z
       .number()
-      .min(1000)
       .optional()
       .describe(
-        'The number of lines to read. Only provide if the file is too large to read at once(min 1000).',
+        'The number of lines to read. Only provide if the file is too large to read at once.(min 1000).',
       ),
     show_line_index: z
       .boolean()
@@ -276,7 +275,9 @@ Usage:
 
     if (input.show_line_index) {
       llmTextContent += formattedLines
-        .map((line, index) => `     ${index + 1 + actualStartLine}\t${line}`)
+        .map((line, index) =>
+          `${index + 1 + actualStartLine}\t${line}`.padStart(5, ' '),
+        )
         .join('\n');
     } else {
       llmTextContent += formattedLines.join('\n');
@@ -287,6 +288,13 @@ Usage:
 
 export class ListDirectory extends BaseTool {
   toolKitName?: string = 'file-system';
+
+  static readonly Name = 'list_directory';
+
+  name: string = 'list_directory';
+
+  description: string =
+    'Get a detailed listing of all files and directories in a specified path.';
 
   schema = z.object({
     path: z
@@ -299,11 +307,6 @@ export class ListDirectory extends BaseTool {
   });
 
   output = 'path\n├── file-1.mp4\n├── file-2.mp4\n├── ...';
-
-  name: string = 'list_directory';
-
-  description: string =
-    'Get a detailed listing of all files and directories in a specified path. Results distinguish between files and directories with [FILE] and [DIR] prefixes. Only works within allowed directories.';
 
   constructor(params?: FileWriteParameters) {
     super(params);
@@ -331,50 +334,54 @@ export class ListDirectory extends BaseTool {
       maxDepth: input.recursive ? Number.POSITIVE_INFINITY : 1,
       exclude: input.ignore?.map((x) => new RegExp(x)) || [],
     });
-    return `Directory listing for ${filePath}:\n${treeOutput}`;
+    if (treeOutput.split('\n').length == 1) {
+      return `Directory listing for ${filePath}:\n[empty directory]`;
+    }
+
+    return `Directory listing for ${filePath}:\n[root] ${treeOutput}`;
   }
 }
 
-export class CreateDirectory extends BaseTool {
-  toolKitName?: string = 'file-system';
+// export class CreateDirectory extends BaseTool {
+//   toolKitName?: string = 'file-system';
 
-  schema = z.object({
-    paths: z.array(z.string()),
-  });
+//   schema = z.object({
+//     paths: z.array(z.string()),
+//   });
 
-  name: string = 'create_directory';
+//   name: string = 'create_directory';
 
-  description: string =
-    'Create a new directory or ensure a directory exists.  Can create multiple nested directories in one operation.  Only works within allowed directories.';
+//   description: string =
+//     'Create a new directory or ensure a directory exists.  Can create multiple nested directories in one operation.  Only works within allowed directories.';
 
-  constructor(params?: FileWriteParameters) {
-    super(params);
-  }
+//   constructor(params?: FileWriteParameters) {
+//     super(params);
+//   }
 
-  async _call(
-    input: z.infer<typeof this.schema>,
-    runManager,
-    config,
-  ): Promise<string> {
-    const workspace = config?.configurable?.workspace;
-    let filePaths = input.paths;
-    if (workspace) {
-      filePaths = input.paths.map((x) =>
-        path.isAbsolute(x) ? x : path.join(workspace, x),
-      );
-    }
+//   async _call(
+//     input: z.infer<typeof this.schema>,
+//     runManager,
+//     config,
+//   ): Promise<string> {
+//     const workspace = config?.configurable?.workspace;
+//     let filePaths = input.paths;
+//     if (workspace) {
+//       filePaths = input.paths.map((x) =>
+//         path.isAbsolute(x) ? x : path.join(workspace, x),
+//       );
+//     }
 
-    if (filePaths && filePaths.length > 0) {
-      for (const path of filePaths) {
-        fs.mkdirSync(path, { recursive: true });
-      }
-      const folders = filePaths.map((x) => `<folder>${x}</folder>`).join('\n');
-      return `Directory created successfully\n\n${folders}`;
-    } else {
-      return 'No directory to create';
-    }
-  }
-}
+//     if (filePaths && filePaths.length > 0) {
+//       for (const path of filePaths) {
+//         fs.mkdirSync(path, { recursive: true });
+//       }
+//       const folders = filePaths.map((x) => `<folder>${x}</folder>`).join('\n');
+//       return `Directory created successfully\n\n${folders}`;
+//     } else {
+//       return 'No directory to create';
+//     }
+//   }
+// }
 
 export class SearchFiles extends BaseTool {
   toolKitName?: string = 'file-system';
@@ -644,9 +651,9 @@ const formatCodeWithLineNumbers = ({
 
       // Format line number with padding if needed
       if (lineNumberStr.length >= 6) {
-        return `${lineNumberStr}→${line}`;
+        return `${lineNumberStr}\t${line}`;
       }
-      return `${lineNumberStr.padStart(6, ' ')}→${line}`;
+      return `${lineNumberStr.padStart(6, ' ')}\t${line}`;
     })
     .join('\n');
 };
@@ -663,8 +670,9 @@ const safeReplace = (
     : (str: string, search: string, replace: string) =>
         str.replace(search, () => replace);
 
-  if (replaceValue !== '')
+  if (replaceValue !== '') {
     return replacer(sourceString, searchValue, replaceValue);
+  }
 
   return !searchValue.endsWith(`\n`) &&
     sourceString.includes(`${searchValue}\n`)
@@ -697,7 +705,7 @@ const patchFile = (
             edit.replace_all,
           );
 
-    if (contents === W)
+    if (contents === W && edit.old_string != edit.new_string)
       throw new Error('String not found in file. Failed to apply edit.');
     newContents.push(edit.new_string);
   }
@@ -709,6 +717,8 @@ const patchFile = (
 };
 export class Edit extends BaseTool {
   toolKitName?: string = 'file-system';
+
+  static readonly Name = 'edit';
 
   name: string = 'edit';
 
@@ -780,6 +790,10 @@ ${formatCodeWithLineNumbers({ content: snippet, startLine })}`;
   }
 }
 export class MultiEdit extends BaseTool {
+  toolKitName?: string = 'file-system';
+
+  static readonly Name = 'multi_edit';
+
   name: string = 'multi_edit';
 
   description: string = `This is a tool for making multiple edits to a single file in one operation. It is built on top of the \`edit\` tool and allows you to perform multiple find-and-replace operations efficiently. Prefer this tool over the \`edit\` tool when you need to make multiple edits to the same file.
@@ -1231,7 +1245,7 @@ export class GlobTool extends BaseTool {
   name: string = 'glob';
 
   description: string = `- Fast file pattern matching tool that works with any codebase size
-- Supports glob patterns like "**/*.js" or "src/**/*.ts"
+- Supports glob patterns like "**/\\*.js" or "src/**/\\*.ts"
 - Returns matching file paths sorted by modification time
 - Use this tool when you need to find files by name patterns
 - When you are doing an open ended search that may require multiple rounds of globbing and grepping, use the Agent tool instead
@@ -1241,20 +1255,13 @@ export class GlobTool extends BaseTool {
     pattern: z
       .string()
       .describe(
-        "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
+        "The glob pattern to match files against (e.g., '**/*.py', 'docs/*.md').",
       ),
     path: z
       .string()
       .optional()
       .describe(
-        'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
-      ),
-    case_sensitive: z
-      .boolean()
-      .optional()
-      .default(false)
-      .describe(
-        'Optional: Whether the search should be case-sensitive. Defaults to false.',
+        'The directory to search in. If not specified, the current working directory will be used. IMPORTANT: Omit this field to use the default directory. DO NOT enter "undefined" or "null" - simply omit it for the default behavior. Must be a valid directory path if provided.',
       ),
   });
 
@@ -1263,18 +1270,20 @@ export class GlobTool extends BaseTool {
     runManager?: CallbackManagerForToolRun,
     config?: ToolRunnableConfig,
   ): Promise<any> {
-    const entries = glob.sync(input.pattern, {
-      cwd: searchDirAbsolute,
-      withFileTypes: true,
+    const { pattern, path } = input;
+    const entries = glob.sync(pattern, {
+      cwd: path,
       nodir: true,
       stat: true,
-      nocase: !input.case_sensitive,
+      nocase: true,
       dot: true,
       ignore: ['**/node_modules/**', '**/.git/**'],
       follow: false,
-      signal: config?.signal,
     });
-    throw new Error('Method not implemented.');
+    if (entries.length === 0) {
+      return `No files found`;
+    }
+    return entries.join('\n');
   }
 }
 
@@ -1287,13 +1296,14 @@ export class FileSystemToolKit extends BaseToolKit {
       new FileRead(),
       new FileInfo(),
       new ListDirectory(),
-      new CreateDirectory(),
+      // new CreateDirectory(),
       new SearchFiles(),
       new MoveFile(),
       new DeleteFile(),
       new Edit(),
       new MultiEdit(),
       new GrepTool(),
+      new GlobTool(),
     ];
   }
 }

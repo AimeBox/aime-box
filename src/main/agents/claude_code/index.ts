@@ -17,7 +17,7 @@ import {
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { getProviderModel } from '@/main/utils/providerUtil';
 import { getChatModel } from '@/main/llm';
-import { RunnableConfig } from '@langchain/core/runnables';
+import { RunnableConfig, RunnableLambda } from '@langchain/core/runnables';
 import { concat, IterableReadableStream } from '@langchain/core/utils/stream';
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import { getClaudeCodePrompt, getCompressionPrompt } from './prompt';
@@ -47,7 +47,12 @@ import { toolsManager } from '@/main/tools';
 import { TodoRead, TodoWrite } from '@/main/tools/TodoToolkit';
 import { PythonInterpreterTool } from '@/main/tools/PythonInterpreter';
 import { TerminalTool } from '@/main/tools/TerminalTool';
-import { BashTool } from '@/main/tools/BashTool';
+import bashManager, {
+  BashOutputTool,
+  BashSession,
+  BashTool,
+  KillBashTool,
+} from '@/main/tools/BashToolkit';
 import { v4 as uuidv4 } from 'uuid';
 import { MemoryRead, MemorySave } from '@/main/tools/MemoryToolkit';
 import { dbManager } from '@/main/db';
@@ -62,7 +67,7 @@ import path from 'path';
 import fs from 'fs';
 import settingsManager from '@/main/settings';
 import os from 'os';
-import { appendPart, prependPart } from '@/main/utils/messages';
+import { appendPart, fixMessages, prependPart } from '@/main/utils/messages';
 
 export class VibeAgent extends BaseAgent {
   name: string = 'vibe_agent';
@@ -123,6 +128,12 @@ export class VibeAgent extends BaseAgent {
 
   compression_model?: BaseChatModel;
 
+  compression_token_threshold: number;
+
+  compression_preserve_threshold: number;
+
+  planMode: boolean;
+
   constructor(options: {
     provider: string;
     modelName: string;
@@ -142,6 +153,8 @@ export class VibeAgent extends BaseAgent {
     const { store, model, messageEvent, chatOptions, signal, configurable } =
       params;
 
+    const cwd = configurable?.workspace;
+
     const sendMessage = async (
       message: BaseMessage,
       state?: 'start' | 'chunk' | 'end',
@@ -157,13 +170,81 @@ export class VibeAgent extends BaseAgent {
         await messageEvent.finished([message]);
       }
     };
+
+    const getRemindersMD = async (systemPrompt: string) => {
+      const reminders_file = path.join(cwd, '.reminders.md');
+      if (!fs.existsSync(reminders_file) && !systemPrompt) {
+        return undefined;
+      }
+
+      if (systemPrompt && !fs.existsSync(reminders_file)) {
+        await fs.promises.writeFile(reminders_file, '');
+      }
+      let content = fs.readFileSync(reminders_file, 'utf8');
+      if (content.trim() == '' && !systemPrompt) {
+        return undefined;
+      }
+
+      if (systemPrompt.trim() != content.trim()) {
+        await fs.promises.writeFile(reminders_file, systemPrompt.trim());
+        content = systemPrompt.trim();
+      }
+      content = content.trim();
+
+      const stats = fs.statSync(reminders_file);
+
+      return {
+        content: content,
+        path: reminders_file,
+        updateTime: stats.mtime,
+      };
+    };
+
+    const getBashReminders = async (bashSessionIds: string[]) => {
+      let bashSessions_md: string[] = [];
+      for (const bashSessionId of bashSessionIds) {
+        if (bashManager.hasUpdate(bashSessionId)) {
+          const session = bashManager.get(bashSessionId);
+          if (session) {
+            if (session.isExited) {
+              bashSessions_md.push(
+                `- (bash_id: ${session.bashId}) (command: ${session.command}) (status: completed) (exit code: ${session.exitCode}) Has new output available. `,
+              );
+            } else {
+              bashSessions_md.push(
+                `- (bash_id: ${session.bashId}) (command: ${session.command}) (status: running) Has new output available. `,
+              );
+            }
+          }
+        } else {
+          bashSessions_md.push(
+            `- (bash_id: ${bashSessionId}) is not exists, Please use the 'kill_bash' tool to remove the bash session`,
+          );
+        }
+      }
+      if (bashSessions_md.length == 0) {
+        return undefined;
+      }
+      return `<system-reminder>
+Background Bash:
+${bashSessions_md.join('\n')}
+
+You can check the output of any bash session using the 'bash_output' tool.
+</system-reminder>`;
+    };
     const config = await this.getConfig();
-    this.systemPrompt = '';
+    this.compression_token_threshold = config.compression_token_threshold;
+    this.compression_preserve_threshold = config.compression_preserve_threshold;
+    this.systemPrompt = chatOptions?.system || '';
     this.model = model;
+
     if (!this.model) {
       try {
         const { provider, modelName } = getProviderModel(config.model);
-        this.model = await getChatModel(provider, modelName, chatOptions);
+        this.model = await getChatModel(provider, modelName, {
+          ...(chatOptions || {}),
+          maxRetries: 3,
+        });
       } catch {
         console.error('model not found');
       }
@@ -200,20 +281,23 @@ export class VibeAgent extends BaseAgent {
 
     const commonTools = await toolsManager.buildTools([
       ...new Set([
-        new BashTool().name,
-        new PythonInterpreterTool().name,
-        new FileRead().name,
-        new FileWrite().name,
-        new TodoWrite().name,
+        BashTool.Name,
+        BashOutputTool.Name,
+        KillBashTool.Name,
+        PythonInterpreterTool.Name,
+        FileRead.Name,
+        FileWrite.Name,
+        TodoWrite.Name,
         // new TodoRead().name,
-        new Edit().name,
-        new MultiEdit().name,
-        new ListDirectory().name,
-        new WebSearchTool().name,
-        new WebLoader().name,
-        new GrepTool().name,
-        new Think().name,
-        new AskHuman().name,
+        Edit.Name,
+        MultiEdit.Name,
+        ListDirectory.Name,
+        WebSearchTool.Name,
+        WebLoader.Name,
+        GrepTool.Name,
+        GlobTool.Name,
+        Think.Name,
+        AskHuman.Name,
         ...(chatOptions?.toolNames || []),
       ]),
     ]);
@@ -267,29 +351,46 @@ export class VibeAgent extends BaseAgent {
           } else if (_agent) {
             const _tools = await toolsManager.buildTools(_agent.tools);
 
-            const system_prompt = `${_agent.prompt}
+            //             const system_prompt = `${_agent.prompt}
 
-# Additional Instructions
+            // # Additional Instructions
 
-Here is useful information about the environment you are running in:
-<env>
-Working directory: ${cwd}
-Platform: ${process.platform}
-OS Version: ${os.version()}
-System Language: ${settingsManager.getLanguage()}
-Today's date: ${new Date().toISOString().split('T')[0]}
-</env>
-`;
-            _agent.prompt = system_prompt;
+            // Here is useful information about the environment you are running in:
+            // <env>
+            // Working directory: ${cwd}
+            // Platform: ${process.platform}
+            // OS Version: ${os.version()}
+            // System Language: ${settingsManager.getLanguage()}
+            // Today's date: ${new Date().toISOString().split('T')[0]}
+            // </env>
+            // `;
+            //             _agent.prompt = system_prompt;
             const subAgent = await agentManager.buildAgent({
               agent: _agent as Agent,
               model: _agent.model,
               signal,
               tools: _tools,
             });
+
+            let input_message = new HumanMessage(prompt);
+            const reminders_md = await getRemindersMD(this.systemPrompt);
+            if (reminders_md) {
+              const reminders_md_message = `<system-reminder>
+As you answer the user's questions, you can use the following context:
+# RemindersMD
+Codebase and user instructions are shown below. Be sure to adhere to these instructions. IMPORTANT: These instructions OVERRIDE any default behavior and you MUST follow them exactly as written.
+
+Contents of "${reminders_md.path}" (project instructions, checked into the codebase):
+
+${reminders_md.content}
+
+IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.
+</system-reminder>`;
+              input_message = appendPart(input_message, reminders_md_message);
+            }
             const res: { messages: BaseMessage[] } = await subAgent.invoke(
               {
-                messages: [new HumanMessage(prompt)],
+                messages: [input_message],
               },
               {
                 ...(config || {}),
@@ -300,7 +401,8 @@ Today's date: ${new Date().toISOString().split('T')[0]}
             return {
               is_success: true,
               messages: [
-                ...(_agent.prompt ? [new SystemMessage(system_prompt)] : []),
+                ...(_agent.prompt ? [new SystemMessage(_agent.prompt)] : []),
+                input_message,
                 ...res.messages,
               ],
             };
@@ -332,9 +434,9 @@ When using the Task tool, you must specify a subagent_type parameter to select w
 
 When NOT to use the Agent tool:
 
-- If you want to read a specific file path, use the '${new FileRead().name}' or '${new GlobTool().name}' tool instead of the Agent tool, to find the match more quickly
-- If you are searching for a specific class definition like "class Foo", use the '${new GlobTool().name}' tool instead, to find the match more quickly
-- If you are searching for code within a specific file or set of 2-3 files, use the '${new FileRead().name}' tool instead of the Agent tool, to find the match more quickly
+- If you want to read a specific file path, use the '${FileRead.Name}' or '${GlobTool.Name}' tool instead of the Agent tool, to find the match more quickly
+- If you are searching for a specific class definition like "class Foo", use the '${GlobTool.Name}' tool instead, to find the match more quickly
+- If you are searching for code within a specific file or set of 2-3 files, use the '${FileRead.Name}' tool instead of the Agent tool, to find the match more quickly
 - Other tasks that are not related to the agent descriptions above
 
 
@@ -356,8 +458,8 @@ Example usage:
 <example>
 user: "Please write a function that checks if a number is prime"
 assistant: Sure let me write a function that checks if a number is prime
-assistant: First let me use the '${new FileWrite().name}' tool to write a function that checks if a number is prime
-assistant: I'm going to use the '${new FileWrite().name}' tool to write the following code:
+assistant: First let me use the '${FileWrite.Name}' tool to write a function that checks if a number is prime
+assistant: I'm going to use the '${FileWrite.Name}' tool to write the following code:
 <code>
 function isPrime(n) {
  if (n <= 1) return false
@@ -388,10 +490,42 @@ assistant: "I'm going to use the 'task' tool to launch the with the greeting-res
       return TaskTool;
     };
 
+    const createExitPlanModeTool = async () => {
+      const ExitPlanModeSchema = z.object({
+        plan: z
+          .string()
+          .describe(
+            'The plan you came up with, that you want to run by the user for approval. Supports markdown. The plan should be pretty concise.',
+          ),
+      });
+      const ExitPlanModeTool = tool(
+        async (
+          arg: z.infer<typeof ExitPlanModeSchema>,
+          runManager?: CallbackManagerForToolRun,
+          config?: RunnableConfig,
+        ) => {
+          return `User has approved your plan. You can now start coding. Start with updating your todo list if applicable.`;
+        },
+        {
+          name: 'ExitPlanMode',
+          description: `Use this tool when you are in plan mode and have finished presenting your plan and are ready to code. This will prompt the user to exit plan mode.
+IMPORTANT: Only use this tool when the task requires planning the implementation steps of a task that requires writing code. For research tasks where you're gathering information, searching files, reading files or in general trying to understand the codebase - do NOT use this tool.
+
+Eg.
+
+1. Initial task: "Search for and understand the implementation of vim mode in the codebase" - Do not use the exit plan mode tool because you are not planning the implementation steps of a task.
+2. Initial task: "Help me implement yank mode for vim" - Use the exit plan mode tool after you have finished planning the implementation steps of the task.`,
+          schema: ExitPlanModeSchema,
+        },
+      );
+      return ExitPlanModeTool;
+    };
+
     const taskTool = await createTaskTool(tools, agents);
+    const exitPlanModeTool = await createExitPlanModeTool();
 
     tools.push(taskTool);
-    const cwd = configurable?.workspace;
+    // tools.push(exitPlanModeTool);
 
     const modelWithTool = this.model.bindTools(tools);
 
@@ -401,6 +535,9 @@ assistant: "I'm going to use the 'task' tool to launch the with the greeting-res
         messages: Annotation<BaseMessage[]>,
         isCompressed: Annotation<boolean | undefined>,
         todoReminders: Annotation<string | undefined>,
+        remindersUpdateTime: Annotation<string | undefined>,
+        planMode: Annotation<boolean | undefined>,
+        bashSessionIds: Annotation<string[]>,
       },
     });
 
@@ -465,7 +602,11 @@ assistant: "I'm going to use the 'task' tool to launch the with the greeting-res
       messages,
       isCompressed,
       todoReminders,
+      remindersUpdateTime,
+      bashSessionIds,
     }: typeof StateAnnotation.State) => {
+      // write system
+
       const memory = await new MemoryRead().invoke(
         {},
         {
@@ -484,34 +625,58 @@ assistant: "I'm going to use the 'task' tool to launch the with the greeting-res
         agents,
       );
       const systemMessage = new SystemMessage(systemPrompt.join('\n'));
+      let _remindersUpdateTime =
+        remindersUpdateTime || new Date().toISOString();
       const aiMessage = new AIMessage('');
       aiMessage.id = uuidv4();
       await sendMessage(aiMessage, 'start');
 
-      const reminders_file = path.join(cwd, '.reminders.md');
+      const reminders_md = await getRemindersMD(this.systemPrompt);
+
+      await fs.promises.mkdir(cwd, { recursive: true });
 
       const last_message = messages[messages.length - 1];
       const first_message = messages[0];
 
       if (
-        fs.existsSync(reminders_file) &&
-        (isCompressed || messages.length == 1)
+        (reminders_md && (isCompressed || messages.length == 1)) ||
+        (reminders_md &&
+          _remindersUpdateTime != reminders_md.updateTime.toISOString())
       ) {
-        const systemReminder = `<system-reminder>
+        if (isHumanMessage(first_message)) {
+          if (messages.length == 1 || isCompressed) {
+            const systemReminder = `<system-reminder>
 As you answer the user's questions, you can use the following context:
-#
+# RemindersMD
 Codebase and user instructions are shown below. Be sure to adhere to these instructions. IMPORTANT: These instructions OVERRIDE any default behavior and you MUST follow them exactly as written.
 
-Contents of ${reminders_file} (project instructions, checked into the codebase):
+Contents of "${reminders_md.path}" (project instructions, checked into the codebase):
 
-${fs.readFileSync(reminders_file, 'utf-8')}
+${reminders_md.content}
 
 IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.
 </system-reminder>`;
-
-        if (isHumanMessage(first_message)) {
-          const msg = prependPart(first_message, systemReminder);
-          messages[0] = msg;
+            const msg = prependPart(first_message, systemReminder);
+            messages[0] = msg;
+            _remindersUpdateTime = reminders_md.updateTime.toISOString();
+          }
+        }
+        if (
+          messages.length > 1 &&
+          isHumanMessage(last_message) &&
+          _remindersUpdateTime != reminders_md.updateTime.toISOString() &&
+          !isCompressed
+        ) {
+          const systemReminder = `<system-reminder>
+Note: "${reminders_md.path}" was modified, either by the user or by a linter. Don't tell the user this, since they are already aware. This change was intentional, so make sure to take it into account as you proceed (ie. don't revert it unless the user asks you to). So that you don't need to re-read the file, here's the result of running \`cat -n\` on a snippet of the edited file:
+${reminders_md.content
+  .split('\n')
+  .map((line, index) => `${(index + 1).toString().padStart(6, ' ')}\t${line}`)
+  .join('\n')}
+</system-reminder>`;
+          const msg = appendPart(last_message, systemReminder);
+          messages[messages.length - 1] = msg;
+          _remindersUpdateTime = reminders_md.updateTime.toISOString();
         }
       }
 
@@ -544,8 +709,38 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
         );
       }
 
+      const _bashSessionIds = bashManager.removeNotExsited(
+        bashSessionIds || [],
+      );
+      const bashSessions_reminder = await getBashReminders(_bashSessionIds);
+
+      if (bashSessions_reminder) {
+        if (
+          (isCompressed || messages.length == 1) &&
+          isHumanMessage(first_message)
+        ) {
+          messages[0] = appendPart(first_message, bashSessions_reminder);
+        } else if (messages.length > 1 && isHumanMessage(last_message)) {
+          messages[messages.length - 1] = appendPart(
+            messages[messages.length - 1],
+            bashSessions_reminder,
+          );
+        }
+      }
+
+      const _messages = fixMessages(messages);
+
+      // const fallback = RunnableLambda.from(
+      //   async (messages: BaseMessage[], config) => {
+      //     messages.push;
+      //     return x + x;
+      //   },
+      // );
+
+      // const runnable = modelWithTool.withFallbacks([fallback]);
+
       const response = await modelWithTool.stream(
-        [systemMessage, ...messages],
+        [systemMessage, ..._messages],
         {
           tags: ['ignore'],
           signal: signal,
@@ -565,66 +760,82 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
 
       finalResult.id = aiMessage.id;
       finalResult.additional_kwargs = finalResult.additional_kwargs || {};
-      finalResult.additional_kwargs['history'] = [systemMessage, ...messages];
+      finalResult.additional_kwargs['history'] = [systemMessage, ..._messages];
+
       await sendMessage(finalResult, 'end');
 
       delete finalResult.additional_kwargs['history'];
 
       if (finalResult.content) console.log(finalResult.content);
+      let goto = END;
+      let update = {
+        messages: [...messages, finalResult],
+        remindersUpdateTime: _remindersUpdateTime,
+        isCompressed: false,
+        todoReminders: _todoReminders,
+        bashSessionIds: _bashSessionIds,
+      };
 
       if (finalResult.tool_calls && finalResult.tool_calls.length > 0) {
-        const ask_human = finalResult.tool_calls.find(
-          (x) => x.name == new AskHuman().name,
-        );
-        if (ask_human) {
-          return new Command({
-            goto: 'human',
-            update: {
-              messages: [...messages, finalResult],
-              waitHumanAsk: true,
-              isCompressed: false,
-              todoReminders: _todoReminders,
-            },
-          });
+        if (finalResult.tool_calls.find((x) => !x.id)) {
+          goto = END;
+          // return new Command({
+          //   goto: END,
+          //   update: {
+          //     remindersUpdateTime: _remindersUpdateTime,
+          //   },
+          // });
+        } else {
+          goto = 'tool';
+
+          // const exit_plan_mode = finalResult.tool_calls.find(
+          //   (x) => x.name == exitPlanModeTool.name,
+          // );
+
+          // if (exit_plan_mode) {
+          //   return new Command({
+          //     goto: 'exit_plan_mode',
+          //     update: {
+          //       messages: [...messages, finalResult],
+          //       waitHumanAsk: true,
+          //       isCompressed: false,
+          //       todoReminders: _todoReminders,
+          //       remindersUpdateTime: _remindersUpdateTime,
+          //     },
+          //   });
+          // }
+
+          const task_calls = finalResult.tool_calls.filter(
+            (x) => x.name == taskTool.name,
+          );
+
+          if (task_calls.length > 0) {
+            goto = 'task';
+          }
+
+          const ask_human = finalResult.tool_calls.find(
+            (x) => x.name == new AskHuman().name,
+          );
+          if (ask_human) {
+            goto = 'human';
+            update['waitHumanAsk'] = true;
+          }
         }
-
-        const task_calls = finalResult.tool_calls.filter(
-          (x) => x.name == taskTool.name,
-        );
-
-        if (task_calls.length > 0) {
-          return new Command({
-            goto: 'task',
-            update: {
-              messages: [...messages, finalResult],
-              isCompressed: false,
-              todoReminders: _todoReminders,
-            },
-          });
-        }
-
-        return new Command({
-          update: {
-            messages: [...messages, finalResult],
-            isCompressed: false,
-            todoReminders: _todoReminders,
-          },
-          goto: 'tool',
-        });
       }
 
       return new Command({
-        update: {
-          messages: [...messages, finalResult],
-          todoReminders: _todoReminders,
-        },
-        goto: END,
+        update: update,
+        goto: goto,
       });
     };
 
-    const toolNode = async ({ messages }: typeof StateAnnotation.State) => {
+    const toolNode = async ({
+      messages,
+      bashSessionIds,
+    }: typeof StateAnnotation.State) => {
       const last_message = messages[messages.length - 1];
       const tool_call_messages = [];
+      let _bashSessionIds: string[] = [...(bashSessionIds || [])];
       if (isAIMessage(last_message)) {
         const toolCalls = last_message.tool_calls;
         for (const toolCall of toolCalls) {
@@ -637,9 +848,10 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
           await sendMessage(toolMessage, 'start');
 
           const tool = await tools.find((t) => t.name == toolName);
+          let toolResult;
 
           try {
-            const toolResult = await tool?.invoke(toolArgs);
+            toolResult = await tool?.invoke(toolArgs);
             toolMessage.content = toolResult;
             toolMessage.status = ChatStatus.SUCCESS;
           } catch (err) {
@@ -649,11 +861,33 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
           }
           await sendMessage(toolMessage, 'end');
           tool_call_messages.push(toolMessage);
+
+          if (
+            toolName == BashTool.Name &&
+            toolArgs.run_in_background &&
+            toolMessage.status == ChatStatus.SUCCESS
+          ) {
+            const bashId =
+              toolResult.split(' ')[toolResult.split(' ').length - 1];
+            const bashSession = bashManager.get(bashId);
+            if (bashSession) {
+              _bashSessionIds.push(bashId);
+            }
+          }
+          if (
+            toolName == KillBashTool.Name &&
+            toolMessage.status == ChatStatus.SUCCESS
+          ) {
+            _bashSessionIds = _bashSessionIds.filter(
+              (x) => x != toolArgs.bashId,
+            );
+          }
         }
       }
       return new Command({
         update: {
           messages: [...messages, ...tool_call_messages],
+          bashSessionIds: _bashSessionIds,
         },
         goto: 'messageCompactor',
       });
@@ -662,8 +896,11 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
     const messageCompactor = async ({
       messages,
     }: typeof StateAnnotation.State) => {
-      const { messages: _messages, isCompressed } =
-        await tryCompressMessage(messages);
+      const { messages: _messages, isCompressed } = await tryCompressMessage(
+        messages,
+        this.compression_token_threshold || 0.7,
+        this.compression_preserve_threshold || 0.3,
+      );
 
       return new Command({
         update: {
@@ -682,6 +919,8 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
       if (messages.length < 5) return { messages, isCompressed: false };
       const tokenCount = await tokenCounter(messages);
 
+      const _messages = fixMessages(messages);
+
       let max_context_length: number = 64 * 1000;
       if (this.model.metadata && 'max_context_length' in this.model.metadata) {
         max_context_length = this.model.metadata.max_context_length as number;
@@ -692,28 +931,29 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
       );
 
       if (tokenCount < compression_token_threshold * max_context_length)
-        return { messages, isCompressed: false };
+        return { messages: _messages, isCompressed: false };
 
-      let preserve_message_index = Math.ceil(messages.length * 0.3);
+      let preserve_message_index = Math.ceil(_messages.length * 0.3);
 
-      while (preserve_message_index < messages.length) {
-        if (isToolMessage(messages[preserve_message_index])) {
+      while (preserve_message_index < _messages.length) {
+        if (isToolMessage(_messages[preserve_message_index])) {
           preserve_message_index += 1;
         } else {
           break;
         }
       }
 
-      const compression_message = messages.slice(
+      const compression_message = _messages.slice(
         0,
-        messages.length - preserve_message_index + 1,
+        _messages.length - preserve_message_index + 1,
       );
 
-      const preserved_message = messages.slice(
-        messages.length - preserve_message_index + 1,
+      const preserved_message = _messages.slice(
+        _messages.length - preserve_message_index + 1,
       );
 
       const compressionPrompt = getCompressionPrompt();
+      console.log(`开始压缩提示词...`);
       const compressionResponse = await this.compression_model.invoke(
         [
           new SystemMessage(
@@ -819,9 +1059,9 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
     const app = workflow.compile({
       store: store,
       checkpointer: dbManager.langgraphSaver,
-
       // interruptAfter: ['ask'],
     });
+    // app.updateState()
     return app;
   }
 

@@ -39,6 +39,10 @@ export class ChatOptions {
   streaming?: boolean = true;
 
   format?: string;
+
+  thinking?: boolean = false;
+
+  maxRetries?: number = undefined;
 }
 
 export interface IChatPlannerPlanStep {
@@ -125,6 +129,12 @@ export class Chat {
 
   @Column({ nullable: true, default: true })
   message_edit_enable?: boolean = true;
+
+  @Column({ nullable: true, default: false })
+  pinned?: boolean = false;
+
+  @Column({ nullable: true })
+  workspace?: string;
 }
 
 @Entity('chat_message')

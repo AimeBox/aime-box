@@ -16,6 +16,7 @@ import { Route, Routes, useNavigate, Link } from 'react-router-dom';
 import Content from '@/renderer/components/layout/Content';
 import PluginsManager from './PluginsManager';
 import InstancesManager from './InstancesManager';
+import SecretsManager from './SecretsManager';
 
 // import { Container } from '@/components/Container';
 
@@ -90,6 +91,14 @@ export default function Settings() {
                 ),
               },
               {
+                key: 'secrets',
+                label: (
+                  <Link to="/settings/secrets-manager">
+                    {t('settings.secrets')}
+                  </Link>
+                ),
+              },
+              {
                 key: 'about',
 
                 label: <Link to="/settings/about">{t('settings.about')}</Link>,
@@ -114,6 +123,7 @@ export default function Settings() {
             <Route path="localModelManager" element={<LocalModelManager />} />
             <Route path="plugins-manager" element={<PluginsManager />} />
             <Route path="instances-manager" element={<InstancesManager />} />
+            <Route path="secrets-manager" element={<SecretsManager />} />
           </Routes>
 
           {/* {currentPage == 'general' && <GeneralSettings />}

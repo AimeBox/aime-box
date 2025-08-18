@@ -20,6 +20,9 @@ import { Agent } from '@/entity/Agent';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { McpServers, Tools } from '@/entity/Tools';
 import { Instances } from '@/entity/Instances';
+import { Secrets } from '@/entity/Secrets';
+import { appManager } from '../app/AppManager';
+import { notificationManager } from '../app/NotificationManager';
 
 export class DBManager {
   // defaultDb: Database;
@@ -53,6 +56,7 @@ export class DBManager {
         Tools,
         McpServers,
         Instances,
+        Secrets,
       ],
       migrations: [],
       subscribers: [],
@@ -92,10 +96,20 @@ export class DBManager {
       event.returnValue = await this.getMany(tableName, where, sort);
     });
     ipcMain.on('db:insert', async (event, tableName, data) => {
-      event.returnValue = await this.insert(tableName, data);
+      try {
+        event.returnValue = await this.insert(tableName, data);
+      } catch (error) {
+        notificationManager.sendNotification(error.message, 'error');
+        event.returnValue = undefined;
+      }
     });
     ipcMain.on('db:update', async (event, tableName, data, condition) => {
-      event.returnValue = await this.update(tableName, data, condition);
+      try {
+        event.returnValue = await this.update(tableName, data, condition);
+      } catch (error) {
+        notificationManager.sendNotification(error.message, 'error');
+        event.returnValue = undefined;
+      }
     });
 
     ipcMain.on('insert-or-update', async (event, tableName, data) => {

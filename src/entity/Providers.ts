@@ -21,6 +21,7 @@ export enum ProviderType {
   REPLICATE = 'replicate',
   ELEVENLABS = 'elevenlabs',
   MOONSHOT = 'moonshot',
+  MODELSCOPE = 'modelscope',
 }
 
 @Entity('providers')

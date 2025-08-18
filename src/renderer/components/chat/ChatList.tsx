@@ -25,6 +25,7 @@ export interface ChatListRef {
 
 export interface ChatListProps {
   onNewChat?: (mode: 'default' | 'planner' | 'file') => void;
+  className?: string;
 }
 // const ChatListComponent = function ({
 //   onNewChat,
@@ -34,7 +35,7 @@ export interface ChatListProps {
 // };
 
 const ChatList = React.forwardRef((props: ChatListProps, ref) => {
-  const { onNewChat } = props;
+  const { onNewChat, className } = props;
   const location = useLocation();
   const [chats, setChats] = useState<ChatInfo[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -136,6 +137,7 @@ const ChatList = React.forwardRef((props: ChatListProps, ref) => {
         dataLength={chats.length}
         hasMore={chats.length < totalCount}
         width={250}
+        className={className}
         loadMoreData={() => {
           getData();
         }}

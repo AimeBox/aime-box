@@ -4,6 +4,7 @@ import { FaEdit, FaPlus, FaSearch, FaTrashAlt } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import InfiniteScroll from 'react-infinite-scroll-component';
+import { cn } from '@/lib/utils';
 
 export interface ListProps {
   width?: number | null;
@@ -20,6 +21,7 @@ export interface ListProps {
   filterTags?: string[] | ReactNode | null;
   selectedFilterTags?: string[] | null;
   onFilterTagsChange?: (tags: string[]) => void | null;
+  className?: string;
 }
 
 const List = forwardRef((props: ListProps) => {
@@ -35,6 +37,7 @@ const List = forwardRef((props: ListProps) => {
     filterTags,
     selectedFilterTags,
     onFilterTagsChange,
+    className,
   } = props;
 
   const scrollAreaRef = useRef();
@@ -49,7 +52,10 @@ const List = forwardRef((props: ListProps) => {
 
   return (
     <div
-      className={`max-h-[${height}] h-[${height}] lg:relative  dark:bg-gray-800 dark:text-gray-200 text-gray-700 ${shadow ? 'shadow-2xl' : 'text-sm transition'}`}
+      className={cn(
+        `max-h-[${height}] h-[${height}] lg:relative  dark:bg-gray-800 dark:text-gray-200 text-gray-700 ${shadow ? 'shadow-2xl' : 'text-sm transition'}`,
+        className,
+      )}
       style={{ width: `${width}px` }}
     >
       <ul

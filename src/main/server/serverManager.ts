@@ -15,6 +15,7 @@ import {
 } from '@modelcontextprotocol/sdk/types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import { supabase } from '../supabase/supabaseClient';
+import e from 'express';
 
 class ServerManager {
   app: express.Application;
@@ -77,7 +78,6 @@ class ServerManager {
       }
     });
 
-    
     this.app.post(`/tools/:tool_name`, async (req, res) => {
       const toolName = req.params.tool_name;
       const methodName = req.body.method;
@@ -111,13 +111,27 @@ class ServerManager {
     server.setRequestHandler(ListToolsRequestSchema, async () => {
       const toolList = toolsManager.getList();
 
-      const tools = toolList.map((x: ToolInfo) => {
-        return {
-          name: x.name,
-          description: x.description,
-          inputSchema: x.schema,
-        };
-      });
+      const tools = [];
+      for (const tool of toolList) {
+        if (tool.is_toolkit) {
+          tools.push(
+            ...tool.tools.map((x: ToolInfo) => {
+              return {
+                name: x.name,
+                description: x.description,
+                inputSchema: x.schema,
+              };
+            }),
+          );
+        } else {
+          tools.push({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.schema,
+          });
+        }
+      }
+
       return {
         tools: [...tools],
       };

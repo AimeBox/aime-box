@@ -103,7 +103,7 @@ import { Think } from './ThinkTool';
 import { BilibiliToolkit } from './social-media/BilibiliToolkit';
 import { KnowledgeBaseToolkit } from './KnowledgeBaseToolkit';
 import { ToolExploreToolkit } from './ToolExploreToolkit';
-import { BashTool } from './BashTool';
+import { BashToolkit } from './BashToolkit';
 import { TodoToolkit } from './TodoToolkit';
 import { BrowserToolkit } from './BrowserToolkit';
 
@@ -571,7 +571,7 @@ export class ToolsManager extends BaseManager {
     await this.registerTool(BrowserToolkit);
     await this.registerTool(TerminalTool);
 
-    await this.registerTool(BashTool);
+    await this.registerTool(BashToolkit);
     await this.registerTool(Calculator);
     await this.registerTool(DateTimeTool);
     await this.registerTool(Translate);

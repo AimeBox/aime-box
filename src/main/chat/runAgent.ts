@@ -263,7 +263,7 @@ export const runAgent = async (
           for (const msg of data.output.messages) {
             if (isToolMessage(msg)) {
               const _msg = _messages.find(
-                (x) => x?.tool_call_id == msg.tool_call_id,
+                (x) => x?.tool_call_id == msg.tool_call_id && isAIMessage(x),
               );
               if (_msg && _msg.status === undefined && !msg.content) {
                 const tooStart = _toolStart.find(

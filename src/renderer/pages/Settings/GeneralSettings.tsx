@@ -151,6 +151,9 @@ export default function GeneralSettings() {
             <small className="text-sm text-gray-500">
               {t('settings.serverPort.description')}
             </small>
+            <small className="text-sm text-gray-500">
+              [MCP-SSE] http://localhost:{settings?.serverPort}/sse
+            </small>
           </div>
         </div>
         <div className="flex flex-col gap-2">

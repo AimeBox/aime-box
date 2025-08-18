@@ -1,7 +1,12 @@
 import { AskHuman } from '@/main/tools/AskHuman';
 import { BaseTool } from '@/main/tools/BaseTool';
-import { BashTool } from '@/main/tools/BashTool';
-import { FileRead, FileWrite, GrepTool } from '@/main/tools/FileSystemTool';
+import { BashTool } from '@/main/tools/BashToolkit';
+import {
+  FileRead,
+  FileWrite,
+  GlobTool,
+  GrepTool,
+} from '@/main/tools/FileSystemTool';
 import { MemoryRead, MemorySave } from '@/main/tools/MemoryToolkit';
 import { TodoRead, TodoWrite } from '@/main/tools/TodoToolkit';
 import fs from 'fs';

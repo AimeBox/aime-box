@@ -7,6 +7,7 @@ import settingsManager from '../settings';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import {
+  AvailableModel,
   CreateChatCompletionOptions,
   LLMClient,
   LLMResponse,
@@ -19,6 +20,7 @@ import providersManager from '../providers';
 import { getChatModel } from '../llm';
 import {
   AIMessage,
+  BaseMessageLike,
   HumanMessage,
   SystemMessage,
 } from '@langchain/core/messages';
@@ -27,6 +29,8 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { ChatCompletion } from 'openai/resources';
 
 class MyLLMClient extends LLMClient {
   async createChatCompletion<T = LLMResponse>(
@@ -145,6 +149,84 @@ ${JSON.stringify(jsonZod, null, 2)}`;
   }
 }
 
+export class LangchainClient extends LLMClient {
+  public type = 'langchainClient' as const;
+
+  private model: BaseChatModel;
+
+  constructor(model: BaseChatModel) {
+    super(model.name as AvailableModel);
+    this.model = model;
+  }
+
+  async createChatCompletion<T = ChatCompletion>({
+    options,
+  }: CreateChatCompletionOptions): Promise<T> {
+    const formattedMessages: BaseMessageLike[] = options.messages.map(
+      (message) => {
+        if (Array.isArray(message.content)) {
+          if (message.role === 'system') {
+            return new SystemMessage(
+              message.content
+                .map((c) => ('text' in c ? c.text : ''))
+                .join('\n'),
+            );
+          }
+
+          const content = message.content.map((content) =>
+            'image_url' in content
+              ? { type: 'image', image: content.image_url.url }
+              : { type: 'text', text: content.text },
+          );
+
+          if (message.role === 'user') return new HumanMessage({ content });
+
+          const textOnlyParts = content.map((part) => ({
+            type: 'text' as const,
+            text: part.type === 'image' ? '[Image]' : part.text,
+          }));
+
+          return new AIMessage({ content: textOnlyParts });
+        }
+
+        return {
+          role: message.role,
+          content: message.content,
+        };
+      },
+    );
+
+    if (options.response_model) {
+      const responseSchema = zodToJsonSchema(options.response_model.schema, {
+        $refStrategy: 'none',
+      });
+      const structuredModel = this.model.withStructuredOutput(responseSchema);
+      const response = await structuredModel.invoke(formattedMessages);
+
+      return {
+        data: response,
+        usage: {
+          prompt_tokens: 0, // Langchain doesn't provide token counts by default
+          completion_tokens: 0,
+          total_tokens: 0,
+        },
+      } as T;
+    }
+
+    const modelWithTools = this.model.bindTools(options.tools);
+    const response = await modelWithTools.invoke(formattedMessages);
+
+    return {
+      data: response,
+      usage: {
+        prompt_tokens: 0, // Langchain doesn't provide token counts by default
+        completion_tokens: 0,
+        total_tokens: 0,
+      },
+    } as T;
+  }
+}
+
 export class BrowserInstance extends BaseInstance {
   browser_context: BrowserContext;
 
@@ -169,7 +251,9 @@ export class BrowserInstance extends BaseInstance {
         await getProviderModel(modelProvider);
       const provider = await providersManager.getProvider(providerName);
 
-      const llmClient = new MyLLMClient(modelProvider);
+      const chatModel = await getChatModel(providerName, modelName);
+
+      const llmClient = new LangchainClient(chatModel);
 
       const stagehand = new Stagehand({
         env: 'LOCAL',
@@ -277,8 +361,11 @@ export class BrowserInstance extends BaseInstance {
   };
 
   clear = async () => {
-    if (this.instances?.config?.userDataPath) {
-      await fs.promises.rmdir(this.instances?.config?.userDataPath, {
+    if (
+      this.instances?.config?.userDataPath &&
+      fs.existsSync(this.instances?.config?.userDataPath)
+    ) {
+      await fs.promises.rm(this.instances?.config?.userDataPath, {
         recursive: true,
       });
     }

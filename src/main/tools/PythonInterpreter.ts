@@ -25,9 +25,7 @@ export interface PythonInterpreterParameters extends ToolParams {
 }
 
 export class PythonInterpreterTool extends BaseTool {
-  static lc_name() {
-    return 'python_interpreter';
-  }
+  static readonly Name = 'python_interpreter';
 
   configSchema: FormSchema[] = [
     {

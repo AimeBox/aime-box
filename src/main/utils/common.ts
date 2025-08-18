@@ -36,7 +36,7 @@ export const removeEmptyValues = (
 
 export const downloadFile = async (
   url: string,
-  savePath: string,
+  savePath?: string,
 ): Promise<string> => {
   try {
     const response = await fetch(url);

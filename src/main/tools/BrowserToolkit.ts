@@ -9,13 +9,43 @@ import fs from 'fs';
 import { getTmpPath } from '../utils/path';
 import { BrowserInstance } from '../instances/BrowserInstance';
 import { AnyIfEmpty } from 'react-redux';
+import { truncateText } from '../utils/common';
+import { Stagehand } from '@browserbasehq/stagehand';
 
 export interface BrowserParameters extends ToolParams {
   instancId?: string;
   model?: string;
 }
 
-const getStagehand = async (instancId: string, model: string) => {
+export interface TabInfo {
+  pageId: number;
+  url: string;
+  title: string;
+}
+
+const observeInfoSchema = z
+  .object({
+    console_level: z
+      .enum(['error', 'warning', 'info', 'log'])
+      .optional()
+      .describe(
+        'Optional: If set will return console log level, default is none',
+      ),
+    observe_prompt: z
+      .string()
+      .optional()
+      .describe('get observe content after the action'),
+    capture: z.boolean().optional().default(false),
+  })
+  .optional()
+  .describe(
+    'It will return the console log level, and the prompt to observe the page after navigation.',
+  );
+
+const getStagehand = async (
+  instancId: string,
+  model: string,
+): Promise<Stagehand> => {
   const instance = await instanceManager.getBrowserInstance(instancId, model);
   if (!instance) {
     throw new Error('instance not found');
@@ -23,57 +53,31 @@ const getStagehand = async (instancId: string, model: string) => {
   const browser_context = await instance.getEnhancedContext();
   return instance.stagehand;
 };
-export class BrowserGetTabs extends BaseTool {
-  schema = z.object({});
 
-  toolKitName?: string = 'browser_toolkit';
+const getCurrentState = async (
+  stagehand: Stagehand,
+  console_messages: [] | undefined,
+) => {
+  const { page } = stagehand;
+  const console_output = console_messages
+    ? `${JSON.stringify(console_messages, null, 2)}`
+    : '(No console log)';
 
-  name: string = 'browser_get_current_state';
-
-  description: string = 'Get the current browser tabs.';
-
-  params: BrowserParameters;
-
-  constructor(params: BrowserParameters) {
-    super(params);
-    this.params = params;
-  }
-
-  async _call(input: z.infer<typeof this.schema>, runManager, config) {
-    const instance = await instanceManager.getBrowserInstance(
-      this.params.instancId,
-      this.params.model,
-    );
-    if (!instance) {
-      throw new Error('instance not found');
-    }
-    const { browser_context } = instance;
-    const tabs = browser_context.pages();
-    return tabs.map((tab, index) => ({
-      tabId: index.toString(),
-      url: tab.url(),
-      title: tab.title(),
-    }));
-  }
-}
+  return `Action: navigate
+Current Tab URL: ${page.url()}
+Status: completed
+Date: ${new Date().toUTCString()}
+${console_messages !== undefined ? `Console: \n ${console_output}` : ''}`;
+};
 
 export class BrowserNavigate extends BaseTool {
   schema = z.object({
-    url: z.string().describe('The URL to navigate to.'),
-    observe_info: z
-      .object({
-        console_level: z
-          .enum(['error', 'warning', 'info', 'log'])
-          .optional()
-          .describe(
-            'Optional: If set will return console log level, default is none',
-          ),
-        observe_prompt: z.string().optional().describe(''),
-      })
-      .optional()
+    url: z
+      .string()
       .describe(
-        'It will return the console log level, and the prompt to observe the page after navigation.',
+        'The URL to navigate to, If navigate local file, use file:// protocol',
       ),
+    observe: observeInfoSchema,
   });
 
   toolKitName?: string = 'browser_toolkit';
@@ -96,25 +100,35 @@ export class BrowserNavigate extends BaseTool {
     );
     const { page } = stagehand;
 
-    const console_messages: any[] = [];
+    let console_messages: any[] = [];
+    const level = {
+      error: 1,
+      warning: 2,
+      info: 3,
+      log: 4,
+    };
 
     const console_handler = async (message: ConsoleMessage) => {
       const args = await Promise.all(
         message.args().map((arg) => arg.jsonValue()),
       );
       console_messages.push({
-        args: args,
-        message: message.text(),
+        // args: args,
+        message: truncateText(message.text(), 500),
         type: message.type(),
-        location: message.location(),
+        location: message.location()?.url,
       });
     };
 
     page.on('console', console_handler);
     await page.goto(input.url);
     await page.waitForLoadState('networkidle');
-    const actionlist = await page.observe(input.observe_info?.observe_prompt);
+    const actionlist = await page.observe(input.observe?.observe_prompt);
     page.off('console', console_handler);
+
+    console_messages = console_messages.filter(
+      (x) => level[x.type] <= level[input.observe?.console_level],
+    );
 
     const console_output = console_messages
       ? `${JSON.stringify(console_messages, null, 2)}`
@@ -124,13 +138,14 @@ Current Tab URL: ${page.url()}
 Status: completed
 Date: ${new Date().toUTCString()}
 Action: \n ${JSON.stringify(actionlist, null, 2)}
-${input.observe_info?.console_level ? `Console: \n ${console_output}` : ''}`;
+${input.observe?.console_level ? `Console: \n ${console_output}` : ''}`;
   }
 }
 
 export class BrowserAct extends BaseTool {
   schema = z.object({
-    prompt: z.string().describe('The prompt to act on the page.'),
+    action: z.string().describe(`The action to perform on the page.`),
+    observe: observeInfoSchema,
   });
 
   toolKitName?: string = 'browser_toolkit';
@@ -152,16 +167,16 @@ export class BrowserAct extends BaseTool {
       this.params.model,
     );
     const { page } = stagehand;
-    const act_res = await page.act(input.prompt);
+    const act_res = await page.act(input.action);
 
     console.log(act_res);
-    return `Browser act '${input.prompt}' is completed, This is after the action result: \n ${JSON.stringify(act_res, null, 2)}`;
+    return `Browser act '${input.action}' is completed, This is after the action result: \n ${JSON.stringify(act_res, null, 2)}`;
   }
 }
 
 export class BrowserExtract extends BaseTool {
   schema = z.object({
-    prompt: z.string().describe('The prompt to extract from the page.'),
+    instruction: z.string().describe('The prompt to extract from the page.'),
   });
 
   toolKitName?: string = 'browser_toolkit';
@@ -183,14 +198,14 @@ export class BrowserExtract extends BaseTool {
       this.params.model,
     );
     const { page } = stagehand;
-    const extract_res = await page.extract(input.prompt);
+    const extract_res = await page.extract(input.instruction);
     console.log(extract_res);
-    return `Browser extract '${input.prompt}' is completed, This is the extract result: \n ${JSON.stringify(extract_res, null, 2)}`;
+    return `Browser extract is completed, This is the extract result: \n${JSON.stringify(extract_res, null, 2)}`;
   }
 }
 export class BrowserScript extends BaseTool {
   schema = z.object({
-    prompt: z.string().describe('The prompt to extract from the page.'),
+    script: z.string().describe('The prompt to extract from the page.'),
   });
 
   toolKitName?: string = 'browser_toolkit';
@@ -213,7 +228,7 @@ export class BrowserScript extends BaseTool {
     );
     const { page } = stagehand;
     page.addInitScript;
-    const extract_res = await page.extract(input.prompt);
+    const extract_res = await page.evaluate(input.script);
     console.log(extract_res);
     return `Browser extract '${input.prompt}' is completed, This is the extract result: \n ${JSON.stringify(extract_res, null, 2)}`;
   }
@@ -249,36 +264,14 @@ export class BrowserRequest extends BaseTool {
       this.params.instancId,
       this.params.model,
     );
-  }
-}
-
-export class BrowserCloseTabs extends BaseTool {
-  schema = z.object({
-    url: z.string().describe('The URL to navigate to.'),
-  });
-
-  toolKitName?: string = 'browser_toolkit';
-
-  name: string = 'browser_close_tabs';
-
-  description: string = 'Close all tabs.';
-
-  params: BrowserParameters;
-
-  constructor(params: BrowserParameters) {
-    super(params);
-    this.params = params;
-  }
-
-  async _call(input: z.infer<typeof this.schema>, runManager, config) {
-    const instance = await instanceManager.getBrowserInstance(
-      this.params.instancId,
-      this.params.model,
-    );
-    if (!instance) {
-      throw new Error('instance not found');
-    }
-    return 'BrowserNavigate';
+    const { page } = stagehand;
+    const response = (await page.evaluate(
+      (method, url, body, headers) => {
+        return fetch(url, { method, body, headers }).then((res) => res.text());
+      },
+      [input.method, input.url, input.body, input.headers],
+    )) as string;
+    return response.text();
   }
 }
 
@@ -299,30 +292,15 @@ export class BrowserClick extends BaseTool {
 }
 
 export class BrowserGetCurrentState extends BaseTool {
-  schema = z.object({});
+  schema = z.object({
+    capture: z.boolean().optional().default(false),
+  });
 
   toolKitName?: string = 'browser_toolkit';
 
   name: string = 'browser_get_current_state';
 
   description: string = 'Get the current state of the browser.';
-
-  async _call(input: z.infer<typeof this.schema>, runManager, config) {
-    return 'BrowserGetCurrentState';
-  }
-}
-
-export class BrowserCapture extends BaseTool {
-  schema = z.object({
-    selector: z.string().optional(),
-    tabId: z.string(),
-  });
-
-  toolKitName?: string = 'browser_toolkit';
-
-  name: string = 'browser_capture';
-
-  description: string = 'Navigate to a URL.';
 
   params: BrowserParameters;
 
@@ -332,21 +310,33 @@ export class BrowserCapture extends BaseTool {
   }
 
   async _call(input: z.infer<typeof this.schema>, runManager, config) {
-    const instance = await instanceManager.getBrowserInstance(
+    const stagehand = await getStagehand(
       this.params.instancId,
+      this.params.model,
     );
-    if (!instance) {
-      throw new Error('instance not found');
+
+    const tabsInfos: TabInfo[] = [];
+    let currentPage;
+
+    for (let index = 0; index < stagehand.context.pages().length; index++) {
+      const page = stagehand.context.pages()[index];
+      if (page == stagehand.page) {
+        currentPage = page;
+      }
+      const tabInfo: TabInfo = {
+        pageId: index,
+        url: page.url(),
+        title: await page.title(),
+      };
+      tabsInfos.push(tabInfo);
     }
-    const { browser_context } = instance;
-    const page: Page = browser_context.pages()[input.tabId];
-    if (input.selector) {
-      const element = await page.$(input.selector);
-      return element?.screenshot();
-    }
-    const buffer = await page.screenshot();
-    const path = await fs.promises.writeFile(getTmpPath(), buffer);
-    return `screenshot saved to: \n<file>${path}</file>`;
+    const browser_info = `
+    Current Page: ${currentPage?.url()}
+Available tabs:
+${`[${tabsInfos.map((tab) => `TabInfo(pageId=${tab.pageId}, url="${tab.url}", title="${tab.title}")`).join(', ')}]`}
+
+    `;
+    return browser_info;
   }
 }
 
@@ -360,7 +350,7 @@ export class BrowserBackOrForward extends BaseTool {
 
   name: string = 'browser_back_or_forward';
 
-  description: string = 'Navigate to a URL.';
+  description: string = '';
 
   params: BrowserParameters;
 
@@ -387,70 +377,70 @@ export class BrowserBackOrForward extends BaseTool {
   }
 }
 
-export class BrowserCloseTab extends BaseTool {
-  schema = z.object({
-    tabId: z.string(),
-  });
+// export class BrowserCloseTab extends BaseTool {
+//   schema = z.object({
+//     tabId: z.string(),
+//   });
 
-  toolKitName?: string = 'browser_toolkit';
+//   toolKitName?: string = 'browser_toolkit';
 
-  name: string = 'browser_close_tab';
+//   name: string = 'browser_close_tab';
 
-  description: string = 'Navigate to a URL.';
+//   description: string = 'Navigate to a URL.';
 
-  params: BrowserParameters;
+//   params: BrowserParameters;
 
-  constructor(params: BrowserParameters) {
-    super(params);
-    this.params = params;
-  }
+//   constructor(params: BrowserParameters) {
+//     super(params);
+//     this.params = params;
+//   }
 
-  async _call(input: z.infer<typeof this.schema>, runManager, config) {
-    const instance = await instanceManager.getBrowserInstance(
-      this.params.instancId,
-    );
-    if (!instance) {
-      throw new Error('instance not found');
-    }
-    const { browser_context } = instance;
-    const page = browser_context.pages()[parseInt(input.tabId, 10)];
-    await page.close();
-    return 'BrowserCloseTab';
-  }
-}
+//   async _call(input: z.infer<typeof this.schema>, runManager, config) {
+//     const instance = await instanceManager.getBrowserInstance(
+//       this.params.instancId,
+//     );
+//     if (!instance) {
+//       throw new Error('instance not found');
+//     }
+//     const { browser_context } = instance;
+//     const page = browser_context.pages()[parseInt(input.tabId, 10)];
+//     await page.close();
+//     return 'BrowserCloseTab';
+//   }
+// }
 
-export class BrowserConsole extends BaseTool {
-  schema = z.object({
-    tabId: z.string(),
-    level: z.enum(['error', 'warning', 'info', 'debug']).optional(),
-  });
+// export class BrowserConsole extends BaseTool {
+//   schema = z.object({
+//     tabId: z.string(),
+//     level: z.enum(['error', 'warning', 'info', 'debug']).optional(),
+//   });
 
-  toolKitName?: string = 'browser_toolkit';
+//   toolKitName?: string = 'browser_toolkit';
 
-  name: string = 'browser_console';
+//   name: string = 'browser_console';
 
-  description: string = 'Get the console logs of the browser.';
+//   description: string = 'Get the console logs of the browser.';
 
-  params: BrowserParameters;
+//   params: BrowserParameters;
 
-  constructor(params: BrowserParameters) {
-    super(params);
-    this.params = params;
-  }
+//   constructor(params: BrowserParameters) {
+//     super(params);
+//     this.params = params;
+//   }
 
-  async _call(input: z.infer<typeof this.schema>, runManager, config) {
-    const instance = await instanceManager.getBrowserInstance(
-      this.params.instancId,
-    );
-    if (!instance) {
-      throw new Error('instance not found');
-    }
-    const { browser_context } = instance;
-    const page = browser_context.pages()[parseInt(input.tabId, 10)];
-    await page.close();
-    return 'BrowserCloseTab';
-  }
-}
+//   async _call(input: z.infer<typeof this.schema>, runManager, config) {
+//     const instance = await instanceManager.getBrowserInstance(
+//       this.params.instancId,
+//     );
+//     if (!instance) {
+//       throw new Error('instance not found');
+//     }
+//     const { browser_context } = instance;
+//     const page = browser_context.pages()[parseInt(input.tabId, 10)];
+//     await page.close();
+//     return 'BrowserCloseTab';
+//   }
+// }
 
 export class BrowserToolkit extends BaseToolKit {
   name: string = 'browser_toolkit';
@@ -482,16 +472,14 @@ export class BrowserToolkit extends BaseToolKit {
   getTools(): BaseTool[] {
     return [
       new BrowserNavigate(this.params),
-      new BrowserGetTabs(this.params),
-      new BrowserGetCurrentState(this.params),
-      new BrowserCapture(this.params),
-      new BrowserBackOrForward(this.params),
-      new BrowserCloseTab(this.params),
-      new BrowserConsole(this.params),
-      new BrowserScript(this.params),
-      new BrowserRequest(this.params),
-      new BrowserAct(this.params),
-      new BrowserExtract(this.params),
+      // new BrowserGetCurrentState(this.params),
+      // new BrowserBackOrForward(this.params),
+      // // new BrowserCloseTab(this.params),
+      // // new BrowserConsole(this.params),
+      // new BrowserScript(this.params),
+      // new BrowserRequest(this.params),
+      // new BrowserAct(this.params),
+      // new BrowserExtract(this.params),
     ];
   }
 }

@@ -48,6 +48,7 @@ import { ElevenLabsProvider } from './ElevenLabsProvider';
 import { LmStudioProvider } from './LmStudioProvider';
 import { MoonshotProvider } from './MoonshotProvider';
 import { BigmodelProvider } from './BigmodelProvider';
+import { ModelScopeProvider } from './ModelScopeProvider';
 
 export interface ProviderInfo extends Providers {
   credits: {
@@ -228,6 +229,10 @@ export class ProvidersManager extends BaseManager {
         const bigmodel = new BigmodelProvider({ provider: connection });
         const list = await bigmodel.getModelList();
         return list;
+      } else if (connection?.type === ProviderType.MODELSCOPE) {
+        const modelscope = new ModelScopeProvider({ provider: connection });
+        const list = await modelscope.getModelList();
+        return list;
       }
     } catch (e) {
       console.log(e);
@@ -280,6 +285,8 @@ export class ProvidersManager extends BaseManager {
         return new MoonshotProvider({ provider: providerObj });
       case ProviderType.BIGMODEL:
         return new BigmodelProvider({ provider: providerObj });
+      case ProviderType.MODELSCOPE:
+        return new ModelScopeProvider({ provider: providerObj });
       default:
         return undefined;
     }
@@ -377,14 +384,16 @@ export class ProvidersManager extends BaseManager {
 
   @channel('providers:getLLMModels')
   public async getLLMModels(): Promise<any[]> {
-    return this.connectionsStore
-      .map((x) => {
-        return {
-          ...x,
-          models: x.models.filter((m) => m.enable).map((z) => z.name),
-        };
-      })
-      .filter((x) => x.models.length > 0);
+    return (
+      this.connectionsStore
+        ?.map((x) => {
+          return {
+            ...x,
+            models: x.models.filter((m) => m.enable).map((z) => z.name),
+          };
+        })
+        ?.filter((x) => x.models.length > 0) || []
+    );
   }
 
   @channel('providers:getEmbeddingModels')
