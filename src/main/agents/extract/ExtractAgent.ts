@@ -983,6 +983,8 @@ export class ExtractAgent extends BaseAgent {
       }
     }
 
+    const workspace = configurable?.workspace;
+
     const that = this;
     this.textSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
@@ -1024,8 +1026,16 @@ export class ExtractAgent extends BaseAgent {
         description: 'continue to extract',
         schema: z.object({}),
       });
+      const taskId = fs
+        .readdirSync(workspace)
+        .find((x) => x.startsWith('extract-'));
+      const extractTools = [fieldsTool];
+
+      if (taskId) {
+        extractTools.push(continueTool);
+      }
       //const prompt = await promptTemplate.invoke({ messages: state.messages });
-      const llmWithTool = that.model.bindTools([fieldsTool, continueTool]);
+      const llmWithTool = that.model.bindTools(extractTools);
       const response = await promptTemplate
         .pipe(llmWithTool)
         .invoke({ messages: state.messages, configurable: { signal: signal } });
@@ -1096,7 +1106,6 @@ export class ExtractAgent extends BaseAgent {
         (x) => x.name == 'continue_tool',
       );
 
-      const workspace = _config?.configurable?.workspace;
       const taskId = fs
         .readdirSync(workspace)
         .find((x) => x.startsWith('extract-'));
