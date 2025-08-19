@@ -84,20 +84,21 @@ export class Vision extends BaseTool {
       const mimeType = mime.lookup(fileOrUrl);
       if (mimeType.startsWith('image/')) {
         imagePath = fileOrUrl;
-        const image = await fsPromises.readFile(fileOrUrl);
-        imageBase64 = image.toString('base64');
+        // const image = await fsPromises.readFile(fileOrUrl);
+        // imageBase64 = image.toString('base64');
+        // message_part = {
+        //   type: 'image_url',
+        //   image_url: {
+        //     url: `data:${mimeType};base64,${imageBase64}`,
+        //   },
+        // };
+        const imageBuffer = await Sharp(imagePath).toFormat('jpeg').toBuffer();
+        const { width, height, format } = await Sharp(imagePath).metadata();
+        imageBase64 = imageBuffer.toString('base64');
         message_part = {
           type: 'image_url',
           image_url: {
-            url: `data:${mimeType};base64,${imageBase64}`,
-          },
-        };
-        const { width, height, format } = await Sharp(fileOrUrl).metadata();
-        imageBase64 = image.toString('base64');
-        message_part = {
-          type: 'image_url',
-          image_url: {
-            url: `data:${mimeType};base64,${imageBase64}`,
+            url: `data:image/jpeg;base64,${imageBase64}`,
           },
         };
         fileInfo = `Width: ${width}\nHeight: ${height}\nFormat: ${format}`;

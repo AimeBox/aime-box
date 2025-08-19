@@ -66,7 +66,8 @@ import FileDropZone from '@/renderer/components/common/FileDropZone';
 import ChatToolView from '@/renderer/components/chat/ChatToolView';
 import ChatHistoryDrawer from './ChatHistoryDrawer';
 import { formatNumber } from '@/main/utils/format';
-import ChatInput from '@/renderer/components/chat/ChatInput';
+import ChatInput, { ChatInputRef } from '@/renderer/components/chat/ChatInput';
+import { EditorRef } from '@/renderer/components/common/Editor';
 
 export interface ChatContentProps {
   chatId?: string;
@@ -99,7 +100,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
   const [attachments, setAttachments] = useState<ChatInputAttachment[]>([]);
   const { agents, tools, knowledgeBase } = useContext(GlobalContext);
   const scrollRef = useRef<ScrollAreaRef | null>(null);
-  // const editorRef = useRef<EditorRef>(null);
+  const chatInputRef = useRef<ChatInputRef>(null);
   const [openCanvasView, setOpenCanvasView] = useState<boolean>(false);
 
   const [canvasViewValue, setCanvasViewValue] = useState<any>({});
@@ -168,8 +169,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
       content: text.trim(),
       extend: { attachments },
     });
-    setChatInputMessage('');
-    setAttachments([]);
+    chatInputRef.current?.clear();
     scrollToBottom(false);
   };
 
@@ -635,6 +635,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
                 </Splitter.Panel>
                 <Splitter.Panel min={220} defaultSize={220}>
                   <ChatInput
+                    ref={chatInputRef}
                     isRunning={currentChat?.status == 'running'}
                     onChat={onChat}
                     chatInputValue={chatInputMessage}

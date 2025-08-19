@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useImperativeHandle, useState } from 'react';
 import ProviderSelect from '../providers/ProviderSelect';
 import { Button, Input, Popconfirm, Tag, Tooltip } from 'antd';
 import {
@@ -14,6 +14,10 @@ import { FaGear } from 'react-icons/fa6';
 import { t } from 'i18next';
 import { ChatInputAttachment } from '@/types/chat';
 
+export interface ChatInputRef {
+  clear: () => void;
+}
+
 export interface ChatInputProps {
   className?: string;
   onChat?: (text?: string, attachments?: ChatInputAttachment[]) => void;
@@ -28,103 +32,112 @@ export interface ChatInputProps {
   attachmentEnabled?: boolean;
 }
 
-const ChatInput = React.forwardRef((props: ChatInputProps, ref) => {
-  const {
-    className,
-    header,
-    footer,
-    isRunning = false,
-    attachments: initialAttachments = [],
-    chatInputValue: initialChatInputValue = '',
-    attachmentEnabled = true,
-  } = props;
-  const [attachments, setAttachments] =
-    useState<ChatInputAttachment[]>(initialAttachments);
-  const [chatInputValue, setChatInputValue] = useState<string>(
-    initialChatInputValue,
-  );
-  const onChat = () => {
-    props.onChat?.(chatInputValue, attachments);
-  };
+const ChatInput = React.forwardRef<ChatInputRef, ChatInputProps>(
+  (props: ChatInputProps, ref) => {
+    const {
+      className,
+      header,
+      footer,
+      isRunning = false,
+      attachments: initialAttachments = [],
+      chatInputValue: initialChatInputValue,
+      attachmentEnabled = true,
+    } = props;
+    const [attachments, setAttachments] =
+      useState<ChatInputAttachment[]>(initialAttachments);
+    const [chatInputValue, setChatInputValue] = useState<string>(
+      initialChatInputValue,
+    );
 
-  const onCancel = () => {
-    props.onCancel?.();
-  };
+    useImperativeHandle(ref, () => ({
+      clear: () => {
+        setChatInputValue('');
+        setAttachments([]);
+      },
+    }));
 
-  useEffect(() => {
-    setAttachments(initialAttachments);
-    setChatInputValue(initialChatInputValue);
-  }, [initialAttachments, initialChatInputValue]);
+    const onChat = () => {
+      props.onChat?.(chatInputValue, attachments);
+    };
 
-  const onDeleteAttachment = (attachment: ChatInputAttachment) => {
-    const _attachments = attachments.filter((x) => x.path != attachment.path);
-    setAttachments(_attachments);
-    props.onAttachmentsChanged?.(_attachments);
-  };
+    const onCancel = () => {
+      props.onCancel?.();
+    };
 
-  const onSelectFile = async () => {
-    const res = await window.electron.app.showOpenDialog({
-      properties: ['openFile', 'multiSelections'],
-    });
-    if (res && res.length > 0) {
-      const _attachments = [];
-      for (const item of res) {
-        if (attachments.find((x) => x.path == item.path)) {
-          continue;
+    useEffect(() => {
+      setAttachments(initialAttachments);
+    }, [initialAttachments]);
+
+    const onDeleteAttachment = (attachment: ChatInputAttachment) => {
+      const _attachments = attachments.filter((x) => x.path != attachment.path);
+      setAttachments(_attachments);
+      props.onAttachmentsChanged?.(_attachments);
+    };
+
+    const onSelectFile = async () => {
+      const res = await window.electron.app.showOpenDialog({
+        properties: ['openFile', 'multiSelections'],
+      });
+      if (res && res.length > 0) {
+        const _attachments = [];
+        for (const item of res) {
+          if (attachments.find((x) => x.path == item.path)) {
+            continue;
+          }
+          _attachments.push({
+            path: item.path,
+            name: item.name,
+            type: item.type,
+            ext: item.ext,
+          });
         }
-        _attachments.push({
-          path: item.path,
-          name: item.name,
-          type: item.type,
-          ext: item.ext,
-        });
+        const new_attachments = [...attachments, ..._attachments];
+        setAttachments(new_attachments);
+        props.onAttachmentsChanged?.(new_attachments);
       }
-      const new_attachments = [...attachments, ..._attachments];
-      setAttachments(new_attachments);
-      props.onAttachmentsChanged?.(new_attachments);
-    }
-  };
+    };
 
-  return (
-    <div className="p-4 h-full">
-      <div className="flex flex-col gap-2 p-3 h-full bg-gray-100 rounded-2xl border border-gray-200 border-solid dark:border-none dark:bg-gray-600">
-        {header}
-        {attachments.length > 0 && (
-          <div className="flex flex-row flex-wrap gap-2 w-full">
-            {attachments.map((attachment) => (
-              <ChatAttachment
-                key={attachment.path}
-                value={attachment}
-                onDelete={() => onDeleteAttachment(attachment)}
-              />
-            ))}
-          </div>
-        )}
-        <div className="flex flex-col flex-1 gap-2 h-full">
-          <div className="flex flex-col flex-1 h-full">
-            <div className="flex-1 w-full h-full text-sm bg-transparent outline-none resize-none">
-              <Input.TextArea
-                id="chat-input"
-                className="w-full !h-full !outline-none !shadow-none !bg-transparent dark:text-white"
-                rows={1}
-                value={chatInputValue}
-                variant="borderless"
-                placeholder="Type a message"
-                onChange={(e) => {
-                  setChatInputValue(e.target.value);
-                }}
-                onKeyPress={(e) => {
-                  if (e.key == 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    onChat();
-                  }
-                }}
-              ></Input.TextArea>
+    return (
+      <div className="p-4 h-full">
+        <div className="flex flex-col gap-2 p-3 h-full bg-gray-100 rounded-2xl border border-gray-200 border-solid dark:border-none dark:bg-gray-600">
+          {header}
+          {attachments.length > 0 && (
+            <div className="flex flex-row flex-wrap gap-2 w-full">
+              {attachments.map((attachment) => (
+                <ChatAttachment
+                  key={attachment.path}
+                  value={attachment}
+                  onDelete={() => onDeleteAttachment(attachment)}
+                />
+              ))}
+            </div>
+          )}
+          <div className="flex flex-col flex-1 gap-2 h-full">
+            <div className="flex flex-col flex-1 h-full">
+              <div className="flex-1 w-full h-full text-sm bg-transparent outline-none resize-none">
+                <Input.TextArea
+                  id="chat-input"
+                  className="w-full !h-full !outline-none !shadow-none !bg-transparent dark:text-white"
+                  rows={1}
+                  value={chatInputValue}
+                  variant="borderless"
+                  autoFocus
+                  placeholder="Type a message"
+                  onChange={(e) => {
+                    setChatInputValue(e.target.value);
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key == 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      onChat();
+                    }
+                  }}
+                ></Input.TextArea>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex flex-row justify-between items-center w-full">
-          {/* <div className="flex gap-2 items-center">
+          <div className="flex flex-row justify-between items-center w-full">
+            {/* <div className="flex gap-2 items-center">
             <Tooltip
               placement="top"
               title={
@@ -214,39 +227,40 @@ const ChatInput = React.forwardRef((props: ChatInputProps, ref) => {
               </Popconfirm>
             </Tooltip>
           </div> */}
-          {footer || <div></div>}
-          <div className="flex flex-row items-center gap-2">
-            {attachmentEnabled && (
-              <Button
-                icon={<FaPaperclip />}
-                type="text"
-                onClick={() => {
-                  onSelectFile();
-                }}
-              ></Button>
-            )}
-            {isRunning && (
-              <Button
-                type="primary"
-                icon={<FaStop />}
-                onClick={() => {
-                  onCancel();
-                }}
-              />
-            )}
-            {!isRunning && (
-              <Button
-                type="primary"
-                disabled={!chatInputValue?.trim()}
-                icon={props.submitIcon || <FaArrowUp />}
-                onClick={onChat}
-              />
-            )}
+            {footer || <div></div>}
+            <div className="flex flex-row items-center gap-2">
+              {attachmentEnabled && (
+                <Button
+                  icon={<FaPaperclip />}
+                  type="text"
+                  onClick={() => {
+                    onSelectFile();
+                  }}
+                ></Button>
+              )}
+              {isRunning && (
+                <Button
+                  type="primary"
+                  icon={<FaStop />}
+                  onClick={() => {
+                    onCancel();
+                  }}
+                />
+              )}
+              {!isRunning && (
+                <Button
+                  type="primary"
+                  disabled={!chatInputValue?.trim()}
+                  icon={props.submitIcon || <FaArrowUp />}
+                  onClick={onChat}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-});
+    );
+  },
+);
 
 export default ChatInput;
