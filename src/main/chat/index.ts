@@ -853,7 +853,7 @@ export class ChatManager {
       }
       await this.chatMessageRepository.save(msgs);
 
-      if (err.message == 'Aborted') {
+      if (err.message == 'Aborted' || err.message == 'Abort') {
         const aborted_msg = new ChatMessage(
           uuidv4(),
           lastMesssageId,
