@@ -1,5 +1,9 @@
 import { Providers, ProviderType } from '@/entity/Providers';
-import { BaseProvider, BaseProviderParams } from './BaseProvider';
+import {
+  BaseProvider,
+  BaseProviderParams,
+  StructuredModelOptions,
+} from './BaseProvider';
 import { convertToOpenAITool } from '@langchain/core/utils/function_calling';
 import { Ollama } from 'ollama';
 import type {
@@ -745,6 +749,12 @@ export class OllamaProvider extends BaseProvider {
     });
     llm.invoke([], { think: false });
     return llm;
+  }
+
+  getStructuredModel(modelName?: string): StructuredModelOptions {
+    return {
+      structMethod: 'jsonSchema',
+    };
   }
 
   getEmbeddings(modelName: string): Embeddings {

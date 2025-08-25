@@ -167,26 +167,6 @@ export class ProvidersManager extends BaseManager {
         const anthropic = new AnthropicProvider({ provider: connection });
         const list = await anthropic.getModelList();
         return list;
-      } else if (connection.type === ProviderType.ZHIPU) {
-        const models = [
-          'GLM-4-0520',
-          'GLM-4-Long',
-          'GLM-4-AirX',
-          'GLM-4-Air',
-          'GLM-4-Flash',
-          'GLM-4V',
-          'GLM-4-AllTools',
-          'GLM-4',
-          'GLM-4-Plus',
-          'CodeGeeX-4',
-        ];
-        return models.map((x) => {
-          return {
-            name: x,
-            enable:
-              connection.models?.find((z) => z.name == x)?.enable || false,
-          };
-        });
       } else if (connection?.type === ProviderType.GOOGLE) {
         const google = new GoogleProvider({ provider: connection });
         const list = await google.getModelList();
@@ -262,6 +242,7 @@ export class ProvidersManager extends BaseManager {
       case ProviderType.OLLAMA:
         return new OllamaProvider({ provider: providerObj });
       case ProviderType.OPENAI:
+      case ProviderType.BAIDU:
         return new OpenAIProvider({ provider: providerObj });
       case ProviderType.AZURE_OPENAI:
         return new AzureOpenAIProvider({ provider: providerObj });
@@ -287,6 +268,10 @@ export class ProvidersManager extends BaseManager {
         return new BigmodelProvider({ provider: providerObj });
       case ProviderType.MODELSCOPE:
         return new ModelScopeProvider({ provider: providerObj });
+      case ProviderType.GOOGLE:
+        return new GoogleProvider({ provider: providerObj });
+      case ProviderType.GROQ:
+        return new GroqProvider({ provider: providerObj });
       default:
         return undefined;
     }
@@ -435,7 +420,7 @@ export class ProvidersManager extends BaseManager {
             name: connection.name,
             models: list,
           });
-        } else if (connection?.type === ProviderType.ZHIPU) {
+        } else if (connection?.type === ProviderType.BIGMODEL) {
           emb_list.push({
             name: connection.name,
             models: ['embedding-2', 'text_embedding'],

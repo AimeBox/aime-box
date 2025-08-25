@@ -12,7 +12,7 @@ import {
 import { Tool, ToolParams } from '@langchain/core/tools';
 
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { RunnableLambda } from '@langchain/core/runnables';
+import { Runnable, RunnableLambda } from '@langchain/core/runnables';
 import { ChatGroqInput, ChatGroq } from '@langchain/groq';
 import settingsManager from '../settings';
 import providersManager from '../providers';
@@ -33,13 +33,14 @@ import { TogetherProvider } from '../providers/TogetherProvider';
 import { MoonshotProvider } from '../providers/MoonshotProvider';
 import { BigmodelProvider } from '../providers/BigmodelProvider';
 import { ModelScopeProvider } from '../providers/ModelScopeProvider';
+import { OpenAIProvider } from '../providers/OpenAIProvider';
 
 export async function getChatModel(
   providerName: string,
   modelName: string,
   options: ChatOptions = { streaming: true },
   tools: BaseTool[] = [],
-): Promise<BaseChatModel> {
+): Promise<BaseChatModel | Runnable> {
   const provider = await (
     await providersManager.getProviders()
   ).find((x) => x.name === providerName);
@@ -53,69 +54,16 @@ export async function getChatModel(
     throw new Error(`model "${modelName}" not enable`);
   }
 
-  let llm;
-  if (provider?.type === ProviderType.OLLAMA) {
-    llm = new OllamaProvider({ provider }).getChatModel(model.name, options);
-  } else if (
-    provider?.type === ProviderType.OPENAI ||
-    provider?.type === ProviderType.OPENROUTER ||
-    provider?.type === ProviderType.SILICONFLOW ||
-    provider?.type === ProviderType.BAIDU ||
-    provider?.type === ProviderType.LMSTUDIO
-  ) {
-    llm = new ChatOpenAI({
-      apiKey: provider.api_key,
-      modelName: model.name,
-      configuration: {
-        apiKey: provider.api_key,
-        baseURL: provider.api_base,
-        httpAgent: settingsManager.getHttpAgent(),
-      },
-      topP: options?.top_p,
-      maxTokens: options?.maxTokens,
-      temperature: options?.temperature,
-      streaming: options?.streaming,
-    });
-  } else if (provider?.type === ProviderType.TONGYI) {
-    llm = new TongyiProvider({ provider }).getChatModel(model.name, options);
-  } else if (provider?.type === ProviderType.ZHIPU) {
-    llm = new ChatZhipuAI({
-      modelName: model.name,
-      zhipuAIApiKey: provider.api_key,
-      topP: options?.top_p,
-      temperature: options?.temperature,
-      maxTokens: options?.maxTokens,
-      streaming: options?.streaming,
-    });
-  } else if (provider?.type === ProviderType.GROQ) {
-    llm = new GroqProvider({ provider }).getChatModel(model.name, options);
-  } else if (provider?.type === ProviderType.ANTHROPIC) {
-    llm = new AnthropicProvider({ provider }).getChatModel(model.name, options);
-  } else if (provider?.type === ProviderType.GOOGLE) {
-    llm = new GoogleProvider({ provider }).getChatModel(model.name, options);
-  } else if (provider?.type === ProviderType.DEEPSEEK) {
-    llm = new DeepSeekProvider({ provider }).getChatModel(model.name, options);
-  } else if (provider?.type === ProviderType.TOGETHERAI) {
-    llm = new TogetherProvider({ provider }).getChatModel(model.name, options);
-  } else if (provider?.type === ProviderType.AZURE_OPENAI) {
-    llm = new AzureOpenAIProvider({ provider }).getChatModel(
-      model.name,
-      options,
-    );
-  } else if (provider?.type === ProviderType.MINIMAX) {
-    llm = new MinimaxProvider({ provider }).getChatModel(model.name, options);
-  } else if (provider?.type === ProviderType.MOONSHOT) {
-    llm = new MoonshotProvider({ provider }).getChatModel(model.name, options);
-  } else if (provider?.type === ProviderType.BIGMODEL) {
-    llm = new BigmodelProvider({ provider }).getChatModel(model.name, options);
-  } else if (provider?.type === ProviderType.MODELSCOPE) {
-    llm = new ModelScopeProvider({ provider }).getChatModel(
-      model.name,
-      options,
-    );
-  } else {
-    throw new Error(`provider "${providerName}" not support`);
+  const providerInstance = await providersManager.getProvider(providerName);
+  if (!providerInstance) {
+    throw new Error(`provider "${providerName}" not found`);
   }
+
+  const llm = await providerInstance.getChatModel(modelName, options);
+  if (!llm) {
+    throw new Error(`model "${modelName}" not found`);
+  }
+
   if (tools.length > 0) {
     const llmWithTools = llm.bindTools(tools);
     return llmWithTools;

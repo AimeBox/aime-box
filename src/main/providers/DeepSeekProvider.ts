@@ -1,11 +1,22 @@
 import { Providers, ProviderType } from '@/entity/Providers';
-import { BaseProvider, BaseProviderParams } from './BaseProvider';
+import {
+  BaseProvider,
+  BaseProviderParams,
+  StructuredModelOptions,
+} from './BaseProvider';
 import { ChatMinimax } from '@langchain/community/chat_models/minimax';
 import { OpenAI } from 'openai';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatOptions } from '@/entity/Chat';
 import { getEnvironmentVariable } from '@langchain/core/utils/env';
 import { ChatOpenAI } from '@langchain/openai';
+import {
+  BaseMessage,
+  isSystemMessage,
+  SystemMessage,
+} from '@langchain/core/messages';
+import { ZodSchema } from 'zod';
+import zodToJsonSchema from 'zod-to-json-schema';
 
 export class DeepSeekProvider extends BaseProvider {
   name: string = ProviderType.DEEPSEEK;
@@ -36,6 +47,35 @@ export class DeepSeekProvider extends BaseProvider {
       max_context_length: 64 * 1000,
     };
     return llm;
+  }
+
+  getStructuredModel(modelName?: string): StructuredModelOptions {
+    return {
+      structMethod: 'jsonMode',
+    };
+  }
+
+  getStructuredMessages(
+    messages: BaseMessage[],
+    modelName?: string,
+    schema?: ZodSchema,
+  ): BaseMessage[] {
+    const systemMessage = messages.find((x) => isSystemMessage(x));
+    const responseSchema = zodToJsonSchema(schema, {
+      $refStrategy: 'none',
+    });
+    if (systemMessage) {
+      systemMessage.content =
+        systemMessage.content +
+        `\n\nPlease return the result in the following JSON Schema format:\n${JSON.stringify(responseSchema, null, 2)}`;
+    } else {
+      messages.unshift(
+        new SystemMessage(
+          `Please return the result in the following JSON Schema format:\n${JSON.stringify(responseSchema, null, 2)}`,
+        ),
+      );
+    }
+    return messages;
   }
 
   async getModelList(): Promise<{ name: string; enable: boolean }[]> {

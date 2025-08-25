@@ -4,7 +4,7 @@ export enum ProviderType {
   OLLAMA = 'ollama',
   OPENAI = 'openai',
   TONGYI = 'tongyi',
-  ZHIPU = 'zhipu',
+  // ZHIPU = 'zhipu',
   GROQ = 'groq',
   ANTHROPIC = 'anthropic',
   TOGETHERAI = 'togetherai',

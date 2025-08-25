@@ -1,7 +1,12 @@
 import { CallbackManagerForToolRun } from '@langchain/core/callbacks/manager';
 import { ToolCall } from '@langchain/core/dist/messages/tool';
 import { RunnableConfig } from '@langchain/core/runnables';
-import { Tool, ToolParams, ToolSchemaBase } from '@langchain/core/tools';
+import {
+  ResponseFormat,
+  Tool,
+  ToolParams,
+  ToolSchemaBase,
+} from '@langchain/core/tools';
 import { IterableReadableStream } from '@langchain/core/utils/stream';
 import { CallOptions } from '@langchain/langgraph/dist/pregel/types';
 import { notificationManager } from '../app/NotificationManager';

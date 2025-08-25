@@ -170,6 +170,8 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
       extend: { attachments },
     });
     chatInputRef.current?.clear();
+    setAttachments([]);
+    setChatInputMessage('');
     scrollToBottom(false);
   };
 

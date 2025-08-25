@@ -1,4 +1,4 @@
-import { Tool, ToolParams } from '@langchain/core/tools';
+import { ResponseFormat, Tool, ToolParams } from '@langchain/core/tools';
 import {
   exec,
   execSync,

@@ -79,9 +79,6 @@ export async function getEmbeddingModel(
   } else if (provider?.type === ProviderType.TONGYI) {
     const emb = new AlibabaTongyiEmbeddings({ apiKey: provider.api_key });
     return emb;
-  } else if (provider?.type === ProviderType.ZHIPU) {
-    const emb = new ZhipuAIEmbeddings({ apiKey: provider.api_key });
-    return emb;
   } else if (provider?.type === ProviderType.TOGETHERAI) {
     const emb = new TogetherAIEmbeddings({
       apiKey: provider.api_key,

@@ -4,9 +4,17 @@ import { ChatOptions } from '@/entity/Chat';
 import { ChatOpenAI } from '@langchain/openai';
 import { OpenAI } from 'openai';
 import { Embeddings } from '@langchain/core/embeddings';
+import { ZodSchema } from 'zod';
+import { BaseMessage, BaseMessageLike } from '@langchain/core/messages';
+import settingsManager from '../settings';
 
 export interface BaseProviderParams {
   provider: Providers;
+}
+
+export interface StructuredModelOptions {
+  structMethod?: 'functionCalling' | 'jsonMode' | 'jsonSchema' | string;
+  strict?: boolean;
 }
 
 export abstract class BaseProvider {
@@ -29,6 +37,7 @@ export abstract class BaseProvider {
       configuration: {
         apiKey: this.provider.api_key,
         baseURL: this.provider.api_base,
+        httpAgent: settingsManager.getHttpAgent(),
       },
       topP: options?.top_p,
       maxTokens: options?.maxTokens,
@@ -36,6 +45,18 @@ export abstract class BaseProvider {
       streaming: options?.streaming,
     });
     return llm;
+  }
+
+  getStructuredModel(modelName?: string): StructuredModelOptions {
+    return undefined;
+  }
+
+  getStructuredMessages(
+    messages: BaseMessage[],
+    modelName?: string,
+    schema?: ZodSchema,
+  ): BaseMessage[] {
+    return messages;
   }
 
   getEmbeddings(modelName: string): Embeddings {

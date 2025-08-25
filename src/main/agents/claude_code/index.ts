@@ -402,7 +402,6 @@ IMPORTANT: this context may or may not be relevant to your tasks. You should not
               is_success: true,
               messages: [
                 ...(_agent.prompt ? [new SystemMessage(_agent.prompt)] : []),
-                input_message,
                 ...res.messages,
               ],
             };

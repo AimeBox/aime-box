@@ -10,11 +10,12 @@ import { getTmpPath } from '../utils/path';
 import { BrowserInstance } from '../instances/BrowserInstance';
 import { AnyIfEmpty } from 'react-redux';
 import { truncateText } from '../utils/common';
-import { Stagehand } from '@browserbasehq/stagehand';
+import { ObserveResult, Stagehand } from '@browserbasehq/stagehand';
 
 export interface BrowserParameters extends ToolParams {
   instancId?: string;
   model?: string;
+  useVision?: boolean;
 }
 
 export interface TabInfo {
@@ -29,18 +30,71 @@ const observeInfoSchema = z
       .enum(['error', 'warning', 'info', 'log'])
       .optional()
       .describe(
-        'Optional: If set will return console log level, default is none',
+        'Optional: If set will return console log level(error, warning, info, log).',
       ),
     observe_prompt: z
       .string()
       .optional()
-      .describe('get observe content after the action'),
-    capture: z.boolean().optional().default(false),
+      .describe('Get observe content after the action.'),
+    capture: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe(
+        'Return the screenshot of the page after the action, default is false.',
+      ),
   })
   .optional()
   .describe(
     'It will return the console log level, and the prompt to observe the page after navigation.',
   );
+
+const getObserveSchema = (useVision: boolean = false) => {
+  if (useVision) {
+    return z
+      .object({
+        console_level: z
+          .enum(['error', 'warning', 'info', 'log'])
+          .optional()
+          .describe(
+            'Optional: If set will return console log level(error, warning, info, log).',
+          ),
+        observe_prompt: z
+          .string()
+          .optional()
+          .describe('Get observe content after the action.'),
+        capture: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe(
+            'Return the screenshot of the page after the action, default is false.',
+          ),
+      })
+      .optional()
+      .describe(
+        'It will return the console log level, and the prompt to observe the page after navigation.',
+      );
+  } else {
+    return z
+      .object({
+        console_level: z
+          .enum(['error', 'warning', 'info', 'log'])
+          .optional()
+          .describe(
+            'Optional: If set will return console log level(error, warning, info, log).',
+          ),
+        observe_prompt: z
+          .string()
+          .optional()
+          .describe('Get observe content after the action.'),
+      })
+      .optional()
+      .describe(
+        'It will return the console log level, and the prompt to observe the page after navigation.',
+      );
+  }
+};
 
 const getStagehand = async (
   instancId: string,
@@ -77,7 +131,6 @@ export class BrowserNavigate extends BaseTool {
       .describe(
         'The URL to navigate to, If navigate local file, use file:// protocol',
       ),
-    observe: observeInfoSchema,
   });
 
   toolKitName?: string = 'browser_toolkit';
@@ -91,6 +144,9 @@ export class BrowserNavigate extends BaseTool {
   constructor(params: BrowserParameters) {
     super(params);
     this.params = params;
+    this.schema = this.schema.extend({
+      observe: getObserveSchema(params.useVision),
+    });
   }
 
   async _call(input: z.infer<typeof this.schema>, runManager, config) {
@@ -114,15 +170,19 @@ export class BrowserNavigate extends BaseTool {
       );
       console_messages.push({
         // args: args,
-        message: truncateText(message.text(), 500),
+        message: truncateText(message.text(), 300),
         type: message.type(),
         location: message.location()?.url,
       });
     };
 
     page.on('console', console_handler);
-    await page.goto(input.url);
-    await page.waitForLoadState('networkidle');
+
+    try {
+      await page.goto(input.url);
+      await page.waitForLoadState('networkidle', { timeout: 1000 * 30 });
+    } catch {}
+
     const actionlist = await page.observe(input.observe?.observe_prompt);
     page.off('console', console_handler);
 
@@ -133,32 +193,67 @@ export class BrowserNavigate extends BaseTool {
     const console_output = console_messages
       ? `${JSON.stringify(console_messages, null, 2)}`
       : '(No console log)';
-    return `Action: navigate
-Current Tab URL: ${page.url()}
+    const result = `Action: navigate
+Current URL: ${page.url()}
 Status: completed
 Date: ${new Date().toUTCString()}
-Action: \n ${JSON.stringify(actionlist, null, 2)}
-${input.observe?.console_level ? `Console: \n ${console_output}` : ''}`;
+${input.observe?.console_level ? `Console: \n ${console_output}` : ''}
+Action List: \n ${JSON.stringify(actionlist, null, 2)}
+`;
+
+    if (!input.observe?.capture) {
+      return result;
+    } else {
+      const screenshot = await page.screenshot();
+      const base64 = screenshot.toString('base64');
+      return [
+        { type: 'text', text: result },
+        {
+          type: 'image_url',
+          image_url: { url: `data:image/jpeg;base64,${base64}` },
+        },
+      ];
+    }
   }
 }
 
 export class BrowserAct extends BaseTool {
+  //selector: string;
+  // description: string;
+  // backendNodeId?: number;
+  // method?: string;
+  // arguments?: string[];
   schema = z.object({
-    action: z.string().describe(`The action to perform on the page.`),
-    observe: observeInfoSchema,
+    action_prompt: z
+      .string()
+      .describe(
+        `The action to perform on the page. (eg, Click the search box)`,
+      ),
+    action: z
+      .object({
+        selector: z.string().describe('The selector to click.'),
+        description: z.string().describe('The description of the action.'),
+        backendNodeId: z.number().optional(),
+        method: z.string().optional(),
+        arguments: z.array(z.string()).optional(),
+      })
+      .optional(),
   });
 
   toolKitName?: string = 'browser_toolkit';
 
   name: string = 'browser_action';
 
-  description: string = 'Act on the page.';
+  description: string = 'Execute an action on the page.';
 
   params: BrowserParameters;
 
   constructor(params: BrowserParameters) {
     super(params);
     this.params = params;
+    this.schema = this.schema.extend({
+      observe: getObserveSchema(params.useVision),
+    });
   }
 
   async _call(input: z.infer<typeof this.schema>, runManager, config) {
@@ -167,10 +262,71 @@ export class BrowserAct extends BaseTool {
       this.params.model,
     );
     const { page } = stagehand;
-    const act_res = await page.act(input.action);
+
+    let act_res;
+    let action_list;
+    if (input.action) {
+      act_res = await page.act(input.action as ObserveResult);
+    } else {
+      act_res = await page.act(input.action_prompt);
+    }
 
     console.log(act_res);
-    return `Browser act '${input.action}' is completed, This is after the action result: \n ${JSON.stringify(act_res, null, 2)}`;
+
+    let console_messages: any[] = [];
+    const level = {
+      error: 1,
+      warning: 2,
+      info: 3,
+      log: 4,
+    };
+
+    const console_handler = async (message: ConsoleMessage) => {
+      const args = await Promise.all(
+        message.args().map((arg) => arg.jsonValue()),
+      );
+      console_messages.push({
+        // args: args,
+        message: truncateText(message.text(), 300),
+        type: message.type(),
+        location: message.location()?.url,
+      });
+    };
+
+    if (input.observe?.observe_prompt) {
+      action_list = await page.observe(input.observe?.observe_prompt);
+    }
+    page.off('console', console_handler);
+
+    console_messages = console_messages.filter(
+      (x) => level[x.type] <= level[input.observe?.console_level],
+    );
+
+    const console_output = console_messages
+      ? `${JSON.stringify(console_messages, null, 2)}`
+      : '(No console log)';
+    const result = `Action: ${input.action_prompt}
+Current URL: ${page.url()}
+Status: completed
+Date: ${new Date().toUTCString()}
+${input.observe?.console_level ? `Console: \n ${console_output}` : ''}
+Action Result: \n ${JSON.stringify(act_res, null, 2)}
+${action_list ? `Action List: \n ${JSON.stringify(action_list, null, 2)}` : ''}
+`;
+
+    if (!input.observe?.capture) {
+      return result;
+    } else {
+      const screenshot = await page.screenshot();
+      const base64 = screenshot.toString('base64');
+      return [
+        { type: 'text', text: result },
+        {
+          type: 'image_url',
+          image_url: { url: `data:image/jpeg;base64,${base64}` },
+        },
+      ];
+    }
   }
 }
 
@@ -199,8 +355,9 @@ export class BrowserExtract extends BaseTool {
     );
     const { page } = stagehand;
     const extract_res = await page.extract(input.instruction);
-    console.log(extract_res);
-    return `Browser extract is completed, This is the extract result: \n${JSON.stringify(extract_res, null, 2)}`;
+    const extraction = extract_res.extraction;
+    console.log(extraction);
+    return `Extract is completed, This is the extract result: \n${extraction}`;
   }
 }
 export class BrowserScript extends BaseTool {
@@ -463,6 +620,12 @@ export class BrowserToolkit extends BaseToolKit {
         allowClear: true,
       },
     },
+    {
+      label: t('common.useVision'),
+      field: 'useVision',
+      component: 'Switch',
+      defaultValue: false,
+    },
   ];
 
   constructor(params?: BrowserParameters) {
@@ -478,8 +641,8 @@ export class BrowserToolkit extends BaseToolKit {
       // // new BrowserConsole(this.params),
       // new BrowserScript(this.params),
       // new BrowserRequest(this.params),
-      // new BrowserAct(this.params),
-      // new BrowserExtract(this.params),
+      new BrowserAct(this.params),
+      new BrowserExtract(this.params),
     ];
   }
 }

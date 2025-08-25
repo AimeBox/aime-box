@@ -1,5 +1,9 @@
 import { Providers, ProviderType } from '@/entity/Providers';
-import { BaseProvider, BaseProviderParams } from './BaseProvider';
+import {
+  BaseProvider,
+  BaseProviderParams,
+  StructuredModelOptions,
+} from './BaseProvider';
 import { Ollama } from 'ollama';
 import { ChatOllama } from '@langchain/ollama';
 import {
@@ -33,6 +37,13 @@ export class OpenAIProvider extends BaseProvider {
       apiKey: this.provider.api_key,
       httpAgent: this.httpProxy,
     });
+  }
+
+  getStructuredModel(modelName?: string): StructuredModelOptions {
+    return {
+      structMethod: 'functionCalling',
+      strict: true,
+    };
   }
 
   getEmbeddings(modelName: string): Embeddings {

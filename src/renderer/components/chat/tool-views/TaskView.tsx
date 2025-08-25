@@ -66,7 +66,14 @@ export default function TaskView(props: TaskViewProps) {
               {item['kwargs'].tool_calls &&
                 item['kwargs'].tool_calls.length > 0 && (
                   <div className="whitespace-pre-wrap break-all w-full">
-                    {JSON.stringify(item['kwargs'].tool_calls, null, 2)}
+                    {item['kwargs'].tool_calls.map((too_calls) => {
+                      return (
+                        <Tag className="rounded-full" color="blue">
+                          {too_calls.name}
+                        </Tag>
+                      );
+                    })}
+                    {/* {JSON.stringify(item['kwargs'].tool_calls, null, 2)} */}
                   </div>
                 )}
             </List.Item>

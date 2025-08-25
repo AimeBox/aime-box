@@ -49,7 +49,15 @@ export class FileWrite extends BaseTool {
 
   name = 'file_write';
 
-  description: string = 'create file and write';
+  description: string = `Writes a file to the local filesystem.
+
+Usage:
+
+- This tool will overwrite the existing file if there is one at the provided path.
+- If this is an existing file, you MUST use the Read tool first to read the file's contents. This tool will fail if you did not read the file first.
+- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
+- NEVER proactively create documentation files (\*.md) or README files. Only create documentation files if explicitly requested by the User.
+- Only use emojis if the user explicitly requests it. Avoid writing emojis to files unless asked.`;
 
   constructor(params?: FileWriteParameters) {
     super(params);
@@ -68,6 +76,13 @@ export class FileWrite extends BaseTool {
         filePath = path.join(workspace, filePath);
       }
     }
+    if (fs.existsSync(filePath)) {
+      if (fileSystemManager.needReadFile(filePath)) {
+        throw new Error(
+          `File '${filePath}' has been modified since last read. Please use 'file_read' tool to read the file first and then use 'file_write' tool to overwrite the file.`,
+        );
+      }
+    }
 
     const dirPath = path.dirname(filePath);
     if (!fs.existsSync(dirPath)) {
@@ -79,6 +94,9 @@ export class FileWrite extends BaseTool {
     } else {
       await fs.promises.writeFile(filePath, input.data);
     }
+
+    fileSystemManager.updateFileModTime(filePath);
+
     return `The file was successfully written and saved in:\n<file>${filePath.replaceAll('\\', '/')}</file>`;
   }
 }
@@ -275,13 +293,15 @@ Usage:
 
     if (input.show_line_index) {
       llmTextContent += formattedLines
-        .map((line, index) =>
-          `${index + 1 + actualStartLine}\t${line}`.padStart(5, ' '),
+        .map(
+          (line, index) =>
+            `${(index + 1 + actualStartLine).toString().padStart(5, ' ')}\t${line}`,
         )
         .join('\n');
     } else {
       llmTextContent += formattedLines.join('\n');
     }
+    fileSystemManager.updateFileModTime(filePath);
     return llmTextContent;
   }
 }
@@ -302,7 +322,10 @@ export class ListDirectory extends BaseTool {
       .describe(
         'The absolute path to the directory to list (must be absolute, not relative)',
       ),
-    ignore: z.array(z.string()).optional().describe('List of RegExp to ignore'),
+    ignore: z
+      .array(z.string())
+      .optional()
+      .describe('List of regex patterns to ignore'),
     recursive: z.boolean().optional().default(false),
   });
 
@@ -330,7 +353,7 @@ export class ListDirectory extends BaseTool {
 
     ignore = [...new Set(ignore)];
 
-    const treeOutput = tree(filePath, {
+    let treeOutput = tree(filePath, {
       maxDepth: input.recursive ? Number.POSITIVE_INFINITY : 1,
       exclude: input.ignore?.map((x) => new RegExp(x)) || [],
     });
@@ -338,7 +361,9 @@ export class ListDirectory extends BaseTool {
       return `Directory listing for ${filePath}:\n[empty directory]`;
     }
 
-    return `Directory listing for ${filePath}:\n[root] ${treeOutput}`;
+    treeOutput = treeOutput.split('\n').slice(1).join('\n');
+
+    return `Directory listing for \n${filePath}\n${treeOutput}`;
   }
 }
 
@@ -760,6 +785,16 @@ Usage:
       _file_path = path.join(workspace, file_path);
     }
 
+    if (!fs.existsSync(_file_path)) {
+      throw new Error(`File ${_file_path} does not exist.`);
+    }
+
+    if (fileSystemManager.needReadFile(_file_path)) {
+      throw new Error(
+        `File '${_file_path}' has been modified since last read. Please use 'file_read' tool to read the file first and then do this again.`,
+      );
+    }
+
     let content = '';
 
     if (fs.existsSync(_file_path)) {
@@ -776,6 +811,8 @@ Usage:
       },
     ]);
     await fs.promises.writeFile(_file_path, new_content);
+
+    fileSystemManager.updateFileModTime(_file_path);
 
     if (replace_all)
       return `The file ${_file_path} has been updated. All occurrences of '${old_string}' were successfully replaced with '${new_string}'.`;
@@ -870,6 +907,16 @@ If you want to create a new file, use:
       _file_path = path.join(workspace, file_path);
     }
 
+    if (!fs.existsSync(_file_path)) {
+      throw new Error(`File ${_file_path} does not exist.`);
+    }
+
+    if (fileSystemManager.needReadFile(_file_path)) {
+      throw new Error(
+        `File '${_file_path}' has been modified since last read. Please use 'file_read' tool to read the file first and then do this again.`,
+      );
+    }
+
     let content = '';
 
     if (fs.existsSync(_file_path)) {
@@ -880,6 +927,7 @@ If you want to create a new file, use:
     fs.mkdirSync(path.dirname(_file_path), { recursive: true });
 
     await fs.promises.writeFile(_file_path, new_content);
+    fileSystemManager.updateFileModTime(_file_path);
 
     return `Applied ${edits.length} edit${edits.length === 1 ? '' : 's'} to ${_file_path}:
 ${edits
@@ -1307,3 +1355,29 @@ export class FileSystemToolKit extends BaseToolKit {
     ];
   }
 }
+
+export class FileSystemManager {
+  fileModTimes: Record<string, number | null> = {};
+
+  needReadFile(filePath: string) {
+    const fileModTime = this.fileModTimes[filePath];
+
+    if (!fs.existsSync(filePath)) {
+      return false;
+    }
+
+    if (!fileModTime) {
+      return true;
+    }
+    const fileStat = fs.statSync(filePath);
+    const currentModTime = fileStat.mtime.getTime();
+    return currentModTime !== fileModTime;
+  }
+
+  updateFileModTime(filePath: string) {
+    const fileStat = fs.statSync(filePath);
+    this.fileModTimes[filePath] = fileStat.mtime.getTime();
+  }
+}
+
+export const fileSystemManager = new FileSystemManager();

@@ -84,24 +84,23 @@ export class Vision extends BaseTool {
       const mimeType = mime.lookup(fileOrUrl);
       if (mimeType.startsWith('image/')) {
         imagePath = fileOrUrl;
-        // const image = await fsPromises.readFile(fileOrUrl);
-        // imageBase64 = image.toString('base64');
+        imageBase64 = await fsPromises.readFile(fileOrUrl, 'base64');
+        message_part = {
+          type: 'image_url',
+          image_url: {
+            url: `data:${mimeType};base64,${imageBase64}`,
+          },
+        };
+        //const imageBuffer = await Sharp(imagePath).toBuffer();
+        //const { width, height, format } = await Sharp(imagePath).metadata();
+        //imageBase64 = imageBuffer.toString('base64');
         // message_part = {
         //   type: 'image_url',
         //   image_url: {
         //     url: `data:${mimeType};base64,${imageBase64}`,
         //   },
         // };
-        const imageBuffer = await Sharp(imagePath).toFormat('jpeg').toBuffer();
-        const { width, height, format } = await Sharp(imagePath).metadata();
-        imageBase64 = imageBuffer.toString('base64');
-        message_part = {
-          type: 'image_url',
-          image_url: {
-            url: `data:image/jpeg;base64,${imageBase64}`,
-          },
-        };
-        fileInfo = `Width: ${width}\nHeight: ${height}\nFormat: ${format}`;
+        //fileInfo = ` - Width: ${width}\n - Height: ${height}`;
       } else if (mimeType.startsWith('video/')) {
         imagePath = fileOrUrl;
         const image = await fsPromises.readFile(fileOrUrl);
@@ -128,12 +127,12 @@ export class Vision extends BaseTool {
     }
 
     return [
+      message_part,
       {
         type: 'text',
-        text: `here is the image: ${fileOrUrl}
+        text: `Here is the image: ${fileOrUrl}
 ${fileInfo ? `MetaData: \n${fileInfo}` : ''}`,
       },
-      message_part,
     ];
 
     // const { provider, modelName } = getProviderModel(this.model);

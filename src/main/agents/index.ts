@@ -400,6 +400,17 @@ export class AgentManager extends BaseManager {
     await this.agentRepository.delete(id);
   }
 
+  @channel('agent:setDefault')
+  public async setDefaultAgent(id: string) {
+    const agent = await this.agentRepository.findOne({
+      where: { id: id },
+    });
+    if (!agent) {
+      throw new Error('agent not found');
+    }
+    settingsManager.set('defaultAgent', id);
+  }
+
   public async buildAgent(config: {
     agent: Agent;
     tools?: BaseTool[];

@@ -20,9 +20,12 @@ import providersManager from '../providers';
 import { getChatModel } from '../llm';
 import {
   AIMessage,
+  AIMessageChunk,
+  BaseMessage,
   BaseMessageLike,
   HumanMessage,
   SystemMessage,
+  ToolMessage,
 } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -31,6 +34,10 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatCompletion } from 'openai/resources';
+import {
+  BaseProvider,
+  StructuredModelOptions,
+} from '../providers/BaseProvider';
 
 class MyLLMClient extends LLMClient {
   async createChatCompletion<T = LLMResponse>(
@@ -154,74 +161,96 @@ export class LangchainClient extends LLMClient {
 
   private model: BaseChatModel;
 
-  constructor(model: BaseChatModel) {
+  private provider: BaseProvider;
+
+  private config?: StructuredModelOptions;
+
+  constructor(
+    model: BaseChatModel,
+    provider: BaseProvider,
+    config?: StructuredModelOptions,
+  ) {
     super(model.name as AvailableModel);
     this.model = model;
+    this.provider = provider;
+    this.config = config;
   }
 
   async createChatCompletion<T = ChatCompletion>({
     options,
   }: CreateChatCompletionOptions): Promise<T> {
-    const formattedMessages: BaseMessageLike[] = options.messages.map(
-      (message) => {
-        if (Array.isArray(message.content)) {
-          if (message.role === 'system') {
-            return new SystemMessage(
-              message.content
-                .map((c) => ('text' in c ? c.text : ''))
-                .join('\n'),
-            );
-          }
-
-          const content = message.content.map((content) =>
-            'image_url' in content
-              ? { type: 'image', image: content.image_url.url }
-              : { type: 'text', text: content.text },
+    const formattedMessages: BaseMessage[] = options.messages.map((message) => {
+      if (Array.isArray(message.content)) {
+        if (message.role === 'system') {
+          return new SystemMessage(
+            message.content.map((c) => ('text' in c ? c.text : '')).join('\n'),
           );
-
-          if (message.role === 'user') return new HumanMessage({ content });
-
-          const textOnlyParts = content.map((part) => ({
-            type: 'text' as const,
-            text: part.type === 'image' ? '[Image]' : part.text,
-          }));
-
-          return new AIMessage({ content: textOnlyParts });
         }
 
-        return {
-          role: message.role,
-          content: message.content,
-        };
-      },
-    );
+        const content = message.content.map((content) =>
+          'image_url' in content
+            ? { type: 'image', image: content.image_url.url }
+            : { type: 'text', text: content.text },
+        );
+
+        if (message.role === 'user') return new HumanMessage({ content });
+
+        const textOnlyParts = content.map((part) => ({
+          type: 'text' as const,
+          text: part.type === 'image' ? '[Image]' : part.text,
+        }));
+
+        return new AIMessage({ content: textOnlyParts });
+      }
+      if (message.role === 'system') {
+        return new SystemMessage(message.content);
+      } else if (message.role === 'user') {
+        return new HumanMessage(message.content);
+      } else if (message.role === 'assistant') {
+        return new AIMessage(message.content);
+      }
+      throw new Error(`Unsupported message role: ${message.role}`);
+    });
 
     if (options.response_model) {
       const responseSchema = zodToJsonSchema(options.response_model.schema, {
         $refStrategy: 'none',
       });
-      const structuredModel = this.model.withStructuredOutput(responseSchema);
-      const response = await structuredModel.invoke(formattedMessages);
-
-      return {
-        data: response,
-        usage: {
-          prompt_tokens: 0, // Langchain doesn't provide token counts by default
-          completion_tokens: 0,
-          total_tokens: 0,
+      const structuredModel = this.model.withStructuredOutput(
+        options.response_model.schema,
+        {
+          includeRaw: true,
+          method: this.config?.structMethod,
+          strict: this.config?.strict,
         },
-      } as T;
+      );
+      const messages = this.provider.getStructuredMessages(
+        formattedMessages,
+        this.model.name,
+        options.response_model.schema,
+      );
+
+      const response = await structuredModel.invoke(messages, {
+        tags: ['ignore'],
+      });
+      console.log(JSON.stringify(response.parsed, null, 2));
+      const raw = response.raw as AIMessageChunk;
+      return response.parsed as T;
     }
 
     const modelWithTools = this.model.bindTools(options.tools);
-    const response = await modelWithTools.invoke(formattedMessages);
+    const response = await modelWithTools.invoke(formattedMessages, {
+      tags: ['ignore'],
+    });
 
     return {
       data: response,
       usage: {
-        prompt_tokens: 0, // Langchain doesn't provide token counts by default
-        completion_tokens: 0,
-        total_tokens: 0,
+        usage: {
+          prompt_tokens: response?.usage_metadata?.input_tokens || 0,
+          completion_tokens: response?.usage_metadata?.output_tokens || 0,
+          total_tokens: response?.usage_metadata?.total_tokens || 0,
+        },
       },
     } as T;
   }
@@ -251,9 +280,16 @@ export class BrowserInstance extends BaseInstance {
         await getProviderModel(modelProvider);
       const provider = await providersManager.getProvider(providerName);
 
-      const chatModel = await getChatModel(providerName, modelName);
-
-      const llmClient = new LangchainClient(chatModel);
+      const chatModel = (await getChatModel(
+        providerName,
+        modelName,
+      )) as BaseChatModel;
+      const structuredModel = provider.getStructuredModel(modelName);
+      const llmClient = new LangchainClient(
+        chatModel,
+        provider,
+        structuredModel,
+      );
 
       const stagehand = new Stagehand({
         env: 'LOCAL',
