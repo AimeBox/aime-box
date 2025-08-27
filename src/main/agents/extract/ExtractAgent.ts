@@ -5,6 +5,7 @@ import {
   BaseMessage,
   ToolMessage,
   ToolMessageChunk,
+  AIMessageChunk,
 } from '@langchain/core/messages';
 import {
   BaseCheckpointSaver,
@@ -14,7 +15,7 @@ import {
   MessagesAnnotation,
   BaseStore,
 } from '@langchain/langgraph';
-import { ChatOptions } from '../../../entity/Chat';
+import { ChatOptions, ChatStatus } from '../../../entity/Chat';
 import { getChatModel } from '../../llm';
 import { dbManager } from '../../db';
 import { z, ZodObject } from 'zod';
@@ -50,7 +51,7 @@ import settingsManager from '@/main/settings';
 import { getProviderModel } from '@/main/utils/providerUtil';
 import { Document } from '@langchain/core/documents';
 
-import { IterableReadableStream } from '@langchain/core/utils/stream';
+import { concat, IterableReadableStream } from '@langchain/core/utils/stream';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { isArray, isString, isUrl } from '@/main/utils/is';
 import { Embeddings } from '@langchain/core/embeddings';
@@ -471,7 +472,7 @@ export class ExtractTool extends BaseTool {
     const result_2 = await extractionChain.invoke(thought, {
       tags: ['ignore'],
       signal: this.signal,
-      timeout: 1000 * 30,
+      timeout: 1000 * 120,
     });
     let data;
     if (!result_2.parsed) {
@@ -537,12 +538,15 @@ export class ExtractTool extends BaseTool {
     } else {
       if (isUrl(pathOrUrl)) {
         type = 'url';
-      } else if (fs.statSync(pathOrUrl).isFile()) {
-        type = 'file';
-      } else if (fs.statSync(pathOrUrl).isDirectory()) {
-        type = 'directory';
       } else {
-        throw new Error('Invalid path or url');
+        if (!fs.existsSync(pathOrUrl)) {
+          throw new Error('Path is not exist');
+        }
+        if (fs.statSync(pathOrUrl).isFile()) {
+          type = 'file';
+        } else if (fs.statSync(pathOrUrl).isDirectory()) {
+          type = 'directory';
+        }
       }
       if (type === 'url') {
         const loader = new WebLoader();
@@ -761,6 +765,7 @@ export class ExtractTool extends BaseTool {
           yield `Extract Done, File Saved :\n<file>${input.savePath}</file>`;
         } catch (err) {
           console.error(err);
+          throw err;
         }
       }
     }
@@ -971,6 +976,21 @@ export class ExtractAgent extends BaseAgent {
   }) {
     const { store, model, messageEvent, chatOptions, signal, configurable } =
       params;
+    const sendMessage = async (
+      message: BaseMessage,
+      state?: 'start' | 'chunk' | 'end',
+    ) => {
+      message.id = message.id || uuidv4();
+      if (state == 'start' || !state) {
+        await messageEvent.created([message]);
+      }
+      if (state == 'chunk') {
+        await messageEvent.updated([message]);
+      }
+      if (state == 'end' || !state) {
+        await messageEvent.finished([message]);
+      }
+    };
     const config = await this.getConfig();
     this.systemPrompt = ExtractAgentSystemPrompt;
     this.model = model;
@@ -1062,7 +1082,10 @@ export class ExtractAgent extends BaseAgent {
       return '__end__';
     }
 
-    async function extractNode({ messages }: typeof MessagesAnnotation.State) {
+    async function extractNode(
+      { messages }: typeof MessagesAnnotation.State,
+      _config: RunnableConfig,
+    ) {
       const lastMessage = messages[messages.length - 1] as AIMessage;
       const toolCall = lastMessage.tool_calls.find(
         (x) => x.name == 'extract_tool',
@@ -1079,22 +1102,47 @@ export class ExtractAgent extends BaseAgent {
         // mode: config.mode,
         // embedding: that.embedding,
       });
-      const toolNode = new ToolNode([extractTool]);
-      const result = await toolNode.streamEvents(
-        {
-          messages: [lastMessage],
-        },
-        {
-          version: 'v2',
-          // tags: ['ignore'],
-        },
-      );
 
-      for await (const chunk of result) {
-        //console.log(chunk);
+      const toolMsg = new ToolMessage('', toolCall.id, 'extract_tool');
+      toolMsg.id = uuidv4();
+      await sendMessage(toolMsg, 'start');
+      try {
+        const result = await await extractTool.stream(toolCall.args, {
+          ..._config,
+          tags: ['ignore'],
+        });
+
+        // const toolNode = new ToolNode([extractTool]);
+
+        // const result = await toolNode.streamEvents(
+        //   {
+        //     messages: [lastMessage],
+        //   },
+        //   {
+        //     version: 'v2',
+        //     // tags: ['ignore'],
+        //   },
+        // );
+        let finalChunk: string = '';
+
+        for await (const chunk of result) {
+          finalChunk += chunk;
+          toolMsg.content = finalChunk;
+          await sendMessage(toolMsg, 'chunk');
+        }
+        toolMsg.status = ChatStatus.SUCCESS;
+        toolMsg.content = finalChunk;
+        console.log(finalChunk);
+      } catch (err) {
+        console.error(err);
+        toolMsg.status = ChatStatus.ERROR;
+        toolMsg.content = err.message;
+        toolMsg.additional_kwargs['error'] = err.message;
       }
 
-      return { messages: [lastMessage] };
+      await sendMessage(toolMsg, 'end');
+
+      return { messages: [lastMessage, toolMsg] };
     }
 
     async function continueNode(
