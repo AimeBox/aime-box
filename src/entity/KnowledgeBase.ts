@@ -49,6 +49,9 @@ export class KnowledgeBase {
 
   @Column({ nullable: true })
   rootPath?: string;
+
+  @Column({ nullable: true })
+  static?: boolean;
 }
 
 export enum KnowledgeBaseItemState {

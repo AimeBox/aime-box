@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { FormSchema } from '@/types/form';
 import fs from 'fs';
 import path from 'path';
-import { imageToBase64, saveFile } from '../utils/common';
+import { downloadFile, imageToBase64, saveFile } from '../utils/common';
 import { v4 as uuidv4 } from 'uuid';
 import { isArray, isUrl } from '../utils/is';
 import { Images } from 'zhipuai-sdk-nodejs-v4';
@@ -82,6 +82,83 @@ export class ReplicateImageEditing extends BaseTool {
         input: body,
       },
     );
+    const url = output.url();
+    const text = url.toString();
+    const ext = path.extname(text);
+    const filePath = await saveFile(text, uuidv4() + ext, parentConfig);
+    return `<file>${filePath}</file>`;
+  }
+}
+
+export class ReplicateMultiImageEditing extends BaseTool {
+  toolKitName: string = 'replicate';
+
+  officialLink: string = REPLICATE_OFFICIAL_LINK;
+
+  tags?: string[] = [ToolTag.IMAGE];
+
+  schema = z.object({
+    prompt: z.string(),
+    input_images: z.array(z.string()).describe('images file path or url'),
+  });
+
+  configSchema?: FormSchema[] = [
+    {
+      field: 'apiKey',
+      component: 'InputPassword',
+      label: 'API Key',
+      required: true,
+    },
+  ];
+
+  name: string = 'replicate_multi_image_editing';
+
+  description: string = 'edit the images from the prompt';
+
+  apiKey?: string;
+
+  params: ReplicateParameters;
+
+  constructor(params?: ReplicateParameters) {
+    super();
+    this.params = params;
+  }
+
+  async _call(
+    input: z.infer<typeof this.schema>,
+    runManager?: CallbackManagerForToolRun,
+    parentConfig?: ToolRunnableConfig,
+  ): Promise<any> {
+    const provider = (await providersManager.getProvider(
+      this.params?.providerId,
+    )) as ReplicateProvider;
+
+    const body: any = input;
+    // google/nano-banana
+    const data = {
+      prompt: body.prompt,
+      image_input: [],
+      output_format: 'jpg',
+    };
+
+    for (const image of body.input_images) {
+      if (isUrl(image)) {
+        console.log('input_image', image);
+        const filePath = await downloadFile(image);
+        data.image_input.push(filePath);
+      } else if (fs.existsSync(image)) {
+        const fileInput = await fs.promises.readFile(image);
+        data.image_input.push(fileInput);
+      } else {
+        throw new Error('Invalid image file path or url');
+      }
+    }
+
+    const model = 'google/nano-banana';
+
+    const output = await provider.replicate.run(model, {
+      input: body,
+    });
     const url = output.url();
     const text = url.toString();
     const ext = path.extname(text);
@@ -682,6 +759,7 @@ export class ReplicateToolkit extends BaseToolKit {
   getTools(): BaseTool[] {
     return [
       new ReplicateImageEditing(this.params),
+      new ReplicateMultiImageEditing(this.params),
       new ReplicateImageGeneration(this.params),
       new ReplicateMultiImageToVideo(this.params),
       new ReplicateTextToVideo(this.params),
