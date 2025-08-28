@@ -151,7 +151,7 @@ export default function KnowledgeBasePage() {
     try {
       await window.electron.kb.delete(item.id);
       await getData();
-      navigate(`/knowledge-base`);
+      navigate(location.pathname);
       message.success('success');
     } catch (err) {
       message.error(err);
@@ -161,14 +161,14 @@ export default function KnowledgeBasePage() {
   const openAddLocalKnowledgeBase = () => {
     setAddButtonOpen(false);
     setCurrentKB(undefined);
-    navigate(`/knowledge-base`);
+    navigate(location.pathname);
     kbModalRef.current.openModal(true);
   };
 
   const openAddDifyKnowledgeBase = () => {
     setAddButtonOpen(false);
     setCurrentKB(undefined);
-    navigate(`/knowledge-base`);
+    navigate(location.pathname);
     kbDifyModalRef.current.openModal(true);
   };
 
@@ -177,15 +177,14 @@ export default function KnowledgeBasePage() {
   }, []);
 
   useEffect(() => {
-    const kbId = location.pathname.split('/')[2];
-
+    const data = location.search.replace('?', '').split('&');
+    const kbId = data.find((x) => x.startsWith('id='))?.split('=')[1];
     if (kbId) {
       setCurrentKB(list.find((x) => x.id == kbId));
-      // setCurrentMode('dataset');
     } else {
       setCurrentKB(undefined);
     }
-  }, [location.pathname]);
+  }, [location.search]);
 
   return (
     <Content>
@@ -210,7 +209,7 @@ export default function KnowledgeBasePage() {
                   >
                     {t('knowledge.localKB')}
                   </Button>
-                  <Button
+                  {/* <Button
                     type="text"
                     block
                     onClick={() => {
@@ -218,7 +217,7 @@ export default function KnowledgeBasePage() {
                     }}
                   >
                     {t('knowledge.difyKB')}
-                  </Button>
+                  </Button> */}
                 </div>
               }
             >
@@ -242,30 +241,35 @@ export default function KnowledgeBasePage() {
                     </div>
                   }
                   active={item.id === currentKB?.id}
-                  href={`/knowledge-base/${item.id}`}
+                  href={{
+                    pathname: location.pathname,
+                    search: `?id=${item.id}`,
+                  }}
                   menu={
-                    <div className="flex flex-col">
-                      <Button
-                        type="text"
-                        icon={<FaEdit />}
-                        onClick={(e) => {
-                          setCurrentKB(item);
-                          kbModalRef.current.openModal(true, item);
-                        }}
-                      >
-                        {t('edit')}
-                      </Button>
-                      <Popconfirm
-                        title="Delete the item?"
-                        onConfirm={() => onDelete(item)}
-                        okText="Yes"
-                        cancelText="No"
-                      >
-                        <Button type="text" danger icon={<FaTrashAlt />}>
-                          {t('delete')}
+                    item.static ? null : (
+                      <div className="flex flex-col">
+                        <Button
+                          type="text"
+                          icon={<FaEdit />}
+                          onClick={(e) => {
+                            setCurrentKB(item);
+                            kbModalRef.current.openModal(true, item);
+                          }}
+                        >
+                          {t('edit')}
                         </Button>
-                      </Popconfirm>
-                    </div>
+                        <Popconfirm
+                          title="Delete the item?"
+                          onConfirm={() => onDelete(item)}
+                          okText="Yes"
+                          cancelText="No"
+                        >
+                          <Button type="text" danger icon={<FaTrashAlt />}>
+                            {t('delete')}
+                          </Button>
+                        </Popconfirm>
+                      </div>
+                    )
                   }
                 ></ListItem>
               );
@@ -274,10 +278,17 @@ export default function KnowledgeBasePage() {
         </List>
         <div className="flex flex-col flex-1 w-full min-w-0 h-full min-h-full">
           <Routes>
-            <Route
-              path="/:id"
-              element={<KnowledgeBaseContent knowledgeBaseId={currentKB?.id} />}
-            />
+            {currentKB?.id && (
+              <Route
+                path="/"
+                element={
+                  <KnowledgeBaseContent
+                    knowledgeBaseId={currentKB?.id}
+                    readonly={currentKB?.static}
+                  />
+                }
+              />
+            )}
           </Routes>
         </div>
       </div>

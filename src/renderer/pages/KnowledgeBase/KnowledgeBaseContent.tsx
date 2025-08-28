@@ -42,6 +42,7 @@ import { KnowledgeBaseItem } from '@/entity/KnowledgeBase';
 
 export interface KnowledgeBaseContentProps {
   knowledgeBaseId: string;
+  readonly?: boolean;
   selectionType?: 'checkbox' | 'radio' | 'none';
   onSelect?: (kbItems: any[], knowledgeBaseId: string) => void;
 }
@@ -51,6 +52,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
     onSelect = (id, knowledgeBaseId) => {},
     selectionType = 'checkbox',
     knowledgeBaseId = null,
+    readonly = false,
   } = props;
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const modalRef = useRef<FormModalRef>(undefined);
@@ -249,30 +251,13 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
         );
       },
     },
-
-    {
-      title: t('knowledge.enable'),
-      dataIndex: 'isEnable',
-      key: 'isEnable',
-      width: '80px',
-      align: 'center',
-      render: (text, record, index) => {
-        return (
-          <Switch
-            value={text}
-            onChange={(v) => {
-              updateEnable(record, v);
-            }}
-          ></Switch>
-        );
-      },
-    },
     {
       title: t('knowledge.state'),
       dataIndex: 'state',
       key: 'state',
       width: '80px',
       align: 'center',
+
       render: (text, record, index) => {
         if (record.state == 'pending') {
           return <FaSpinner className="w-full animate-spin"></FaSpinner>;
@@ -285,23 +270,46 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
         }
       },
     },
-    {
-      title: t('knowledge.action'),
-      width: 100,
-      align: 'center',
-      render: (_, record) => (
-        <Space size="middle">
-          <Popconfirm
-            title="Delete the item?"
-            onConfirm={() => onDelete(record)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Button type="text" icon={<FaTrashAlt />}></Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
+
+    ...(readonly
+      ? []
+      : [
+          {
+            title: t('knowledge.enable'),
+            dataIndex: 'isEnable',
+            key: 'isEnable',
+            width: '80px',
+            align: 'center',
+            render: (text, record, index) => {
+              return (
+                <Switch
+                  value={text}
+                  onChange={(v) => {
+                    updateEnable(record, v);
+                  }}
+                ></Switch>
+              );
+            },
+          },
+          {
+            title: t('knowledge.action'),
+            width: 100,
+            align: 'center',
+            readonly: readonly,
+            render: (_, record) => (
+              <Space size="middle">
+                <Popconfirm
+                  title="Delete the item?"
+                  onConfirm={() => onDelete(record)}
+                  okText="Yes"
+                  cancelText="No"
+                >
+                  <Button type="text" icon={<FaTrashAlt />}></Button>
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]),
   ];
   const onAddSource = () => {};
   const onImport = async (values) => {
@@ -440,20 +448,12 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
           modalRef.current.openModal(false);
         }}
       />
+
       <div
         className="flex flex-row justify-between"
         style={{ marginBottom: 16 }}
       >
         <div className="flex flex-row gap-2">
-          <Button
-            shape="round"
-            onClick={() =>
-              modalRef.current.openModal(true, { sourceType: 'web' })
-            }
-          >
-            {t('knowledge.add_source')}
-          </Button>
-
           <Button
             shape="round"
             onClick={() => {
@@ -462,20 +462,33 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
           >
             {t('knowledge.search')}
           </Button>
-          <Button
-            shape="round"
-            onClick={() => window.electron.kb.restart(knowledgeBaseId)}
-          >
-            {t('knowledge.restart')}
-          </Button>
-          {selectedRowKeys.length > 0 && (
-            <Button
-              shape="round"
-              onClick={() => onDelete(selectedRowKeys)}
-              danger
-            >
-              {`${t('knowledge.delete')} (${selectedRowKeys.length})`}
-            </Button>
+          {!readonly && (
+            <>
+              <Button
+                shape="round"
+                onClick={() =>
+                  modalRef.current.openModal(true, { sourceType: 'web' })
+                }
+              >
+                {t('knowledge.add_source')}
+              </Button>
+
+              <Button
+                shape="round"
+                onClick={() => window.electron.kb.restart(knowledgeBaseId)}
+              >
+                {t('knowledge.restart')}
+              </Button>
+              {selectedRowKeys.length > 0 && (
+                <Button
+                  shape="round"
+                  onClick={() => onDelete(selectedRowKeys)}
+                  danger
+                >
+                  {`${t('knowledge.delete')} (${selectedRowKeys.length})`}
+                </Button>
+              )}
+            </>
           )}
         </div>
         <div>
@@ -491,6 +504,7 @@ export default function KnowledgeBaseContent(props: KnowledgeBaseContentProps) {
           />
         </div>
       </div>
+
       <Table
         className="flex-1"
         scroll={{ y: scrollY }}
