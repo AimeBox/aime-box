@@ -732,16 +732,16 @@ export class KnowledgeBaseManager extends BaseManager {
   }
 
   @channel('kb:update-item')
-  public async updateItem(kbItemId: string, data: any) {
+  public async updateItem(input: { kbItemId: string; data: any }) {
     const repository = dbManager.dataSource.getRepository(KnowledgeBaseItem);
-    const kb_item = await repository.findOne({ where: { id: kbItemId } });
+    const kb_item = await repository.findOne({ where: { id: input.kbItemId } });
     const kb_repository = dbManager.dataSource.getRepository(KnowledgeBase);
     const kb = await kb_repository.findOne({
       where: { id: kb_item.knowledgeBaseId },
     });
     const vectorStore = await this.getVectorStore(kb);
-    await vectorStore.update(data, { kbitemid: kb_item.id });
-    await repository.update({ id: kbItemId }, data);
+    await vectorStore.update(input.data, { kbitemid: kb_item.id });
+    await repository.update({ id: input.kbItemId }, input.data);
   }
 
   @channel('kb:create')
