@@ -688,13 +688,24 @@ export class ChatManager {
         });
 
         if (!msg) return;
-        if (isString(message.content)) {
+        if (isString(message.content) && isAIMessage(message)) {
           msg.content = [{ type: 'text', text: message.content }];
+        } else if (isString(message.content) && isToolMessage(message)) {
+          msg.content = [
+            {
+              type: 'tool_call',
+              text: message.content,
+              tool_call_name: message.name,
+              tool_call_id: (message as ToolMessage).tool_call_id,
+              status: ChatStatus.RUNNING,
+            },
+          ];
+          msg.additional_kwargs = message.additional_kwargs;
         } else {
           msg.content = message.content;
         }
         await this.chatMessageRepository.manager.save(msg);
-
+        event(`chat-message:changed:${msg.id}`, msg);
         event(`chat:message-changed:${chatId}`, msg);
       },
       handleMessageStream: async (message: AIMessage | ToolMessage) => {

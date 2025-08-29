@@ -9,7 +9,7 @@ import {
 import { Button, Radio } from 'antd';
 import { FaClock, FaTimes } from 'react-icons/fa';
 import { Sandpack } from '@codesandbox/sandpack-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactJsonView from '@microlink/react-json-view';
 import { t } from 'i18next';
 import CodeSandboxView from './tool-views/CodeSandboxView';
@@ -43,6 +43,24 @@ export default function ChatToolView(props: ChatToolViewProps) {
   const [toolCallInputView, setToolCallInputView] = useState<'json' | 'text'>(
     'json',
   );
+
+  // const handleChatMessageChanged = (event: any) => {
+  //   console.log('ChatToolView', event);
+  // };
+
+  // useEffect(() => {
+  //   window.electron.ipcRenderer.on(
+  //     `chat-message:changed:${msg.id}`,
+  //     handleChatMessageChanged,
+  //   );
+  //   return () => {
+  //     window.electron.ipcRenderer.removeListener(
+  //       `chat-message:changed:${chatId}`,
+  //       handleChatMessageChanged,
+  //     );
+  //   };
+  // });
+
   const getToolView = () => {
     switch (toolName) {
       case 'code_sandbox':

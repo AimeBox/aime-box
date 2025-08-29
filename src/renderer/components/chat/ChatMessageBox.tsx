@@ -64,6 +64,7 @@ import { t } from 'i18next';
 import { ChatInputAttachment } from '@/types/chat';
 import { splitContextAndFiles } from '@/renderer/utils/ContentUtils';
 import AskHumanMessage from './tool-messages/AskHumanMessage';
+import TaskMessage from './tool-messages/TaskMessage';
 // import 'katex/dist/katex.min.css';
 // import * as prod from 'react/jsx-runtime';
 // import { ProviderIcon } from '../common/ProviderIcon';
@@ -170,9 +171,9 @@ const ChatMessageBox = React.forwardRef(
       setContent(value?.content || []);
     }, [value]);
 
-    // useEffect(() => {
-    //   console.log('toolMessages', toolMessages);
-    // }, [toolMessages]);
+    useEffect(() => {
+      console.log('toolMessages', toolMessages);
+    }, [toolMessages]);
 
     const toUrl = (video_path) => {
       const src = window.URL.createObjectURL(video_path);
@@ -235,6 +236,9 @@ const ChatMessageBox = React.forwardRef(
             onSubmit={(value) => onAskHumanSubmit(value, toolMessage)}
           />
         );
+      }
+      if (toolCall.name == 'task') {
+        return <TaskMessage toolMessage={toolMessage} toolCall={toolCall} />;
       }
       return (
         <motion.div

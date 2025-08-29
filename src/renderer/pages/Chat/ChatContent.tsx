@@ -189,6 +189,7 @@ const ChatContent = React.forwardRef((props: ChatContentProps, ref) => {
         const msg = preChat?.chatMessages.find((x) => x.id == chatMessageId);
         if (msg) {
           msg.content = chatMessage.content;
+          msg.additional_kwargs = chatMessage.additional_kwargs;
           preChat.status == 'running';
           return { ...preChat };
         } else {

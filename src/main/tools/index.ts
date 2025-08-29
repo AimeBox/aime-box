@@ -106,6 +106,7 @@ import { ToolExploreToolkit } from './ToolExploreToolkit';
 import { BashToolkit } from './BashToolkit';
 import { TodoToolkit } from './TodoToolkit';
 import { BrowserToolkit } from './BrowserToolkit';
+import { TestStreamTool } from './test/TestStreamTool';
 
 export interface ToolInfo extends Tools {
   id: string;
@@ -566,6 +567,7 @@ export class ToolsManager extends BaseManager {
       await this.registerTool(ErrorTest);
       await this.registerTool(TestTool);
       await this.registerTool(NodejsVM);
+      await this.registerTool(TestStreamTool);
     }
     await this.registerTool(BrowserUseTool);
     await this.registerTool(BrowserToolkit);

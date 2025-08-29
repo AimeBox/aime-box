@@ -68,6 +68,7 @@ import fs from 'fs';
 import settingsManager from '@/main/settings';
 import os from 'os';
 import { appendPart, fixMessages, prependPart } from '@/main/utils/messages';
+import { createTaskTool } from './taskTool';
 
 export class VibeAgent extends BaseAgent {
   name: string = 'vibe_agent';
@@ -307,188 +308,6 @@ You can check the output of any bash session using the 'bash_output' tool.
     tools.push(new MemorySave());
     // tools.push(new MemoryRead());
 
-    const createTaskTool = async (
-      tools: BaseTool[],
-      agents: BaseAgent[] = [],
-    ) => {
-      let TaskSchema;
-      if (agents.length > 0) {
-        TaskSchema = z.object({
-          description: z
-            .string()
-            .describe('A short (3-5 word) description of the task'),
-          prompt: z.string().describe('The task for the agent to perform'),
-          subagent_type: z
-            .enum(['general-purpose', ...agents.map((agent) => agent.name)])
-            .describe('The type of specialized agent to use for this task'),
-        });
-      } else {
-        TaskSchema = z.object({
-          description: z
-            .string()
-            .describe('A short (3-5 word) description of the task'),
-          prompt: z.string().describe('The task for the agent to perform'),
-          subagent_type: z
-            .enum(['general-purpose'])
-            .describe('The type of specialized agent to use for this task'),
-        });
-      }
-
-      const TaskTool = tool(
-        async (
-          arg: z.infer<typeof TaskSchema>,
-          runManager?: CallbackManagerForToolRun,
-          config?: RunnableConfig,
-        ) => {
-          const { description, prompt, subagent_type } = arg;
-
-          const _agent: AgentInfo = await agentManager.getAgent(subagent_type);
-          if (subagent_type == 'general-purpose') {
-            return {
-              is_success: true,
-              res: `Now task`,
-            };
-          } else if (_agent) {
-            const _tools = await toolsManager.buildTools(_agent.tools);
-
-            //             const system_prompt = `${_agent.prompt}
-
-            // # Additional Instructions
-
-            // Here is useful information about the environment you are running in:
-            // <env>
-            // Working directory: ${cwd}
-            // Platform: ${process.platform}
-            // OS Version: ${os.version()}
-            // System Language: ${settingsManager.getLanguage()}
-            // Today's date: ${new Date().toISOString().split('T')[0]}
-            // </env>
-            // `;
-            //             _agent.prompt = system_prompt;
-            const subAgent = await agentManager.buildAgent({
-              agent: _agent as Agent,
-              model: _agent.model,
-              signal,
-              tools: _tools,
-            });
-
-            let input_message = new HumanMessage(prompt);
-            const reminders_md = await getRemindersMD(this.systemPrompt);
-            if (reminders_md) {
-              const reminders_md_message = `<system-reminder>
-As you answer the user's questions, you can use the following context:
-# RemindersMD
-Codebase and user instructions are shown below. Be sure to adhere to these instructions. IMPORTANT: These instructions OVERRIDE any default behavior and you MUST follow them exactly as written.
-
-Contents of "${reminders_md.path}" (project instructions, checked into the codebase):
-
-${reminders_md.content}
-
-IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.
-</system-reminder>`;
-              input_message = appendPart(input_message, reminders_md_message);
-            }
-            const res: { messages: BaseMessage[] } = await subAgent.invoke(
-              {
-                messages: [input_message],
-              },
-              {
-                ...(config || {}),
-                tags: ['ignore'],
-              },
-            );
-
-            return {
-              is_success: true,
-              messages: [
-                ...(_agent.prompt ? [new SystemMessage(_agent.prompt)] : []),
-                ...res.messages,
-              ],
-            };
-          } else {
-            return {
-              is_success: false,
-              error: `Agent "${subagent_type}" not found`,
-            };
-          }
-        },
-        {
-          name: 'task',
-          description: `Launch a new agent to handle complex, multi-step tasks autonomously.
-
-Available agent types and the tools they have access to:
-
-- general-purpose: General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you. (Tools: \\_)
-${
-  agents.length > 0
-    ? `- ${agents
-        .map((agent) => {
-          return `${agent.name}: ${agent.description}`;
-        })
-        .join('\n')}\n`
-    : ''
-}
-
-When using the Task tool, you must specify a subagent_type parameter to select which agent type to use.
-
-When NOT to use the Agent tool:
-
-- If you want to read a specific file path, use the '${FileRead.Name}' or '${GlobTool.Name}' tool instead of the Agent tool, to find the match more quickly
-- If you are searching for a specific class definition like "class Foo", use the '${GlobTool.Name}' tool instead, to find the match more quickly
-- If you are searching for code within a specific file or set of 2-3 files, use the '${FileRead.Name}' tool instead of the Agent tool, to find the match more quickly
-- Other tasks that are not related to the agent descriptions above
-
-
-Usage notes:
-1. Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses
-2. When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.
-3. Each agent invocation is stateless. You will not be able to send additional messages to the agent, nor will the agent be able to communicate with you outside of its final report. Therefore, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.
-4. The agent's outputs should generally be trusted
-5. Clearly tell the agent whether you expect it to write code or just to do research (search, file reads, web fetches, etc.), since it is not aware of the user's intent
-6. If the agent description mentions that it should be used proactively, then you should try your best to use it without the user having to ask for it first. Use your judgement.
-
-Example usage:
-
-<example_agent_descriptions>
-"code-reviewer": use this agent after you are done writing a signficant piece of code
-"greeting-responder": use this agent when to respond to user greetings with a friendly joke
-</example_agent_description>
-
-<example>
-user: "Please write a function that checks if a number is prime"
-assistant: Sure let me write a function that checks if a number is prime
-assistant: First let me use the '${FileWrite.Name}' tool to write a function that checks if a number is prime
-assistant: I'm going to use the '${FileWrite.Name}' tool to write the following code:
-<code>
-function isPrime(n) {
- if (n <= 1) return false
- for (let i = 2; i * i <= n; i++) {
- if (n % i === 0) return false
- }
- return true
-}
-</code>
-<commentary>
-Since a signficant piece of code was written and the task was completed, now use the code-reviewer agent to review the code
-</commentary>
-assistant: Now let me use the code-reviewer agent to review the code
-assistant: Uses the 'task' tool to launch the with the code-reviewer agent
-</example>
-
-<example>
-user: "Hello"
-<commentary>
-Since the user is greeting, use the greeting-responder agent to respond with a friendly joke
-</commentary>
-assistant: "I'm going to use the 'task' tool to launch the with the greeting-responder agent"
-</example>`,
-          schema: TaskSchema,
-        },
-      );
-
-      return TaskTool;
-    };
-
     const createExitPlanModeTool = async () => {
       const ExitPlanModeSchema = z.object({
         plan: z
@@ -520,7 +339,7 @@ Eg.
       return ExitPlanModeTool;
     };
 
-    const taskTool = await createTaskTool(tools, agents);
+    const taskTool = await createTaskTool(agents);
     const exitPlanModeTool = await createExitPlanModeTool();
 
     tools.push(taskTool);
@@ -847,11 +666,16 @@ ${reminders_md.content
           await sendMessage(toolMessage, 'start');
 
           const tool = await tools.find((t) => t.name == toolName);
-          let toolResult;
-
+          let output = '';
           try {
-            toolResult = await tool?.invoke(toolArgs);
-            toolMessage.content = toolResult;
+            const toolResult = await tool?.stream(toolArgs, { signal });
+
+            for await (const chunk of toolResult) {
+              output += chunk;
+              toolMessage.content = output;
+              await sendMessage(toolMessage, 'chunk');
+            }
+            toolMessage.content = output;
             toolMessage.status = ChatStatus.SUCCESS;
           } catch (err) {
             toolMessage.content = err.message;
@@ -866,8 +690,7 @@ ${reminders_md.content
             toolArgs.run_in_background &&
             toolMessage.status == ChatStatus.SUCCESS
           ) {
-            const bashId =
-              toolResult.split(' ')[toolResult.split(' ').length - 1];
+            const bashId = output.split(' ')[output.split(' ').length - 1];
             const bashSession = bashManager.get(bashId);
             if (bashSession) {
               _bashSessionIds.push(bashId);
@@ -1001,25 +824,36 @@ ${reminders_md.content
               task_call.name,
             );
             task_call_message.id = uuidv4();
+            task_call_message.additional_kwargs['history'] = [];
             await sendMessage(task_call_message, 'start');
 
-            const task_call_result = await taskTool.invoke(
+            let output = '';
+            const task_call_result = await taskTool.stream(
               task_call.args,
               config,
             );
+            let last_chunk;
+            for await (const chunk of task_call_result) {
+              if ('messages' in chunk) {
+                last_chunk = chunk;
+              } else {
+                const msg: BaseMessage = chunk;
+                task_call_message.additional_kwargs['history'].push(msg);
+                await sendMessage(task_call_message, 'chunk');
+              }
+            }
 
-            if (task_call_result.is_success) {
+            if (last_chunk.is_success) {
               const last_message =
-                task_call_result.messages[task_call_result.messages.length - 1];
+                last_chunk.messages[last_chunk.messages.length - 1];
               task_call_message.status = ChatStatus.SUCCESS;
               task_call_message.content = last_message.content;
               task_call_message.additional_kwargs['history'] =
-                task_call_result.messages;
+                last_chunk.messages;
             } else {
               task_call_message.status = ChatStatus.ERROR;
-              task_call_message.additional_kwargs['error'] =
-                task_call_result.error;
-              task_call_message.content = task_call_result.error;
+              task_call_message.additional_kwargs['error'] = last_chunk.error;
+              task_call_message.content = last_chunk.error;
             }
             await sendMessage(task_call_message, 'end');
             delete task_call_message.additional_kwargs['history'];
