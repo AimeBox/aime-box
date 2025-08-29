@@ -58,7 +58,7 @@ import {
   Callbacks,
 } from '@langchain/core/callbacks/manager';
 import { handler } from 'tailwindcss-animate';
-import { agentManager } from '../agents';
+import { AgentInfo, agentManager } from '../agents';
 import { getProviderModel } from '../utils/providerUtil';
 import { notificationManager } from '../app/NotificationManager';
 import { BaseTool } from '../tools/BaseTool';
@@ -794,10 +794,11 @@ export class ChatManager {
     await fs.promises.mkdir(await this.getChatPath(chatId), {
       recursive: true,
     });
+    let agent: AgentInfo;
     try {
       if (chat.mode == 'agent' && chat.agent) {
         // agent 模式
-        const agent = await agentManager.getAgent(chat.agent);
+        agent = await agentManager.getAgent(chat.agent);
         if (agent.type == 'supervisor') {
           await this.chatSupervisor(agent, messages, {
             providerModel: chat.model,
@@ -865,17 +866,46 @@ export class ChatManager {
       await this.chatMessageRepository.save(msgs);
 
       if (err.message == 'Aborted' || err.message == 'Abort') {
-        const aborted_msg = new ChatMessage(
-          uuidv4(),
-          lastMesssageId,
-          chat,
-          modelName,
-          'user',
-          [{ type: 'text', text: '[Request interrupted by user]' }],
-          ChatStatus.SUCCESS,
-        );
-        aborted_msg.is_hidden = true;
-        await this.chatMessageRepository.save(aborted_msg);
+        // const state = await graph.getState({
+        //   configurable: { thread_id: chatId },
+        // });
+        //console.log(state);
+        if (agent) {
+          const _agent = await agentManager.buildAgent({
+            agent,
+          });
+          if (_agent && agent.fixedThreadId === true) {
+            _agent.updateState({
+              configurable: { thread_id: chatId },
+            });
+            const state = await _agent.getState({
+              configurable: { thread_id: chatId },
+            });
+            if ('updateState' in _agent) {
+              await _agent.updateState(
+                { configurable: { thread_id: chatId } },
+                {
+                  messages: [
+                    ...state.values.messages,
+                    new HumanMessage('[Request interrupted by user]'),
+                  ],
+                },
+              );
+            }
+          }
+        } else {
+          const aborted_msg = new ChatMessage(
+            uuidv4(),
+            lastMesssageId,
+            chat,
+            modelName,
+            'user',
+            [{ type: 'text', text: '[Request interrupted by user]' }],
+            ChatStatus.SUCCESS,
+          );
+          aborted_msg.is_hidden = true;
+          await this.chatMessageRepository.save(aborted_msg);
+        }
       }
 
       console.error(err);
@@ -1010,6 +1040,7 @@ export class ChatManager {
         handlerMessageError,
       },
     });
+    return reactAgent;
   }
 
   public async chatBuiltIn(
@@ -1142,6 +1173,7 @@ export class ChatManager {
         handlerMessageError,
       },
     });
+    return workflow;
   }
 
   public async chatReact(
@@ -1188,6 +1220,7 @@ export class ChatManager {
         handlerMessageError,
       },
     });
+    return reactAgent;
   }
 
   public async chatRemoteAgent(

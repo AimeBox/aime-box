@@ -69,6 +69,7 @@ import ExcelJS from 'exceljs';
 import { ExtractAgentSystemPrompt } from './prompt';
 import { removeThinkTags } from '@/main/utils/messages';
 import * as readline from 'readline';
+import zodToJsonSchema from 'zod-to-json-schema';
 
 const fieldZod = z
   .array(
@@ -168,6 +169,7 @@ export class ExtractTool extends BaseTool {
       '.pdf',
       '.docx',
       '.doc',
+      '.pptx',
       '.md',
       '.txt',
       '.jpg',
@@ -433,29 +435,16 @@ export class ExtractTool extends BaseTool {
       .join('\n');
 
     const SYSTEM_PROMPT_TEMPLATE = [
-      '你是一个信息抽取专家,根据用户提供的文件和需要提取的字段进行信息整理,可以进行推理得出答案\n- 输出语言跟用户输入的语言一致.\n- 不要随意编造答案.\n- 你可以输出自己的解析.- 以正常文本输出',
+      '你是一个信息抽取专家,根据用户提供的文件和需要提取的字段进行信息整理,可以进行推理得出答案',
+      '- 输出语言跟用户输入的语言一致.',
+      '- 不要随意编造答案.',
+      '- 你可以输出自己的解析, 以正常文本输出',
     ].join('\n');
 
     const prompt = [
       new SystemMessage(SYSTEM_PROMPT_TEMPLATE),
       new HumanMessage(`提取这份文件的以下字段信息: \n${fieldsMessage}`),
       new HumanMessage(`${doc.map((x) => x.pageContent).join('\n\n')}`),
-      // new AIMessage({
-      //   content: '',
-      //   tool_calls: [
-      //     {
-      //       name: 'ocr',
-      //       args: { path: '/file_1.pdf' },
-      //       id: '1',
-      //       type: 'tool_call',
-      //     },
-      //   ],
-      // }),
-      // new ToolMessage({
-      //   name: 'ocr',
-      //   tool_call_id: '1',
-      //   content: `${doc.map((x) => x.pageContent).join('\n\n')}`,
-      // }),
     ];
     const result = await this.model.invoke(prompt, {
       tags: ['ignore'],
@@ -467,13 +456,22 @@ export class ExtractTool extends BaseTool {
     const extractionChain = this.model.withStructuredOutput(zodFields, {
       includeRaw: true,
       method: this.response_format,
+      //strict: true,
     });
 
-    const result_2 = await extractionChain.invoke(thought, {
-      tags: ['ignore'],
-      signal: this.signal,
-      timeout: 1000 * 120,
-    });
+    const result_2 = await extractionChain.invoke(
+      [
+        new SystemMessage(
+          `You are an expert in information extraction.\n\nPlease return the result in the following JSON Schema format:\n${JSON.stringify(zodToJsonSchema(zodFields), null, 2)}`,
+        ),
+        new HumanMessage(thought),
+      ],
+      {
+        tags: ['ignore'],
+        signal: this.signal,
+        timeout: 1000 * 120,
+      },
+    );
     let data;
     if (!result_2.parsed) {
       if (result_2.raw.tool_calls && result_2.raw.tool_calls.length == 1) {
@@ -727,6 +725,18 @@ export class ExtractTool extends BaseTool {
               yield `${p}`;
             }
           } catch (err) {
+            if (err.message == 'Aborted') {
+              notificationManager.update({
+                id: notificationId,
+                title: 'Extract',
+                type: 'progress',
+                description: `Extract Aborted`,
+                duration: 3,
+                closeEnable: true,
+              } as NotificationMessage);
+              throw err;
+            }
+
             yield `| extract error: ${err}`;
             row.push(`extract error: ${err}`);
           }
@@ -982,13 +992,13 @@ export class ExtractAgent extends BaseAgent {
     ) => {
       message.id = message.id || uuidv4();
       if (state == 'start' || !state) {
-        await messageEvent.created([message]);
+        await messageEvent?.created([message]);
       }
       if (state == 'chunk') {
-        await messageEvent.updated([message]);
+        await messageEvent?.updated([message]);
       }
       if (state == 'end' || !state) {
-        await messageEvent.finished([message]);
+        await messageEvent?.finished([message]);
       }
     };
     const config = await this.getConfig();

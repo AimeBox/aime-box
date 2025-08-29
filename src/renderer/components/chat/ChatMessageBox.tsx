@@ -171,10 +171,6 @@ const ChatMessageBox = React.forwardRef(
       setContent(value?.content || []);
     }, [value]);
 
-    useEffect(() => {
-      console.log('toolMessages', toolMessages);
-    }, [toolMessages]);
-
     const toUrl = (video_path) => {
       const src = window.URL.createObjectURL(video_path);
       return src;

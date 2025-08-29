@@ -27,6 +27,7 @@ import { spawn } from 'child_process';
 import { glob } from 'glob';
 import { EOL } from 'os';
 import { isString } from '../utils/is';
+import { getLoaderFromExt } from '../loaders';
 
 export interface FileWriteParameters extends ToolParams {}
 export interface FileReadParameters extends ToolParams {}
@@ -237,21 +238,30 @@ Usage:
     let content = '';
 
     const lookedUpMimeType = mime.lookup(filePath);
-
-    if (lookedUpMimeType === 'application/pdf') {
-      const loader = new PDFLoader(filePath);
-      const docs = await loader.load();
-      content = docs.map((x) => x.pageContent).join('\n\n');
-    } else if (
-      isString(lookedUpMimeType) &&
-      lookedUpMimeType.startsWith('image/')
-    ) {
-      const loader = new ImageLoader(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const loader = getLoaderFromExt(
+      path.extname(filePath).toLowerCase(),
+      filePath,
+    );
+    if (loader) {
       const docs = await loader.load();
       content = docs.map((x) => x.pageContent).join('\n\n');
     } else {
       content = fs.readFileSync(filePath).toString();
     }
+    // if (lookedUpMimeType === 'application/pdf') {
+    //   const loader = new PDFLoader(filePath);
+
+    // } else if (
+    //   isString(lookedUpMimeType) &&
+    //   lookedUpMimeType.startsWith('image/')
+    // ) {
+    //   const loader = new ImageLoader(filePath);
+    //   const docs = await loader.load();
+    //   content = docs.map((x) => x.pageContent).join('\n\n');
+    // } else {
+    //   content = fs.readFileSync(filePath).toString();
+    // }
 
     const lines = content.split('\n');
     const originalLineCount = lines.length;

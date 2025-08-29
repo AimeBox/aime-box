@@ -35,7 +35,13 @@ import { BaseTool } from '../tools/BaseTool';
 import { toolsManager } from '../tools';
 import { getProviderModel } from '../utils/providerUtil';
 import { createSupervisor, OutputMode } from '@langchain/langgraph-supervisor';
-import { BaseStore } from '@langchain/langgraph';
+import {
+  BaseStore,
+  BinaryOperatorAggregate,
+  CompiledStateGraph,
+  StateGraph,
+  StateType,
+} from '@langchain/langgraph';
 
 import { ManusAgent } from './manus/ManusAgent';
 import { notificationManager } from '../app/NotificationManager';
@@ -421,7 +427,7 @@ export class AgentManager extends BaseManager {
     signal?: AbortSignal;
     responseFormat?: z.ZodObject<any>;
     configurable?: Record<string, any>;
-  }) {
+  }): Promise<any> {
     const {
       agent,
       store,
