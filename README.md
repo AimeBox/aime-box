@@ -1,3 +1,12 @@
+# ⚠️ 仓库已迁移
+
+本项目已迁移到新的仓库地址：
+
+👉 [https://github.com/DarkNoah/aime-chat](https://github.com/DarkNoah/aime-chat)
+
+
+
+
 # Aime Box
 
 ### 一款基于 langchain + electron开发的多平台桌面端 Chat 客户端
